@@ -1,0 +1,86 @@
+/* Prism tokens (light + dark) */
+:root {
+  --tk-comment: #8a8983;
+  --tk-keyword: #7c3aed;
+  --tk-string: #15803d;
+  --tk-number: #b45309;
+  --tk-function: #2563eb;
+  --tk-class: #0e7490;
+  --tk-operator: #5c5b57;
+  --tk-property: #be185d;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --tk-comment: #6b6f7a;
+    --tk-keyword: #c4a7ff;
+    --tk-string: #86efac;
+    --tk-number: #fcd34d;
+    --tk-function: #93c5fd;
+    --tk-class: #67e8f9;
+    --tk-operator: #b4b5bc;
+    --tk-property: #f9a8d4;
+  }
+}
+:root[data-theme='dark'] {
+  --tk-comment: #6b6f7a;
+  --tk-keyword: #c4a7ff;
+  --tk-string: #86efac;
+  --tk-number: #fcd34d;
+  --tk-function: #93c5fd;
+  --tk-class: #67e8f9;
+  --tk-operator: #b4b5bc;
+  --tk-property: #f9a8d4;
+}
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: var(--tk-comment);
+  font-style: italic;
+}
+.token.keyword,
+.token.atrule,
+.token.rule,
+.token.important,
+.token.selector {
+  color: var(--tk-keyword);
+}
+.token.string,
+.token.char,
+.token.attr-value,
+.token.regex,
+.token.template-string,
+.token.inserted {
+  color: var(--tk-string);
+}
+.token.number,
+.token.boolean,
+.token.constant,
+.token.symbol {
+  color: var(--tk-number);
+}
+.token.function,
+.token.function-variable {
+  color: var(--tk-function);
+}
+.token.class-name,
+.token.builtin,
+.token.type-annotation {
+  color: var(--tk-class);
+}
+.token.operator,
+.token.punctuation,
+.token.entity,
+.token.url {
+  color: var(--tk-operator);
+}
+.token.property,
+.token.tag,
+.token.attr-name,
+.token.variable,
+.token.key {
+  color: var(--tk-property);
+}
+.token.deleted {
+  color: var(--bad);
+}
