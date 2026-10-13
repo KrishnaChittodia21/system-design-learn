@@ -1,0 +1,18 @@
+{
+  "id": "clocks-and-election",
+  "title": "Build Lamport/Vector Clocks and a Leader-Election Simulator",
+  "topics": ["ds-consensus", "ds-consistency", "ds-theory"],
+  "difficulty": "expert",
+  "estimatedHours": 8,
+  "summary": "Build the theory behind distributed systems as running code. **Lamport clocks** and **vector clocks** (compare: before / after / concurrent; merge), a **Dynamo-style versioned store** that keeps concurrent writes as siblings, and a **deterministic discrete-event simulation of Raft leader election**: terms, RequestVote and the election restriction, randomized timeouts from a seeded RNG, heartbeats, crashes and network partitions.\n\nThe judge checks the properties interviewers care about: **at most one leader per term**, even across 25 seeds of random crashes and partitions; re-election after the leader dies; no leader without a majority; a deposed leader in a minority partition; and why randomized timeouts and Pre-Vote exist.",
+  "milestones": [
+    { "name": "M1: Lamport clocks", "description": "tick / send / receive = max + 1; timestamps respect happens-before along a message chain." },
+    { "name": "M2: Vector clocks", "description": "`vcCompare` (before / after / equal / concurrent), `vcMerge`, `vcIncrement`, and a `VectorClock` that detects concurrency Lamport clocks cannot." },
+    { "name": "M3: Conflict detection with siblings", "description": "A `VersionedStore` where writes carry a context; dominated versions are replaced, concurrent ones are kept as siblings until a reconciling write." },
+    { "name": "M4: Raft RPC rules", "description": "Seeded `mulberry32`; `handleRequestVote` (one vote per term, stale terms, step-down, election restriction) and `handleAppendEntries`." },
+    { "name": "M5: Election simulation", "description": "A discrete-event `RaftCluster` with a priority queue, election timers and heartbeats. It elects one leader, is deterministic per seed, stays stable while healthy, and shows that fixed timeouts livelock." },
+    { "name": "M6: Crashes", "description": "Re-election after a leader crash in a higher term, no leader without a majority, and `votedFor` / `currentTerm` that survive restart." },
+    { "name": "M7: Partitions and safety", "description": "Minority leaders keep a stale term until heal; term inflation from an isolated node (the Pre-Vote motivation); and at most one leader per term under seeded chaos." }
+  ],
+  "files": ["src/index.ts"]
+}

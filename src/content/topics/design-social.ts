@@ -741,6 +741,84 @@ setInterval(() => void flush().catch(() => {}), 1_000).unref();`,
         'Hot keys appear in every social system — plan for them.',
       ],
     },
+    {
+      heading: 'Level bar: what mid, senior and staff answers include',
+      body: `Calibration: **mid** is about 80% breadth / 20% depth: a working end-to-end design, with the interviewer steering into deep dives. **Senior** is about 60/40: you get through the HLD quickly, then go deep on ordering, fan-out or transcoding yourself, with numbers. **Staff** is about 40/60: you drive, and you raise deploys, cost, privacy and org boundaries without being asked.
+
+**Chat / WhatsApp**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | 1:1, groups, online status | 500M DAU × 40 msgs ≈ 230K msgs/s (peak ~700K); groups ≤ 1,024; receipts; ordered within a conversation | E2E encryption limits (no server search or moderation), multi-device keys, data residency |
+| High-level design | WS servers + chat service + DB | Gateways + session registry (user → gateway), message store partitioned by conversation, APNs/FCM for offline | Stateful connection tier split from stateless logic; a home region per user |
+| Deep dives expected | Sending a message | Per-conversation sequence, acks/receipts, offline sync by device cursor | Large-group fan-out, multi-device consistency, ordering across reconnects |
+| Trade-offs & failure handling | — | Server seq vs client timestamps; at-least-once + dedup | Store-and-delete after delivery vs server-side history (cost, privacy) |
+| Ops/cost/evolution | — | Connections per gateway (~1M with epoll tuning) | Draining millions of sockets per deploy, reconnect storms, retention cost |
+
+- Down-levelled: global ordering by client timestamps; clients polling for new messages; no answer to "the phone was offline for 3 days".
+
+**News feed (Twitter / Instagram)**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Post, follow, view feed | 300M DAU × 5 loads ≈ 17K read QPS (peak ~50K); 200 average followers, 100M for celebrities | Ranking freshness, ads slots, blocks/deletes that must propagate |
+| High-level design | Post, graph and feed services | Kafka fan-out workers push post IDs into Redis feed lists (capped at ~800), hydration on read | Hybrid push/pull plus a ranking service, kept separate from candidate generation |
+| Deep dives expected | Fan-out on write, when asked | Write vs read vs hybrid with a follower threshold | Inactive-user skip, backfill on login, unfollow/delete consistency |
+| Trade-offs & failure handling | — | Feed lag vs read latency | Feed staleness SLO; degraded feed (chronological, cached) when ranking is down |
+| Ops/cost/evolution | — | Fan-out queue lag | Redis memory: 300M × 800 × 8 B ≈ 1.9 TB before replicas |
+
+- Down-levelled: a SQL join of follows and posts per request; pushing a celebrity post to 100M lists.
+
+**YouTube / Netflix**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Upload, watch | ~500 h uploaded/min, billions of views/day; reads overwhelmingly dominate; start-up < 2 s | Cost model (egress dominates), copyright matching, regional licensing |
+| High-level design | Upload → storage → stream | Resumable upload to S3, transcoding DAG, HLS/DASH segments on CDN, metadata DB, view pipeline | ISP-embedded caches (Open Connect), popularity-driven placement |
+| Deep dives expected | Transcoding exists | Chunked parallel transcoding, ABR ladder, CDN hit ratio | Per-title encoding, prefetch to edge off-peak, long-tail economics |
+| Trade-offs & failure handling | — | Eager all renditions vs on-demand for the long tail | Origin shield to protect storage during cache misses on a viral video |
+| Ops/cost/evolution | — | Transcode queue depth | Storage ≈ raw × 5–8 renditions; cold-tier the 80% rarely watched |
+
+- Down-levelled: streaming from app servers; one transcoding job per video; view counts via \`UPDATE ... +1\`.`,
+      keyPoints: [
+        'Chat: the bar is ordering + offline sync, not just "use WebSockets".',
+        'Feed: the bar is the celebrity problem with a numeric threshold.',
+        'Video: the bar is CDN economics; staff talks about egress cost and ISP caches.',
+      ],
+      source: 'Hello Interview — problem breakdowns (levelling expectations)',
+    },
+    {
+      heading: 'Deep-dive ladders: bad → good → great',
+      body: `**Chat: ordering and guaranteed delivery**
+- **Bad:** sort by client timestamps, and the server pushes and forgets. Phone clocks drift by minutes, so replies appear before questions, and anything pushed to a dead socket is lost.
+- **Good:** the server assigns a per-conversation sequence (e.g. \`INCR conv:{id}:seq\`), and clients ack. A retry after a lost ack still creates a duplicate with a new seq.
+- **Great:** the client generates a message UUID, used as an idempotency key, so a retry returns the same seq. Each device keeps a sync cursor (last seq it has seen per conversation), and on reconnect it pulls everything with seq > cursor before resuming live push. Delivered/read receipts are just more sequenced events. Cost: a hot seq allocator for very active groups (shard it by conversation), and one cursor row per device.
+
+**Chat: large-group fan-out**
+- **Bad:** for a 1,024-member group, write one message copy into every member's inbox: 1,024 writes per message.
+- **Good:** store the message once per conversation and fan out only notifications to online members' gateways. Offline members pull by cursor.
+- **Great:** above about 1K members (channels), switch to read-time pull plus a lightweight "new activity" ping, rate-limited per gateway. Cost: two delivery paths to test.
+
+**News feed: the celebrity problem**
+- **Bad:** pure fan-out on write. One post from a 100M-follower account means 100M Redis writes. At 1M writes/s that is 100 s of lag, and it starves everyone else's fan-out.
+- **Good:** pure fan-out on read, merging every followee's recent posts per request. That is 17K QPS × 200 followees ≈ 3.4M reads/s, with p99 set by the slowest shard.
+- **Great:** hybrid. Push for authors under about 10K–100K followers, and at read time merge in the few celebrities each user follows (usually < 20). Skip push to users inactive for 30 days and rebuild their feed on login. Cost: two code paths, plus a merge-and-rank step on every read.
+
+**Video: transcoding throughput**
+- **Bad:** one worker encodes a 2-hour 4K upload into 6 renditions sequentially. That takes hours, and a crash at 90% restarts from zero.
+- **Good:** one job per rendition, running in parallel. Each job is still hours long, and still restarts on failure.
+- **Great:** split at keyframes into 4–10 s GOP-aligned chunks and fan out a DAG: split → N chunks × M renditions → package HLS/DASH → publish manifest. Each chunk retries independently, so wall time ≈ time to encode one chunk. Popular creators get priority queues and per-title encoding. Cost: an orchestrator (DAG state), keyframe alignment across renditions, and storing the intermediate chunks.
+
+**Video: view counts**
+- **Bad:** \`UPDATE videos SET views = views + 1\`. A viral video means one hot row lock.
+- **Good:** sharded Redis counters per video, summed on read. No bot filtering, and you lose data if Redis loses memory.
+- **Great:** view events go to Kafka, then a stream job with dedup (user, video, window) and fraud filtering adds per-minute aggregates to the store. Display an approximate count; billing and creator payouts use the reconciled batch numbers. Cost: counts are minutes stale.`,
+      keyPoints: [
+        'Idempotency key + server sequence + device cursor is the core of chat correctness.',
+        'Hybrid fan-out needs a stated threshold and an inactive-user policy.',
+        'Chunked DAG transcoding turns hours into minutes and makes failures cheap.',
+      ],
+    },
   ],
   codeChallenges: [
     {

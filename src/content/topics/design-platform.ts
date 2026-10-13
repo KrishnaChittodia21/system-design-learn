@@ -1130,6 +1130,120 @@ export function gate(cur: { recallAtK: number; mrr: number }, base: { recallAtK:
       ],
       source: 'Es et al. — RAGAS (2023); Educative / KDnuggets — 2026 AI system design interview guides',
     },
+    {
+      heading: 'Level bar: what mid, senior and staff answers include',
+      body: `**Intuition:** platform designs reward knowing *where correctness lives*: the ledger, the commit SHA, the game owner, the organizer's copy, or the ACL. Mid (≈80% breadth / 20% depth, interviewer steers) gets a working flow. Senior (≈60/40) speeds through the HLD and deep-dives the correctness point on its own initiative, naming trade-offs. Staff (≈40/60) drives, and raises fairness, security, cost and migration without being asked.
+
+**Brokerage (Robinhood-style)**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | buy/sell, portfolio, quotes | brokerage routes and books, exchange matches; async 202 orders | regulatory audit, reconciliation, opening-bell SLOs |
+| High-level design | API → exchange | buying-power reserve + outbox → SOR over FIX; separate quote plane | drop copy + nightly recon; trade-date vs settled positions |
+| Deep dives expected | placing an order | idempotent fills by (venue, ExecID), CumQty booking | ~40M quote msgs/s fan-out with conflation |
+| Trade-offs & failure handling | none | gateway crash → ClOrdID dedup, FIX resend | fill after cancel is real; breaks go to humans |
+| Ops/cost/evolution | none | pre-scale for the open | pacing queued orders, shedding charts before order entry |
+
+*Down-levelled by:* claiming the brokerage matches orders; booking LastQty without dedup.
+
+**CI/CD runner platform**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | run jobs on push | 5M jobs/day, plan limits, fork-PR security | cost centre is the fleet; per-org fairness contract |
+| High-level design | webhook → queue → runner | DAG orchestrator, queue per (label, org), leases + heartbeats | warm ephemeral pools sized from arrival × boot time |
+| Deep dives expected | job queue | fair-share dispatch, live log chunks | VM-per-job isolation, OIDC creds, branch-scoped caches |
+| Trade-offs & failure handling | none | requeue only never-started jobs | cache poisoning; secrets on fork PRs |
+| Ops/cost/evolution | none | ~62K concurrent runners | idle warm-pool cost vs queue time; spot capacity |
+
+*Down-levelled by:* long-lived shared runners for untrusted code; reading the workflow from HEAD instead of the SHA.
+
+**Online chess**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | play a game, matchmaking | time controls, server authority, reconnection | fair play, spectator scale, rating integrity |
+| High-level design | WS server + DB | matchmaker per (time control, region), one owner per game | lease-based owners, durable move log, spectator fan-out |
+| Deep dives expected | move validation | ply numbers, server clocks with lag credit | owner failover crediting outage time |
+| Trade-offs & failure handling | none | append move before broadcast | cheating detection offline, never in the move path |
+| Ops/cost/evolution | none | tiny state per game | delayed broadcast for top events; review workflow |
+
+*Down-levelled by:* client-side clocks; broadcasting a move before it is durable.
+
+**Calendar & scheduling**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | create events, invite | recurrence, time zones, free/busy privacy | sync clients, tz-rule changes, enterprise scale |
+| High-level design | events table | rule + IANA zone + overrides; busy index | organizer copy is truth; per-calendar change log + sync tokens |
+| Deep dives expected | storing events | RRULE expansion on local dates; DST | reminder bursts (~400K/s at :00) in minute buckets |
+| Trade-offs & failure handling | none | materialise a rolling horizon | 410 Gone forces resync; booking via exclusion constraint |
+| Ops/cost/evolution | none | none | re-expansion when tzdata changes |
+
+*Down-levelled by:* storing every instance in UTC as the truth; check-then-insert bookings.
+
+**RAG document Q&A**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | upload docs, ask questions | tenants, ACLs, freshness, citations | evaluation contract, cost per answer |
+| High-level design | embed → vector DB → LLM | structure-aware chunking, hybrid BM25 + dense, rerank | permission-aware retrieval, golden-set CI gate |
+| Deep dives expected | top-k search | HNSW vs IVF-PQ sizing (~4 TB for 1B × 1,024-d) | prompt injection, cache keys with ACL fingerprint |
+| Trade-offs & failure handling | none | recall vs latency vs RAM | ACL change without re-embedding |
+| Ops/cost/evolution | none | re-embed only changed chunks | embedding-model migration with dual indexes |
+
+*Down-levelled by:* filtering permissions after generation; tuning the prompt while retrieval is broken.`,
+      keyPoints: [
+        'Level gap = knowing where correctness lives and defending it under failure.',
+        'Staff adds reconciliation, isolation, fairness and migration unprompted.',
+      ],
+      source: 'Hello Interview — problem breakdowns, "What is expected at each level"',
+    },
+    {
+      heading: 'Deep-dive ladders: bad → good → great',
+      body: `**Intuition:** each rung survives one more realistic failure: a retry, a crash, a hostile input, a burst.
+
+**Brokerage — the gateway crashes after sending a FIX order**
+- **Bad:** retry by sending a new order, which can double-buy if the first one reached the venue.
+- **Good:** ClOrdID = our order id, so the venue rejects the duplicate, and recovery uses FIX resend from the last sequence number.
+- **Great:** buying power is reserved by a conditional UPDATE in the same transaction as the order and an outbox row. Fills are idempotent by (venue, ExecID) and booked as the increase in CumQty. A drop copy plus nightly reconciliation produce breaks for humans, never silent fixes.
+
+**Brokerage — the opening bell**
+- **Bad:** forward every tick to every client. Slow clients build queues of stale prices. **Good:** interest-based subscriptions at the gateways. **Great:** per-connection conflation (latest price only), pre-scaling, jittered reconnects, pacing for queued market-open orders, and shedding charts before order entry.
+
+**CI/CD — fair dispatch across orgs**
+- **Bad:** one FIFO queue, so one org's 2,000-job matrix starves everyone.
+- **Good:** per-org concurrency caps. That is fair, but capacity sits idle when only one org is busy.
+- **Great:** a queue per (pool label, org), dispatching from the lowest running ÷ weight under a plan cap. Leases with heartbeats requeue only jobs that never started. Warm pools are sized from arrival rate × boot time, so idle cost is a dial, not an accident.
+
+**CI/CD — untrusted fork PRs**
+- **Bad:** shared long-lived runners with repo secrets. **Good:** containers per job and no secrets for forks. **Great:** a fresh VM per job, short-lived OIDC credentials instead of static keys, and caches that are immutable, content-keyed and branch-scoped, so a PR cannot poison main's cache.
+
+**Chess — the game owner dies mid-blitz**
+- **Bad:** game state lives only in memory, so the game is lost.
+- **Good:** moves are appended durably before broadcast, and a new owner rebuilds from the log.
+- **Great:** lease expiry triggers the takeover. The new owner rebuilds from snapshot + move log, and clocks are credited for the outage. Ply numbers make client retries harmless, and reconnecting clients get a full snapshot.
+
+**Calendar — a weekly 9:00 meeting across a DST change**
+- **Bad:** expand the instances once into UTC and store them. A DST shift or tzdata change moves every future meeting by an hour.
+- **Good:** store the rule + IANA zone + overrides, and expand on local dates.
+- **Great:** also maintain a materialised busy index over a rolling horizon for free/busy, re-expanded when tzdata changes. Reminders go in minute buckets with version checks, and Calendly-style bookings are enforced by an exclusion constraint.
+
+**RAG — "why did user A see a document they can't open?"**
+- **Bad:** retrieve top-k globally, then filter, or worse, let the LLM ignore forbidden chunks.
+- **Good:** ACL metadata captured at ingestion and filtered inside the vector query.
+- **Great:** partition by tenant, filter inside retrieval, and re-check the final 5–10 chunks against the source of truth. Cache keys include the ACL fingerprint and index version, and ACL changes update metadata without re-embedding.
+
+**RAG — retrieval quality**
+- **Bad:** fixed 512-token chunks and dense-only search. **Good:** structure-aware chunks with heading prefixes plus hybrid BM25 + dense merged by RRF. **Great:** a cross-encoder reranks ~50 candidates down to diverse chunks, and recall@k and faithfulness on a golden set gate every change in CI.`,
+      keyPoints: [
+        'ClOrdID + CumQty booking + reconciliation make order flow safe under crashes.',
+        'Fair share by running ÷ weight; VM per job, OIDC, branch-scoped caches.',
+        'Rules + IANA zones, not UTC instances; durable-before-broadcast moves.',
+        'Permission filtering inside retrieval, re-checked at the end.',
+      ],
+      source: 'Hello Interview — problem breakdowns (Bad / Good / Great deep dives)',
+    },
   ],
   codeChallenges: [
     {

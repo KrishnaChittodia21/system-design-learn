@@ -738,6 +738,71 @@ return {1, 'assigned'}
         'City/zone bulkheads for delivery; user/post sharding for Instagram.',
       ],
     },
+    {
+      heading: 'Level bar: what mid, senior and staff answers include',
+      body: `**Intuition:** Instagram and food delivery are the two most common "product" prompts, so interviewers have sharp calibration for them. Mid (≈80% breadth / 20% depth) needs a complete, working design while the interviewer steers. Senior (≈60/40) gets through the HLD in about 10 minutes, picks the hard deep dives itself and names trade-offs with numbers. Staff (≈40/60) drives the whole session, and the interviewer only narrows focus. Staff answers bring in experience from related systems and raise cost, failure isolation, migration and team boundaries without being asked.
+
+**Instagram**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | post photo, follow, home feed | ~40× read-heavy, read-your-writes for own posts, Stories in or out | which surfaces are ranked vs chronological; ads and integrity owners |
+| High-level design | API → DB → object store, CDN | presigned upload, async renditions, fan-out-on-write + celebrity pull | sharded IDs (41/13/10), logical shards, per-surface services |
+| Deep dives expected | feed generation | hybrid fan-out, cursor snapshots, sharded like counters | ranking funnel and seen-state; Explore retrieval → MTML |
+| Trade-offs & failure handling | push vs pull named | publish only when every media item is READY; eventual counts | celebrity spikes on likes/comments/notifications; degraded feed |
+| Ops/cost/evolution | none | CDN egress dominates cost | codec choice (AVIF/HEVC) as a cost lever; resharding without downtime |
+
+*Down-levelled by:* uploading bytes through the API servers; one fan-out strategy for celebrities and everyone else; no CDN or egress discussion.
+
+**Food delivery (Swiggy/Zomato-style)**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | browse, order, pay, track | three apps, one order as truth; ETA promise; UPI async | city/zone as the unit of scaling and failure; refunds policy |
+| High-level design | services + order DB | serviceability, versioned menu vs live availability, order state machine | per-city bulkheads, dispatch per zone, ledger for money |
+| Deep dives expected | placing an order | idempotent checkout (quote id + Idempotency-Key), acceptance timeouts | batched dispatch timed to food ready; surge with hysteresis |
+| Trade-offs & failure handling | retry payment | lost UPI webhook → polling reconciliation | stress ladder: shrink radius → raise fee → widen ETA → close zone |
+| Ops/cost/evolution | none | order writes only ~100–200/s; pings dominate | forecast and pre-scale per city per slot; load-test 2–3× peak |
+
+*Down-levelled by:* synchronous payment in the order transaction; nearest-idle-rider dispatch with no batching; no story for a lost webhook.`,
+      keyPoints: [
+        'Mid: complete and working; senior: fast HLD and self-chosen deep dives with numbers; staff: drives, and covers cost, bulkheads and migration.',
+        'Instagram traps: bytes through the API, one fan-out mode, no egress.',
+        'Food delivery traps: synchronous payment, greedy dispatch, lost webhooks.',
+      ],
+      source: 'Hello Interview — problem breakdowns, "What is expected at each level"',
+    },
+    {
+      heading: 'Deep-dive ladders: bad → good → great',
+      body: `**Intuition:** both apps fail in the same two places: the write that fans out (feeds, dispatch) and the write that touches money or durable promises (publishing, payment). Climb each ladder by naming the failure first.
+
+**Instagram — home feed with celebrities (500M DAU, some accounts with 300M followers)**
+- **Bad:** pure fan-out-on-read. Every feed open queries ~200 followees' recent posts and merges them, which costs 200 reads × ~60K feed QPS, and p99 blows past 500 ms.
+- **Good:** fan-out-on-write into a per-user Redis list of ~500 post ids. Reads are O(1), but one celebrity post means 300M inserts and minutes of lag, plus wasted writes for inactive followers.
+- **Great:** hybrid. Push for normal authors and only to recently active followers. Pull celebrity posts at read time and merge them in. Fan-out is just candidate generation: a ranker scores ~500 candidates, seen-state filters them, and ads blend in with spacing rules. The ranked list is snapshotted per session behind a signed cursor (session, offset), so scrolling never repeats or skips.
+
+**Instagram — upload and publish**
+- **Bad:** upload bytes through the API servers, then process synchronously. Tying up threads on 5 MB uploads over 3G caps throughput, and a crash loses the post.
+- **Good:** presigned upload straight to the bucket, an event triggers async renditions, and the API records state only.
+- **Great:** decide the MIME type from magic bytes, rotate before stripping EXIF, and write renditions to immutable keys (CDN-friendly). The post publishes, and fan-out starts, only when every media item is READY, while the author sees it immediately (read-your-writes).
+
+**Food delivery — checkout without double charges**
+- **Bad:** create the order and call the PSP synchronously in one request. A client retry on timeout creates two orders and two charges, and a lost UPI webhook leaves a paid order stuck in PENDING.
+- **Good:** an Idempotency-Key plus a UNIQUE constraint makes the order create happen once, and a quote id freezes the price.
+- **Great:** payment is a state machine (CREATED → PENDING → PAID). Webhooks and a polling reconciler both drive the same conditional UPDATE, and an outbox emits OrderPaid exactly once in effect. Refunds are ledger reversals, idempotent per (order, reason), and balances are never mutated in place.
+
+**Food delivery — dispatch at 8 pm peak**
+- **Bad:** assign the nearest idle rider the moment the order is placed. Riders wait 15 minutes at the restaurant, food goes cold elsewhere, and two orders race for one rider.
+- **Good:** offers carry an id + TTL, and accept is a compare-and-set, which ends double assignment.
+- **Great:** just-in-time batched assignment per zone, every few seconds over a pruned rider–order graph, timed so that arrival ≈ food-ready. It is fine to defer an order a round. Under stress, follow the ladder: shrink the radius → raise the fee → widen the ETA → switch the zone off. The ETA shown is a quantile and updates at milestones.`,
+      keyPoints: [
+        'Feeds: hybrid fan-out, then rank, seen-filter, ads, and session-snapshot cursors.',
+        'Publish only when all media is READY; bytes never touch API servers.',
+        'Money: idempotent create, state machine driven by webhook + reconciler, ledger reversals.',
+        'Dispatch: batched, just-in-time, CAS-accepted offers, and a stress ladder.',
+      ],
+      source: 'Hello Interview — problem breakdowns (Bad / Good / Great deep dives)',
+    },
   ],
   codeChallenges: [
     {

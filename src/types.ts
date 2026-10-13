@@ -156,3 +156,25 @@ export interface Company {
   focus: string;
   interviewStyle: string;
 }
+
+// ---------- Capstone build projects (projects/<id>/project.json) ----------
+
+export interface CapstoneMilestone {
+  name: string;
+  /** markdown */
+  description: string;
+}
+
+export interface CapstoneProject {
+  id: string;
+  title: string;
+  /** topic ids whose Capstone tab shows this project */
+  topics: string[];
+  difficulty: Difficulty;
+  estimatedHours: number;
+  /** markdown: what you build and why it matters in interviews */
+  summary: string;
+  milestones: CapstoneMilestone[];
+  /** files the learner edits, relative to the project folder */
+  files: string[];
+}

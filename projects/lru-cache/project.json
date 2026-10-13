@@ -1,0 +1,16 @@
+{
+  "id": "lru-cache",
+  "title": "Build an O(1) LRU Cache (then LFU & TTL)",
+  "topics": ["lld-lru-cache", "cache-fundamentals"],
+  "difficulty": "medium",
+  "estimatedHours": 4,
+  "summary": "Build the cache every interviewer asks for — properly. You hand-write a **doubly linked list** and pair it with a hash map so `get`, `set` and eviction are all **O(1)**, then add the things real caches need: `peek` vs `get` recency semantics, per-entry **TTL with an injected clock** (lazy expiry + `prune`), and an **eviction callback**. The stretch goal is an **O(1) LFU** (frequency buckets + `minFreq`, ties broken by recency) — the classic follow-up that separates people who memorised LRU from people who understand it.\n\nInterview payoff: you can whiteboard the node-pointer surgery without bugs, explain why `Map` insertion order is a shortcut (not a data structure), and discuss lazy vs active expiry and the LRU-vs-LFU trade-off (scan resistance, frequency decay).",
+  "milestones": [
+    { "name": "M1: Doubly linked list", "description": "`DoublyLinkedList` with `pushFront`, `remove(node)`, `moveToFront`, `popBack`, `head`/`tail`/`length`, `toArray`. Every pointer (prev and next) must stay consistent." },
+    { "name": "M2: O(1) LRU core", "description": "`LRUCache` = `Map<K, ListNode>` + your list. `get` refreshes recency, `peek`/`has` don't, `set` overwrites in place, evicts the tail when over capacity, `delete`, `clear`, `keys()` MRU→LRU. Must match a brute-force model over thousands of random ops." },
+    { "name": "M3: Eviction callback", "description": "`onEvict(key, value, 'capacity')` fires only for capacity evictions — never for overwrite, `delete` or `clear`." },
+    { "name": "M4: TTL with an injected clock", "description": "Default `ttlMs` and per-entry overrides; expired when `now() >= setAt + ttl`. Lazy expiry on read (reported as `'expired'`), `prune()` for active cleanup, `keys()` hides expired entries. Reads don't extend TTL; re-sets do." },
+    { "name": "M5: Stretch — O(1) LFU", "description": "`LFUCache` with frequency buckets (`freq → DoublyLinkedList`) and `minFreq`. Evict least-frequent, ties by least-recent. Overwrite counts as a use, `peek` doesn't. Must stay fast over 200k ops." }
+  ],
+  "files": ["src/index.ts"]
+}

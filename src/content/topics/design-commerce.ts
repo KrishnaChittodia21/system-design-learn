@@ -786,6 +786,130 @@ export class WalletStateMachine {
         'External side effects need their own idempotency.',
       ],
     },
+    {
+      heading: 'Level bar: what mid, senior and staff answers include',
+      body: `Calibration: **mid** is about 80% breadth / 20% depth, with the interviewer steering into the hard parts. **Senior** is about 60/40: HLD in about 15 minutes, then a deep dive you start yourself on oversell, double charge or ledger correctness. **Staff** is about 40/60: you drive, and you bring up reconciliation, audit, migration and the finance/ops teams without being asked.
+
+**Hotel reservation**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Search, reserve, cancel | 5K hotels, 1M rooms total ≈ 3 reservations/s; booking is by room type, not room | Overbooking policy, partner channel managers, refunds |
+| High-level design | Hotel + reservation services + DB | Per-date inventory table, idempotent reserve API, payment step | Search in a separate read store; booking path kept small and strongly consistent |
+| Deep dives expected | Double booking, when asked | Conditional update per date vs optimistic lock vs constraint | Cross-service consistency with payment (saga + outbox) |
+| Trade-offs & failure handling | — | Pessimistic vs optimistic for low contention | Allowing 10% overbooking as a business lever |
+| Ops/cost/evolution | — | Reservation error rate | Sharding by hotel_id; archiving past dates |
+
+- Down-levelled: check-then-insert without a lock; caching availability as the source of truth.
+
+**Ticket booking (Ticketmaster / BookMyShow)**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Pick seat, pay | 10-min holds; 1M fans for 50K seats; no seat sold twice | Fairness, bots, refund and resale policy |
+| High-level design | Event + booking services | Seat-hold service with TTL, payment, durable confirm | Virtual waiting room in front, admitting at checkout capacity |
+| Deep dives expected | Locking a seat | TTL hold with implicit expiry | Admission control, bot defence, hot-event isolation |
+| Trade-offs & failure handling | — | Redis hold vs DB hold | Queue fairness vs throughput; what happens if the queue dies |
+| Ops/cost/evolution | — | Hold-to-purchase ratio | Pre-scaling for on-sales, per-event cells |
+
+- Down-levelled: holding a DB lock for the whole checkout; no plan for 1M simultaneous users.
+
+**E-commerce checkout**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Cart, order, pay | 10× flash-sale peaks; never oversell | Returns, multi-seller, tax/invoice rules |
+| High-level design | Cart → order → payment | Inventory reservation, checkout saga, outbox events | Orchestrator owned by checkout; teams own each step |
+| Deep dives expected | — | Reserve vs decrement timing, compensation | Hot-SKU counters, reconciliation with the warehouse |
+| Trade-offs & failure handling | — | Orchestration vs choreography | Oversell budget vs lost sales |
+| Ops/cost/evolution | — | Saga stuck-state alerts | Migrating from a monolith checkout |
+
+- Down-levelled: decrementing stock when items go into the cart; a 2PC across services.
+
+**Payment system**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Charge a card | Exactly-once effect, ~100 TPS but 0 tolerance for errors | PCI scope, multi-PSP routing, settlement |
+| High-level design | Service → PSP | Payment state machine, idempotency keys, double-entry ledger, webhooks | Reconciliation as a first-class service |
+| Deep dives expected | Retries | Timeout = unknown, so poll or webhook before retrying | Daily reconciliation against settlement files |
+| Trade-offs & failure handling | — | Sync vs async confirmation | Failing over between PSPs without double charging |
+| Ops/cost/evolution | — | Stuck-PENDING alerts | Auditability, immutable ledger, finance ops tooling |
+
+- Down-levelled: a mutable balance column; retrying a timed-out charge with a new key.
+
+**Digital wallet**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Transfer between users | 1M TPS, balances always reproducible | Regulation, audit replay, KYC limits |
+| High-level design | Wallet DB | Sharded accounts + distributed transfer (TC/C or saga) | Event sourcing with Raft-replicated state machines |
+| Deep dives expected | — | Atomic cross-shard transfer | Deterministic replay, snapshots, CQRS reads |
+| Trade-offs & failure handling | — | 2PC vs TC/C vs saga | Throughput vs operational complexity |
+| Ops/cost/evolution | — | Imbalance alerts | Log compaction, rebuilding read models |
+
+- Down-levelled: \`UPDATE balance\` with no audit trail; ignoring a transfer whose two halves land on different shards.`,
+      keyPoints: [
+        'In commerce the level bar is mostly correctness: oversell, double charge, unbalanced ledger.',
+        'Senior names the exact concurrency mechanism; staff adds reconciliation and audit.',
+        'Flash-sale admission control is the classic staff-level addition.',
+      ],
+      source: 'Hello Interview — problem breakdowns (Ticketmaster levelling)',
+    },
+    {
+      heading: 'Deep-dive ladders: bad → good → great',
+      body: `**Ticket booking: holding a seat during checkout**
+- **Bad:** \`SELECT ... FOR UPDATE\` on the seat row, held while the user types card details. The lock and the DB connection stay held for minutes. A 50-connection pool runs out with 50 shoppers, and a crashed app server leaves the lock until its session times out.
+- **Good:** a status column, AVAILABLE → HELD with \`held_until\`, plus a cron job that frees expired holds. It is correct, but seats stay stuck for up to one cron interval, and the cron is one more thing that can fail.
+- **Great:** implicit expiry. A hold counts only while \`held_until > now()\`, checked inside the conditional update, so correctness never depends on a cleanup job. Alternatively, an atomic Redis hold (\`SET NX EX 600\`, or the Lua script below for several seats), with the DB doing the final \`UPDATE ... WHERE status='HELD' AND hold_id=$1\` on payment. For the 1M-fans case, add a **virtual waiting room** that admits users at the rate checkout can serve (e.g. 2K/min), with signed admission tokens. Cost: queue infrastructure, and users dislike waiting, though they dislike crashes more.
+
+**Hotel: no double booking**
+- **Bad:** read availability, then insert the reservation. Two requests both see 1 room left.
+- **Good:** \`UPDATE room_type_inventory SET reserved = reserved + :n WHERE hotel_id = :h AND date BETWEEN ... AND reserved + :n <= total * 1.1\` in one transaction, then check that the row count equals the number of nights.
+- **Great:** the same, plus an idempotency key on the reserve request (retries return the same reservation), sharding by hotel_id, and a payment saga that releases inventory on failure. Cost: more tables and states, all of which need monitoring.
+
+**E-commerce: inventory under a flash sale**
+- **Bad:** decrement at add-to-cart, so carts hoard stock. Decrementing after payment instead oversells.
+- **Good:** reserve at checkout with a TTL using a conditional decrement. The hot SKU row becomes the bottleneck at about 1K updates/s.
+- **Great:** split hot-SKU stock into N Redis sub-counters (or per-shard stock), and use a saga (reserve → pay → confirm, with a compensation at each step), an outbox for events, and nightly reconciliation against the warehouse system. Cost: a small oversell or undersell window to reconcile.
+
+**Payment: no double charges**
+- **Bad:** the PSP call times out, so you retry. The first call actually succeeded, and the customer is charged twice.
+- **Good:** an idempotency-key table with a UNIQUE constraint. Retries from the client are safe, but the timeout itself is still unknown.
+- **Great:** a PENDING state, the same idempotency key forwarded to the PSP, and resolution by webhook or a status poll before any retry. Ledger entries are written only on a final state. Daily reconciliation against settlement files catches anything left. Cost: async UX and a reconciliation team.
+
+**Wallet: 1M TPS transfers**
+- **Bad:** one SQL DB with row-level balance updates. It tops out at about 10K TPS, and a cross-shard transfer is not atomic.
+- **Good:** sharded DB + TC/C or saga. This is correct, but the coordinator and the extra round trips cap throughput.
+- **Great:** event sourcing. Commands go to a partitioned, Raft-replicated log, and in-memory state machines apply them deterministically, with periodic snapshots and CQRS read models. Cost: hard to build, and the logic must be strictly deterministic.`,
+      code: [
+        {
+          language: 'lua',
+          title: 'Atomic multi-seat hold in Redis (all-or-nothing)',
+          code: `-- KEYS = seat keys, e.g. seat:{evt42}:A12 (same hash tag = same slot)
+-- ARGV[1] = holdId, ARGV[2] = TTL seconds
+for i = 1, #KEYS do
+  if redis.call('EXISTS', KEYS[i]) == 1 then
+    return 0                       -- any seat taken: hold nothing
+  end
+end
+for i = 1, #KEYS do
+  redis.call('SET', KEYS[i], ARGV[1], 'EX', tonumber(ARGV[2]))
+end
+return 1                           -- all seats held; expiry frees them
+
+-- Release only if we still own it (avoid freeing someone else's hold)
+-- if redis.call('GET', KEYS[1]) == ARGV[1] then
+--   return redis.call('DEL', KEYS[1])
+-- end`,
+        },
+      ],
+      keyPoints: [
+        'Seat holds: row lock → status + cron → implicit expiry/TTL → waiting room.',
+        'Never retry a timed-out payment with a new key; resolve the unknown state first.',
+        'Hot inventory: split counters plus reconciliation, not a bigger DB.',
+      ],
+    },
   ],
   codeChallenges: [
     {

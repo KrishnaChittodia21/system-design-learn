@@ -1,0 +1,16 @@
+{
+  "id": "consistent-hashing",
+  "title": "Build a Consistent-Hash Ring with Virtual Nodes",
+  "topics": ["net-load-balancing", "db-sharding"],
+  "difficulty": "medium",
+  "estimatedHours": 3,
+  "summary": "Build the data structure behind Dynamo, Cassandra, memcached clients and Envoy's ring-hash load balancer. You write a **well-mixed 32-bit hash** (FNV-1a + Murmur finaliser), a **sorted ring with binary-search lookup**, **virtual nodes** for balance, **weights** for heterogeneous hardware, and **preference lists** of N distinct physical nodes for replication. The judge measures what matters: load stays within tolerance, adding an 11th node moves ≈1/11 of keys (and only to the new node), and removing a node disturbs nobody else's keys.\n\nInterview payoff: you can explain *why* `hash(key) % N` reshuffles everything, why vnodes reduce variance (and cost memory + rebuild time), why replicas must be distinct physical nodes, and when you'd pick rendezvous or jump hashing instead.",
+  "milestones": [
+    { "name": "M1: Hashing", "description": "`fnv1a32` over UTF-8 bytes (matches published vectors), `fmix32` avalanche, and seeded `hash32` that spreads near-identical labels evenly." },
+    { "name": "M2: The ring", "description": "`HashRing` with sorted points, `addNode`/`removeNode`, `getNode` = first point clockwise (`>=`) with wrap-around, virtual nodes labelled `id#i`, deterministic regardless of insertion order." },
+    { "name": "M3: Balance & minimal movement", "description": "With enough vnodes every node stays within ±25% of the mean; adding a node moves ≈1/N of keys, only to the new node; removing a node moves only its keys." },
+    { "name": "M4: Replicas", "description": "`getNodes(key, n)` walks clockwise collecting N *distinct physical* nodes — the preference list used for replication." },
+    { "name": "M5: Weights & performance", "description": "`addNode(id, weight)` places `round(vnodes × weight)` points; lookups are O(log P) via binary search." }
+  ],
+  "files": ["src/index.ts"]
+}

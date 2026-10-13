@@ -758,6 +758,175 @@ export async function withTenantTx<T>(fn: (c: PoolClient) => Promise<T>): Promis
         'Name the core data structure early; it anchors the whole design.',
       ],
     },
+    {
+      heading: 'Level bar: what mid, senior and staff answers include',
+      body: `**Intuition:** the same prompt is graded on three different bars. **Mid** (≈80% breadth / 20% depth) must produce a working design while the interviewer steers. **Senior** (≈60/40) moves through the HLD fast, picks the deep dives without being asked and names trade-offs. **Staff** (≈40/60) runs the session: the interviewer only points, and the candidate raises ops, cost and migration without being prompted.
+
+**Leaderboard**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | top-N + my rank | exact vs percentile rank, tie rule, seasons | which boards really need exact rank |
+| High-level design | ZSET behind a score API | durable score log + rebuildable ZSET | log-first; every board a derived index |
+| Deep dives expected | ZADD / ZREVRANK | composite tie score; 500M sharding | score-range shards, rank = prefix counts |
+| Trade-offs & failure handling | add a replica | rebuild after loss; cache top-N | exactness priced in RAM and ops |
+| Ops/cost/evolution | none | ~100 B per member sizing | season rollover, cheat review |
+
+*Down-levelled by:* ORDER BY over 500M rows; no tie rule; Redis treated as the only copy of the scores.
+
+**Stock exchange**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | place/cancel, price-time | latency budget, fairness, determinism | audit, replay, regulatory RTO |
+| High-level design | gateway → engine → feed | sequencer + one engine per symbol | event-sourced journal + hot standby |
+| Deep dives expected | order book shape | level FIFO + id map, O(1) cancel | no GC or allocation on the hot path |
+| Trade-offs & failure handling | DB with locks | why one book stays on one box | deterministic replay as failover; gapless feed |
+| Ops/cost/evolution | none | rebalancing symbols | auctions, kill switches, replay drills |
+
+*Down-levelled by:* row lock per order; multi-threaded matching on one book; feed without sequence numbers.
+
+**Distributed cache**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | get/set/TTL | hit-ratio target, staleness bound | which callers tolerate stale |
+| High-level design | hash keys to nodes | slots + client routing + L1 | L1/L2 tiers, slot-map ownership |
+| Deep dives expected | LRU eviction | hot and big keys | leases vs stampede; cross-region invalidation |
+| Trade-offs & failure handling | add nodes | replica staleness, rebalance cost | invalidation-bus failure plan |
+| Ops/cost/evolution | none | eviction and hot-key metrics | RAM cost vs hit-ratio curve |
+
+*Down-levelled by:* invalidation without ordering; no answer for one key at 1M req/s.
+
+**Global rate limiter**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | N per minute per key | overshoot tolerance, fail-open vs closed | billing limits vs protective limits |
+| High-level design | Redis INCR | Lua token bucket + local cache | local buckets + leased quota |
+| Deep dives expected | fixed window | sliding window, race-free Lua | quota rebalancing under skew |
+| Trade-offs & failure handling | none | accuracy vs latency | limiter as SPOF, partition behaviour |
+| Ops/cost/evolution | none | hot keys | shadow mode before enforcing |
+
+*Down-levelled by:* a synchronous global call per request.
+
+**Typeahead**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | top-5 per prefix | p99 < 100 ms per keystroke, freshness | safety filtering, personalisation |
+| High-level design | trie service | top-k per node, offline build | base snapshot + fresh layer + CDN |
+| Deep dives expected | lookup | prefix sharding | skew on short prefixes; read-time merge |
+| Trade-offs & failure handling | none | freshness vs build cost | bad-snapshot rollback |
+| Ops/cost/evolution | none | debounce cuts QPS 3–5× | poisoned-query defence |
+
+*Down-levelled by:* mutating the trie online under locks.
+
+**Web search**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | crawl, index, query | index size, freshness tiers | quality metrics, spam |
+| High-level design | one inverted index | doc-sharded scatter-gather | tiered index, replicas per shard |
+| Deep dives expected | postings lists | top-k merge, tail latency | early termination, hedging |
+| Trade-offs & failure handling | add shards | partial results | term vs doc partitioning argued |
+| Ops/cost/evolution | none | cost per query | rebuild cadence vs freshness |
+
+*Down-levelled by:* waiting for all 1,000 shards.
+
+**Ad serving**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | pick an ad | ~100 ms budget, overspend bound | billing trust, fraud |
+| High-level design | filter by targeting | retrieval → auction → pacing | + deduped counting ledger |
+| Deep dives expected | targeting index | GSP auction, pacing | overspend under lag, click dedupe |
+| Trade-offs & failure handling | none | revenue vs latency | refunds and reconciliation |
+| Ops/cost/evolution | none | none | revenue per ms of latency, experiments |
+
+*Down-levelled by:* a synchronous budget write per impression.
+
+**Recommender**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | recommend items | latency, signal freshness, cold start | objective and guardrails |
+| High-level design | model scores items | ANN candidates → rank → re-rank | feature store with online/offline parity |
+| Deep dives expected | none | two-tower + ANN | training/serving skew, exploration |
+| Trade-offs & failure handling | none | quality vs latency | feedback loops |
+| Ops/cost/evolution | none | none | GPU/CPU cost, A/B infrastructure |
+
+*Down-levelled by:* scoring every item per request.
+
+**Multi-tenant SaaS**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | tenant_id column | isolation per plan | residency, whales |
+| High-level design | shared DB | pool / bridge / silo + router | cells + tenant directory |
+| Deep dives expected | row-level security | noisy-neighbour quotas | online tenant moves between cells |
+| Trade-offs & failure handling | none | cost vs isolation | blast radius per cell |
+| Ops/cost/evolution | none | per-tenant metrics | cost per tenant drives pricing |
+
+*Down-levelled by:* isolation by convention only.`,
+      keyPoints: [
+        'Mid ≈ 80/20 breadth/depth and is steered; senior ≈ 60/40 and picks the dives; staff ≈ 40/60 and drives.',
+        'Staff answers price exactness, latency and isolation in money and operational load.',
+        'Down-levelling comes from naive hot paths and from missing a source of truth, not from missing boxes.',
+      ],
+      source: 'Hello Interview — problem breakdowns, "What is expected at each level"',
+    },
+    {
+      heading: 'Deep-dive ladders: bad → good → great',
+      body: `**Intuition:** interviewers grade a deep dive by how far up the ladder you climb unprompted. A "bad" answer works on the whiteboard and fails in production. A "good" answer works but has a known cost. A "great" answer names that cost and removes it, or bounds it.
+
+**Leaderboard — "my rank" among 500M players**
+- **Bad:** COUNT(*) WHERE score > mine. That is an index range scan of up to 500M entries on every request, so it takes seconds and pins the DB.
+- **Good:** a single Redis ZSET with ZREVRANK in O(log n). But 500M × ~100 B ≈ 50 GB on one node, a ~100K ops/s single-thread ceiling, and a failover that can lose recent ZADDs.
+- **Great:** score-range shards, each with a cached member count. Rank = the counts of the higher shards + the local ZREVRANK. A durable score log rebuilds any shard. Users outside the top ~1M get a percentile, which drops the cost of exactness where nobody looks.
+
+**Stock exchange — keeping one symbol available**
+- **Bad:** two active engines on the same book. Inputs interleave differently, so you get double fills and diverging books.
+- **Good:** one engine journals to disk and restarts by replaying it. That is correct, but you lose minutes of trading per crash.
+- **Great:** a sequencer totally orders the inputs, and the primary and a hot standby consume the same stream deterministically. Promotion takes milliseconds with fencing, and market-data gaps are refilled through a retransmit service keyed by sequence number.
+
+**Distributed cache — a celebrity key at 1M req/s**
+- **Bad:** one node owns the key. It saturates its NIC, and on expiry 10K concurrent misses stampede the DB.
+- **Good:** an in-process L1 with a 1–5 s TTL plus per-process request coalescing. DB load drops to about one fetch per pod per TTL.
+- **Great:** detect hot keys (sampled top-k) and replicate them under N suffixes. Add memcache-style leases so only one caller refills and the rest get stale-while-revalidate. Staleness is bounded by the L1 TTL, so say so.
+
+**Global rate limiter — one limit across 3 regions**
+- **Bad:** a synchronous call to one global Redis on every request. It adds 80–150 ms cross-region and becomes a global SPOF.
+- **Good:** a static split (limit ÷ regions). It is cheap, but wrong under skew: a user homed in one region gets a third of their quota.
+- **Great:** local buckets that lease quota in chunks from a coordinator, rebalanced by observed demand every ~100 ms. Overshoot ≤ leased-but-unspent tokens. Fail open for protective limits and fail closed for billing limits.
+
+**Typeahead — a query trending within minutes**
+- **Bad:** mutating the shared trie's top-k under locks on the hot path.
+- **Good:** an hourly or daily offline snapshot, swapped atomically. It is fast, but blind to breaking news.
+- **Great:** the base snapshot plus a small streaming fresh layer (count-min + heap over the last hour), merged at read time and filtered by a blocklist, with short prefixes cached at the CDN.
+
+**Web search — scatter-gather over 1,000 shards**
+- **Bad:** wait for every shard, so p99 equals the slowest shard of 1,000.
+- **Good:** replicas plus per-shard timeouts that return partial results.
+- **Great:** hedged requests after p95, a small hot tier that answers most queries, and early termination over impact-ordered postings.
+
+**Ad serving — budget overspend**
+- **Bad:** a synchronous DB decrement per impression, which turns the advertiser's row into a write hotspot.
+- **Good:** async counting with a cached spend check. Lag lets big campaigns overspend for minutes.
+- **Great:** a pacing controller hands each server a budget slice and throttles probabilistically. Billing comes from a deduped log with reconciliation, so overspend is bounded and credited.
+
+**Recommender — candidates in 50 ms**
+- **Bad:** a heavy model scores all 10M items. **Good:** two-tower + HNSW retrieves about 1K items to rank. **Great:** several candidate sources (ANN, co-visitation, trending) feed a light pre-ranker, then a heavy ranker on ~200 items and a diversity re-rank. Features are logged at serve time, so training never skews.
+
+**Multi-tenant SaaS — the whale tenant**
+- **Bad:** a shared pool with no limits, where one export saturates the DB. **Good:** per-tenant quotas, statement timeouts and connection caps. **Great:** cells plus a tenant directory. The whale moves to its own cell by logical replication with a per-tenant cutover, and per-tenant cost metrics justify the price tier.`,
+      keyPoints: [
+        'Bad works on the whiteboard and fails in production; good works with a known cost; great bounds or removes that cost.',
+        'Most "great" answers add a source of truth, a bounded staleness or overshoot, and a failure plan.',
+        'Climb the ladder unprompted: that is the senior and staff signal.',
+      ],
+      source: 'Hello Interview — problem breakdowns (Bad / Good / Great deep dives)',
+    },
   ],
   codeChallenges: [
     {

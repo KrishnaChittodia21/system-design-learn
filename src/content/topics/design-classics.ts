@@ -873,6 +873,117 @@ export class ParkingLot {
         'State what changes at 10× scale.',
       ],
     },
+    {
+      heading: 'Level bar: what mid, senior and staff answers include',
+      body: `Same prompt, three different bars. **Mid** is roughly 80% breadth / 20% depth: a working design end to end, with the interviewer steering into the deep dives. **Senior** is roughly 60/40: the high-level design takes about 15 minutes, then you pick the risky parts yourself and name trade-offs with numbers. **Staff** is roughly 40/60: you drive, the interviewer only narrows focus, and you bring up ops, cost, migration and org concerns without being asked.
+
+**URL shortener**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Shorten, redirect, alias, expiry | 100M URLs/day ≈ 1.2K writes/s, ~100:1 reads; 7 base62 chars = 3.5T codes | Abuse/phishing, custom domains, analytics SLA; says what is out of scope |
+| High-level design | App + DB + cache | Stateless redirect tier, Redis, KV keyed by code, async click stream | Redirects served at the edge, origin is the fallback; write path isolated |
+| Deep dives expected | Code generation, when asked | Counter ranges vs hash + collision; 301 vs 302; hot-link caching | Multi-region ID ranges, non-enumerable codes, click pipeline off the hot path |
+| Trade-offs & failure handling | "Add a cache" | Lost ID range on crash is fine; stampede on a viral link | Read-only degraded mode when the DB fails over; redirects keep working |
+| Ops/cost/evolution | — | Redirect p99, cache hit ratio | ~36 TB over 5 years, malware-scan cost, code reuse policy |
+
+- Down-levelled: random code + "check if it exists" with no collision math; picking 301 and then promising per-click analytics.
+
+**Pastebin**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Create, read, expiry | Size cap (10 MB), ~10 KB average; split metadata from blobs | Secret leakage, takedowns, private vs unlisted semantics |
+| High-level design | Text in DB | Metadata in SQL/KV, content in S3, CDN for public raw | Presigned uploads; content-addressed blobs for dedup |
+| Deep dives expected | Expiry cron | Lazy expiry on read + bulk cleanup | Proving deletion (CDN purge, backups) for GDPR |
+| Trade-offs & failure handling | — | Inline < 4 KB vs S3 latency | Metadata/blob delete ordering: tombstone, then sweep |
+| Ops/cost/evolution | — | S3 request vs storage cost | Egress dominates; tier cold pastes to infrequent access |
+
+- Down-levelled: 10 MB blobs in Postgres rows; expired pastes still served from the CDN.
+
+**Distributed KV store**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | get/put, scale out | Chooses AP or CP from the use case; p99 and value-size limits | Multi-DC, per-request consistency, tenant SLOs |
+| High-level design | Hash ring + replicas | vnodes, N=3 preference list, coordinator, LSM engine | Control plane (membership, rebalancing) split from data plane |
+| Deep dives expected | R + W > N, when prompted | Sloppy quorum, hinted handoff, vector clocks, Merkle repair | Compaction per workload, speculative reads for tail latency |
+| Trade-offs & failure handling | Names CAP | LWW loses writes under clock skew; R=1 is stale | Data-loss window per consistency level during a partition |
+| Ops/cost/evolution | — | Compaction backlog, 50% disk headroom | Node bootstrap streaming, rolling upgrades, 3× replicas vs erasure coding |
+
+- Down-levelled: "R + W > N means linearizable" (not with sloppy quorum or LWW); no node-failure story.
+
+**Unique ID generator**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Unique, numeric | 64-bit, time-sortable, 10K+/s per node, no coordination per ID | Index locality, IDs leaking business volume |
+| High-level design | Snowflake layout | 41/10/12 bits; worker IDs leased from etcd/ZooKeeper | Compares UUIDv7, ticket servers, segment (Leaf) allocation |
+| Deep dives expected | — | Sequence overflow (wait for next ms), clock moving backwards | Worker-ID reuse after lease expiry, epoch runway (~69 years) |
+| Trade-offs & failure handling | — | Wait vs refuse on clock skew | Fails closed on big skew, alerts, never risks duplicates |
+| Ops/cost/evolution | — | NTP monitoring | Migrating off auto-increment without breaking ordering |
+
+- Down-levelled: ignoring clock regression; hard-coding worker IDs in config.
+
+**Notification service**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Push, SMS, email | 10M/day transactional + 100M-per-hour campaigns; priorities; opt-outs | DND/quiet hours, provider SLAs, cost per channel |
+| High-level design | API → queue → workers | Per-channel and per-priority queues, preferences, templates, delivery log | Multi-provider routing, tenant isolation for campaigns |
+| Deep dives expected | Retries | Dedup keys, backoff, provider rate limits | Fairness across tenants, delivery state machine fed by webhooks |
+| Trade-offs & failure handling | — | At-least-once + dedup | Failover provider vs duplicate sends |
+| Ops/cost/evolution | — | Queue lag alerts | SMS ≈ ₹0.15–0.25 each; bounce/uninstall feedback loop |
+
+- Down-levelled: calling the provider inside the request; OTPs and marketing sharing one queue.
+
+The brief designs (file upload, rate limiter, parking lot) follow the same pattern: mid gets it working, senior handles failure (orphaned multipart parts, races in the counter), staff adds cost and abuse.`,
+      keyPoints: [
+        'Mid: complete and correct. Senior: picks the deep dives and puts numbers on trade-offs. Staff: drives and adds ops, cost and migration.',
+        'Each level bar is specific to the design: name the exact mechanism, not "add caching".',
+        'Most down-levels come from a correctness gap: collisions, clock skew, duplicates.',
+      ],
+      source: 'Hello Interview — problem breakdowns (levelling expectations)',
+    },
+    {
+      heading: 'Deep-dive ladders: bad → good → great',
+      body: `In each deep dive, start with the naive answer, show exactly how it fails, and climb. Showing the climb is itself a senior signal.
+
+**URL shortener: generating short codes**
+- **Bad:** pick 7 random base62 characters, SELECT to check, then INSERT. Two writers can pass the check together, and the check is an extra round trip. Once 10B codes exist, each new code collides about 0.3% of the time (10B / 3.5T).
+- **Good:** hash + salt with a UNIQUE constraint, retrying on conflict. This is correct, but retries grow as the space fills, and every write depends on the unique index.
+- **Great:** counter ranges. Each app node leases a block of 1M IDs (one write per million codes) and base62-encodes them. A bijective shuffle (a Feistel/XOR permutation) makes codes non-sequential. Cost: a crash wastes up to 1M IDs, which is harmless.
+
+**URL shortener: the viral link**
+- **Bad:** every redirect reads the DB.
+- **Good:** Redis cache-aside. But one viral code sends 500K rps to a single shard, and an expiry triggers a stampede.
+- **Great:** cache at the CDN/edge with 302 + \`Cache-Control: max-age=60\`, so analytics comes from edge logs. Add an in-process LRU and single-flight coalescing at the origin. Cost: clicks are counted in near-real time, not instantly.
+
+**Pastebin: expiry**
+- **Bad:** a nightly \`DELETE ... WHERE expires_at < now()\` over 1B rows. It holds long locks, creates replication lag, and leaves the S3 blobs behind.
+- **Good:** check expiry lazily on read, plus small batched deletes. The blobs and CDN copies still linger.
+- **Great:** partition metadata by expiry day and drop whole partitions. Write blobs under a day prefix with an S3 lifecycle rule, and set CDN TTL ≤ remaining lifetime. Cost: you need a fixed set of expiry options.
+
+**KV store: concurrent writes**
+- **Bad:** last-write-wins on wall clocks. With 50 ms of skew, a later cart update silently disappears.
+- **Good:** vector clocks return siblings and the client merges them. Clocks grow with the number of writers, and every client needs merge logic.
+- **Great:** CRDTs (OR-set carts, PN-counters) for data that can merge, and a per-key Raft group (CP) for keys that need linearizability, chosen per keyspace. Cost: two code paths and higher latency on CP writes.
+
+**ID generator: the clock goes backwards**
+- **Bad:** use the wall clock as-is. An NTP step of -200 ms reissues timestamps, and the reset sequence then creates duplicate IDs.
+- **Good:** if now < lastTs, wait or throw. This survives small drift, but a step of several seconds causes an outage.
+- **Great:** use a monotonic clock plus a persisted lastTs. Lease worker IDs with a TTL longer than the maximum skew, so a restarted node cannot reuse an ID while its old self still lives. Borrow up to 5 ms of future time, then fail closed and alert. Cost: a lease store dependency at startup.
+
+**Notifications: no duplicate OTPs, no lost alerts**
+- **Bad:** the worker sends and then marks "sent". A crash in between causes a re-send. Marking first instead loses messages.
+- **Good:** take an idempotency key per (user, event, channel) with \`SET NX EX 86400\` and publish through an outbox. A provider timeout still leaves you not knowing whether the message went out.
+- **Great:** pass the key to providers that dedupe. Keep a delivery state machine (queued → sent → delivered, driven by webhooks) and reconcile unknown states. Add token buckets per provider and priority lanes so OTPs bypass campaigns. Cost: about 3 state writes per notification.`,
+      keyPoints: [
+        'Always name the concrete failure of the naive answer: collision rate, lost write, duplicate ID.',
+        '"Good" fixes correctness; "great" fixes scale and operations too, and states its cost.',
+        'Lease plus fencing appears again and again: ID ranges, worker IDs, notification keys.',
+      ],
+    },
   ],
   codeChallenges: [
     {

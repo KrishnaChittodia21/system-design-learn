@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { PHASES, TOPICS, TOPIC_BY_ID } from '../content';
 import type { CodeChallenge, EnvelopeQuestion, InterviewQuestion, Topic } from '../types';
@@ -14,6 +14,9 @@ import {
 import { Badge, CodeBlock, CodeEditor, Diagram, DifficultyBadge, FollowUps, Markdown, ProgressBar, Reveal } from '../components/ui';
 import { practiceLocked, topicCompletion } from '../lib/stats';
 import { PREREQS } from '../content/prereqs';
+import { projectsForTopic } from '../content/projects';
+import { CapstoneTab } from '../components/Capstone';
+import { vizForSection } from '../viz/registry';
 import { currentlyWrong, weakSections } from '../lib/weak';
 
 const TABS = [
@@ -22,6 +25,7 @@ const TABS = [
   { id: 'interview', label: 'Interview Qs' },
   { id: 'envelope', label: 'Back-of-Envelope' },
   { id: 'cheat', label: 'Cheat Sheet' },
+  { id: 'capstone', label: 'Capstone' },
   { id: 'exam', label: 'Exam' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
@@ -44,12 +48,14 @@ export default function TopicPage() {
   const idx = TOPICS.findIndex((t) => t.id === topic.id);
   const prev = TOPICS[idx - 1];
   const next = TOPICS[idx + 1];
+  const capstones = projectsForTopic(topic.id);
   const counts: Record<TabId, number | undefined> = {
     learn: topic.sections.length,
     code: topic.codeChallenges.length,
     interview: topic.interviewQuestions.length,
     envelope: topic.envelopeQuestions.length,
     cheat: undefined,
+    capstone: capstones.length,
     exam: topic.test.length,
   };
   const locks: Partial<Record<TabId, boolean>> = {
@@ -108,6 +114,7 @@ export default function TopicPage() {
       {tab === 'interview' && (locks.interview ? <StudyLock topic={topic} what="interview questions" /> : <InterviewTab topic={topic} />)}
       {tab === 'envelope' && topic.envelopeQuestions.map((q, i) => <EnvelopeCard key={q.id} q={q} n={i + 1} />)}
       {tab === 'cheat' && <CheatSheet topic={topic} />}
+      {tab === 'capstone' && <CapstoneTab projects={capstones} />}
       {tab === 'exam' && (locks.exam ? <StudyLock topic={topic} what="exam" /> : <ExamIntro topic={topic} />)}
 
       <div className="pager">
@@ -170,6 +177,7 @@ function LearnTab({ topic }: { topic: Topic }) {
           <PrereqLinks topicId={topic.id} heading={s.heading} />
           <Markdown>{s.body}</Markdown>
           {s.diagram && <Diagram text={s.diagram} />}
+          <SectionViz topic={topic} sectionIndex={i} />
           {s.code?.map((c, j) => <CodeBlock key={j} snippet={c} />)}
           {s.keyPoints && s.keyPoints.length > 0 && (
             <div className="keypoints">
@@ -573,5 +581,40 @@ export function StudyLock({ topic, what }: { topic: Topic; what: string }) {
         Tick &quot;Read&quot; on each section as you finish it. You can change or turn off this lock in <Link to="/settings">Settings</Link>.
       </p>
     </div>
+  );
+}
+
+/**
+ * Interactive visualisations placed on this section (lazy-loaded). A visualisation placed on
+ * several sections of the same topic renders once, at its first placement; later sections link back.
+ */
+function SectionViz({ topic, sectionIndex }: { topic: Topic; sectionIndex: number }) {
+  const vizzes = vizForSection(topic.id, topic.sections[sectionIndex].heading);
+  if (!vizzes.length) return null;
+  const firstIndex = (id: string) =>
+    topic.sections.findIndex((s) => vizForSection(topic.id, s.heading).some((v) => v.meta.id === id));
+  return (
+    <>
+      {vizzes.map(({ meta, Component }) => {
+        const first = firstIndex(meta.id);
+        if (first !== sectionIndex) {
+          return (
+            <button
+              key={meta.id}
+              type="button"
+              className="viz-backlink"
+              onClick={() => document.getElementById(`s-${first}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            >
+              ▶ Interactive: {meta.title} (in §{first + 1} above), revisit it with this section in mind
+            </button>
+          );
+        }
+        return (
+          <Suspense key={meta.id} fallback={<div className="viz-loading">Loading interactive: {meta.title}…</div>}>
+            <Component />
+          </Suspense>
+        );
+      })}
+    </>
   );
 }

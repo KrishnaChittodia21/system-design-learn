@@ -967,6 +967,112 @@ RETURNING effort_id;   -- a row back = new PR: update Redis and notify
       ],
       source: 'Hello Interview — Strava (leaderboards, real-time sharing); Redis docs — ZADD GT/LT',
     },
+    {
+      heading: 'Level bar: what mid, senior and staff answers include',
+      body: `**Intuition:** these are product designs, so the level gap shows in whether you protect the user-visible promise: no oversell, no stale alert, exactly one match, no duplicate story, a correct leaderboard. Mid (≈80% breadth / 20% depth) gets a working flow while the interviewer steers. Senior (≈60/40) moves fast to the hard part and names trade-offs. Staff (≈40/60) drives, and adds abuse, cost, reconciliation and rollout without being asked.
+
+**Flash sale**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | buy limited stock | per-user limit, payment window, FCFS vs lottery | fairness policy, bot strategy, business tolerance for "sorry" |
+| High-level design | API → DB decrement | CDN token gate → bucketed Redis Lua gate → async orders | pre-generated unit rows as the hard ceiling |
+| Deep dives expected | race on stock | reservation in the same Lua script as the decrement | oversell under Redis failover; tail-bucket consolidation |
+| Trade-offs & failure handling | none | buckets vs stranded tail | lapsed-payment stock to a waitlist |
+| Ops/cost/evolution | none | 83K decisions/s per 50 SKUs | load test at 2–3×, kill switch, bot checks at registration |
+
+*Down-levelled by:* SELECT then UPDATE stock; one Redis key for 83K/s.
+
+**Price tracker & alerts**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | watch a price, alert on drop | freshness per product tier, alert types | provider limits, trust (never send stale deals) |
+| High-level design | cron scrapes, checks every alert | crawl → change events → matcher indexed by product | outbox-driven notify topic keyed by user |
+| Deep dives expected | polling | thresholds precomputed, range-scan matching | hot product with 500K alerts; hysteresis |
+| Trade-offs & failure handling | none | ARMED → FIRED flip dedups | re-check price before a backlogged send |
+| Ops/cost/evolution | none | crawl cost per product tier | provider quotas set drain rate; digests |
+
+*Down-levelled by:* scanning every alert per price change; float money comparisons.
+
+**Tinder**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | swipe, match, chat out of scope | 2B swipes/day, never re-show, geo | safety, fake profiles, match quality goal |
+| High-level design | swipes table | swipe log + Redis recent likes + geosharded index | equal-load S2 shards, mutual-preference filters |
+| Deep dives expected | detect match | co-locate the pair; HSETNX exactly-once | Bloom "seen" filter erring towards hiding |
+| Trade-offs & failure handling | none | two partitions race into 0 or 2 matches | Redis loss → durable log fallback |
+| Ops/cost/evolution | none | ~200 GB/day of swipes | shard rebalancing as cities grow |
+
+*Down-levelled by:* checking for a match with two independent reads; re-showing swiped profiles.
+
+**News aggregator**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | ingest feeds, show news | freshness, editions, personalisation | publisher terms (snippets only), trust/safety |
+| High-level design | poll RSS → DB → feed | adaptive polling + WebSub, dedup → cluster → rank | precomputed edition lists + per-user re-rank |
+| Deep dives expected | exact dedup | MinHash LSH near-dup, story clustering | stable story ids under re-clustering |
+| Trade-offs & failure handling | none | online vs batch clustering | versioned lists so scroll never repeats |
+| Ops/cost/evolution | none | reads 11.6K–60K QPS dominate | cost of per-user ranking vs cached candidates |
+
+*Down-levelled by:* one dedup stage for all three problems; ranking at read time per request.
+
+**Strava**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | upload activity, feed | offline recording, segments, leaderboards | privacy zones as a hard requirement |
+| High-level design | upload to API | presigned upload → S3 event → Kafka pipeline | columnar streams, efforts as truth |
+| Deep dives expected | storing GPS | bbox candidates → exact geometric match | rebuildable boards; friends boards at read time |
+| Trade-offs & failure handling | none | GPS noise vs shortcut rejection | reprocessing when the matcher changes |
+| Ops/cost/evolution | none | ~600 uploads/s peak | heatmap privacy, backfill cost |
+
+*Down-levelled by:* matching every segment against every trace; privacy applied only in the UI.`,
+      keyPoints: [
+        'The level gap is protecting the product promise under load, not drawing more boxes.',
+        'Staff names abuse (bots, fakes), trust (stale deals, privacy) and reconciliation unprompted.',
+      ],
+      source: 'Hello Interview — problem breakdowns, "What is expected at each level"',
+    },
+    {
+      heading: 'Deep-dive ladders: bad → good → great',
+      body: `**Intuition:** every rung answers "what breaks at T+0, under retry, or when a node fails?"
+
+**Flash sale — never oversell 10K units at 83K req/s**
+- **Bad:** SELECT stock, then UPDATE. Read-then-write races oversell, and a row lock caps throughput at a few K/s.
+- **Good:** a single Redis Lua DECR plus an async order write. It is fast, but one key is a hot shard, and a failover to a replica that lags can re-create decremented stock.
+- **Great:** the CDN rejects requests without a token, an in-process flag rejects once sold out, and only then do bucketed Redis keys decide, with the reservation recorded inside the same Lua script. Pre-generated unit rows in the DB are the hard ceiling: a failover becomes an apology, never an oversell. Buckets consolidate into a tail bucket near the end.
+
+**Flash sale — fairness and bots**
+- **Bad:** CAPTCHA at T-0, which punishes humans. **Good:** a waiting room with signed tokens. **Great:** expensive checks at registration, per-account limits enforced in the gate, and lapsed-payment stock (10–30%) released to a waitlist in order.
+
+**Price tracker — a hot product with 500K alerts**
+- **Bad:** for each price change, scan every alert.
+- **Good:** convert % and "any drop" rules into absolute thresholds at creation and index them by (product, threshold), so a change becomes a range scan.
+- **Great:** the ARMED → FIRED flip and an outbox row happen in one transaction (dedup and delivery). The notify topic is keyed by user for throttling and digests. Hysteresis re-arms at 5% above target, and the price is re-checked before any send that waited in a backlog. Provider limits set the drain time, so say it: 500K ÷ 2K/s ≈ 4 minutes.
+
+**Tinder — exactly one match when both swipe right at the same instant**
+- **Bad:** each like checks "did they like me?" by reading another partition. Two concurrent likes produce zero or two matches.
+- **Good:** co-locate the pair under a canonical key (min_id, max_id), so both likes hit one partition.
+- **Great:** HSETNX on a "matched" field makes the announcement exactly-once under retries. The match row is written for both users, Redis pair state expires, and the durable likes log is checked only on a Redis miss.
+
+**News aggregator — 50 outlets publish the same story**
+- **Bad:** URL dedup only, so the front page shows 50 copies. **Good:** MinHash LSH (20 × 5 bands ≈ 0.55 threshold) drops near-duplicates. **Great:** a separate clustering stage gated by shared entities assigns articles online to stories with stable ids. Batch re-clustering repairs quality, and ranking uses breadth, velocity, authority and freshness decay over precomputed edition lists.
+
+**Strava — matching 600 uploads/s against millions of segments**
+- **Bad:** test every segment against every trace.
+- **Good:** a bounding-box index query for candidates, then an exact check per candidate.
+- **Great:** the exact check requires a start pass, a finish pass and ≥ 80% coverage to reject GPS noise and shortcuts. Efforts are the source of truth, so leaderboards are rebuildable. Privacy zones are applied in the pipeline before matching and heatmaps, and a matcher change triggers a metered backfill.`,
+      keyPoints: [
+        'Finite unit rows turn a Redis failover into an apology, not an oversell.',
+        'Precompute thresholds; flip state + outbox atomically; re-check before send.',
+        'Co-locate the like pair; HSETNX for exactly-once match.',
+        'Dedup, near-dup and clustering are three separate stages.',
+      ],
+      source: 'Hello Interview — problem breakdowns (Bad / Good / Great deep dives)',
+    },
   ],
   codeChallenges: [
     {

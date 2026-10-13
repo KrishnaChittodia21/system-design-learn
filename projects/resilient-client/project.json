@@ -1,0 +1,18 @@
+{
+  "id": "resilient-client",
+  "title": "Build a Resilient Call Wrapper: Retries, Deadlines & a Circuit Breaker",
+  "topics": ["rel-patterns", "misc-async-resilience", "rel-production-judgment"],
+  "difficulty": "hard",
+  "estimatedHours": 6,
+  "summary": "Every service-to-service call needs the same armour, and getting it subtly wrong causes outages (retry storms, hung requests, cascading failure). You build it from scratch with every clock, timer, sleep and random source injected: **exponential backoff with full jitter**, **retry only what is transient**, an **overall deadline** that abandons hung attempts and an **AbortSignal** for caller cancellation, a **retry budget** that caps retries as a fraction of traffic, a **circuit breaker** (closed → open → half-open with probe limits), a **bulkhead** that caps concurrency, and a composition that never retries an open circuit.\n\nInterview payoff: you can explain why jitter de-synchronises clients, why retries must be budgeted (and done at one layer only), why a deadline must propagate instead of per-attempt timeouts stacking up, how a breaker turns slow failure into fast failure and how half-open probing avoids a thundering herd on recovery.",
+  "milestones": [
+    { "name": "M1: Backoff & classification", "description": "`backoffDelay` = `floor(random() × min(max, base × 2^k))`; `defaultIsRetryable` accepts 408/429/5xx-gateway statuses, network codes and explicit `retryable` flags only." },
+    { "name": "M2: Retry loop", "description": "`retry(fn, opts)` passes the attempt index, sleeps via the injected `sleep`, calls `onRetry`, rethrows non-retryable errors unwrapped and the last error after `maxAttempts`." },
+    { "name": "M3: Deadlines & cancellation", "description": "An overall `deadlineMs` aborts the attempt's signal and abandons hung attempts (fake timers), refuses sleeps that would cross it, clears its timers; caller `AbortSignal` cancels attempts and sleeps." },
+    { "name": "M4: Retry budget", "description": "`RetryBudget` token bucket: requests deposit `ratio`, retries withdraw 1; an empty budget stops retrying and surfaces the last error." },
+    { "name": "M5: Circuit breaker", "description": "Consecutive-failure threshold, fail-fast `CircuitOpenError(retryAfterMs)` without calling fn, lazy open → half-open, limited concurrent probes, `successThreshold`, failed probe restarts the timer, `isFailure` filter, `onStateChange`." },
+    { "name": "M6: Bulkhead", "description": "`maxConcurrent` + FIFO `maxQueue`, `BulkheadFullError` without calling fn, slots freed on failure." },
+    { "name": "M7: Composition", "description": "`callResilient` = bulkhead(retry(breaker(fn))): an open circuit is never retried and one slot is held across all attempts of a call." }
+  ],
+  "files": ["src/index.ts"]
+}

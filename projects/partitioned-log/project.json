@@ -1,0 +1,17 @@
+{
+  "id": "partitioned-log",
+  "title": "Build a Kafka-lite Partitioned Log",
+  "topics": ["mq-fundamentals", "lld-cases-2", "misc-async-resilience"],
+  "difficulty": "hard",
+  "estimatedHours": 6,
+  "summary": "Build the core of Kafka in memory: **topics with N partitions**, key-hash partitioning (FNV-1a), append-only offsets that are never reused, **consumer groups** with deterministic partition assignment and a **rebalance** on every join and leave, **committed offsets** with zombie fencing, consumer lag, and **retention by count**.\n\nThe point of the project is the delivery guarantee. Positions reset to the committed offset on rebalance, so anything processed but not committed is **redelivered**. That is at-least-once, and it is why consumers must be idempotent. You will be able to explain per-key ordering, why more consumers than partitions leaves some idle, and what happens when a slow consumer falls behind retention.",
+  "milestones": [
+    { "name": "M1: Partitions and offsets", "description": "FNV-1a hashing, topics with N partitions, per-partition offsets from 0, bounded `read` that returns copies with injected timestamps." },
+    { "name": "M2: Key partitioning", "description": "Same key → same partition, so per-key order is preserved. Null keys round-robin. Keys spread evenly." },
+    { "name": "M3: Consumer groups and assignment", "description": "`joinGroup` / `poll` with fetch positions; round-robin assignment over sorted member ids; generation numbers; idle members when there are more members than partitions." },
+    { "name": "M4: Commits and lag", "description": "Commit the *next* offset to read; only the owner may commit; commits are all-or-nothing; lag = end − committed." },
+    { "name": "M5: Rebalance and at-least-once", "description": "Positions reset to committed on rebalance, so uncommitted records are redelivered to the new owner. Zombies that lost a partition are fenced. Groups are independent." },
+    { "name": "M6: Retention and multi-topic groups", "description": "Retention by count advances the log start without renumbering; consumers behind retention reset to log start; members only get the topics they subscribed to." }
+  ],
+  "files": ["src/index.ts"]
+}

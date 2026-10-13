@@ -1,0 +1,16 @@
+{
+  "id": "redis-clone",
+  "title": "Build a Mini Redis: RESP Protocol & an Event-Loop Server",
+  "topics": ["misc-caching-redis", "cache-fundamentals", "fund-os-kernel"],
+  "difficulty": "hard",
+  "estimatedHours": 7,
+  "summary": "Build a single-threaded, event-loop key-value server that real Redis clients could talk to. You write a **RESP2 serializer** and an **incremental parser** that copes with frames split at any TCP byte boundary and with **pipelined** requests, a **`node:net` server** (port 0, the OS picks), the core string commands (`PING ECHO GET SET[EX|PX|NX|XX] DEL EXISTS INCR EXPIRE TTL`) with Redis's exact replies and error strings, **lazy + active expiry** on an injected clock, and **graceful shutdown**.\n\nInterview payoff: you can explain why one thread with an event loop (epoll/kqueue) handles 100k connections, why TCP is a byte stream and not a message stream, how pipelining amortises round trips, how Redis reclaims expired keys nobody reads, why `SET NX PX` is the building block of a lock, and what draining a server looks like during a deploy.",
+  "milestones": [
+    { "name": "M1: RESP serializer", "description": "`encode` for simple strings, errors, integers (incl. bigint), bulk strings (byte lengths, null) and arrays (nested, null)." },
+    { "name": "M2: Incremental RESP parser", "description": "`RespParser.push(chunk)` returns all complete frames and buffers the rest; works for every split point and byte-by-byte; throws `ProtocolError` on malformed input." },
+    { "name": "M3: Commands", "description": "`execute(args)` for PING, ECHO, GET, SET with EX/PX/NX/XX validation, DEL, EXISTS, INCR with int64 overflow detection — exact Redis error strings, case-insensitive names." },
+    { "name": "M4: Expiry", "description": "TTLs on the injected clock: lazy expiry on every read path, `TTL`/`PTTL`/`EXPIRE` semantics (SET clears TTL, INCR keeps it, EXPIRE ≤ 0 deletes), and `activeExpireCycle(maxChecks)` reclaiming keys nobody reads." },
+    { "name": "M5: Event-loop TCP server", "description": "`listen(0)` returns the port; per-connection parser; pipelined in-order replies; split frames; many concurrent clients; protocol errors close only that connection; graceful `close()` that flushes replies, ends idle clients and refuses new connections." }
+  ],
+  "files": ["src/index.ts"]
+}

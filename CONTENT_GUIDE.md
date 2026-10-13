@@ -150,3 +150,56 @@ Phase id `behavioral`, topic ids prefixed `beh-`. The learner is a senior backen
 - **test (MCQs):** judgment questions, e.g. "Which answer best demonstrates Ownership?", "What is the biggest problem with this answer?", "The interviewer asks X — which follow-up response raises your level?". Use `code` with `language: 'text'` to show a candidate answer excerpt when useful. The ≥4-with-code rule is waived; ≥3 multi-select still applies.
 - **envelopeQuestions:** none required.
 - Never invent company-specific facts. Leadership Principles, round names and company practices must come from official pages or credible candidate reports, cited in `sources`.
+
+---
+
+## Capstone build projects (projects/<id>/) — rules for project writers
+
+Each capstone is a small, real TypeScript project that the learner builds and that a test suite **judges**. Layout:
+
+```
+projects/<id>/
+  project.json      # manifest (see CapstoneProject in src/types.ts): id, title, topics[], difficulty, estimatedHours, summary (markdown), milestones[{name, description}], files[]
+  README.md         # the brief: goal, API to implement, constraints, how to run, hints, stretch goals
+  src/index.ts      # STARTER: full exported API with types and doc comments; every function/method body throws new Error('Not implemented: <name>')
+  solution/index.ts # REFERENCE: complete, idiomatic, commented implementation of the same API
+  test/*.test.ts    # THE JUDGE: node:test + node:assert/strict, 12–25 tests
+```
+
+- **Runtime:** Node 23 runs the `.ts` files directly through type stripping. Use only *erasable* TypeScript: **no enums, no parameter properties (`constructor(private x)`), no namespaces, no decorators**. Import local files with an explicit `.ts` extension. Use no npm dependencies, only Node built-ins (`node:net`, `node:fs`, `node:crypto`, `node:events`…).
+- **Tests load the implementation dynamically,** so the same tests judge both the starter and the solution:
+  `const { LRUCache } = (await import(process.env.PROJECT_IMPL!)) as typeof import('../solution/index.ts');`
+- **Tests are deterministic.** Inject clocks, randomness, timers and the file-system root through constructor options. Never use real `sleep`. Each test cleans up after itself (temp dirs under `os.tmpdir()`, servers closed), and every test finishes in a few seconds.
+- **Name every test `M<n>: <behaviour>`** so it maps to a milestone (`M1: get returns undefined for a missing key`). Order the milestones from the core to the stretch goals. Include edge cases, concurrency and failure cases that interviewers ask about.
+- **Verify before finishing:**
+  - `npm run project -- <id> --solution` passes **every** test;
+  - `npm run project -- <id> --no-save` fails cleanly, with "Not implemented" messages and no crash;
+  - `npx tsc --ignoreConfig --noEmit --strict --skipLibCheck --target es2022 --module esnext --moduleResolution bundler --allowImportingTsExtensions --verbatimModuleSyntax --types node projects/<id>/solution/index.ts projects/<id>/src/index.ts projects/<id>/test/*.test.ts` passes. If it fails only because node types are missing, report that and rely on the runner.
+- **Never** run without `--no-save` on the starter, because that would overwrite the learner's `public/project-results.json`.
+
+## New topic ids for this round (so capstones and links line up)
+
+`fund-os-kernel` (fundamentals, order 4) · `fund-scaling-journey` (fundamentals, 5) · `db-postgres-internals` (databases, 7) · `ds-theory` (distributed, 5) · `rel-production-judgment` (reliability, 4) · `platform-key-tech` (platform, 6) · `prod-dissections` (production, 5) · `design-patterns` (designs, order 0, comes first in the phase) · `design-agents` (designs, 13).
+
+When adding sections to an **existing** topic, **append them at the end** of `sections` (never insert in the middle), because learners' "Read" ticks are stored by section index.
+
+---
+
+## Interactive visualisations (src/viz/widgets/<id>/) — rules for visualisation writers
+
+Study the reference **src/viz/widgets/circuit-breaker/** and the framework **src/viz/core.tsx** first. Learning goal: *segmenting + interactivity + prediction*. The learner steps through states at their own pace, changes the inputs, and predicts before revealing. A video-like loop is not the goal.
+
+Files per visualisation:
+- `meta.ts`: `export const meta: VizMeta` with `id`, `title`, `blurb`, and `placements: [{ topic, heading }]`. `heading` is a **prefix of an existing section heading**; find exact headings with the coverage dump. Place each visualisation in 1–3 sections where it teaches the concept, preferring the core lesson over Miscellaneous.
+- `sim.ts`: a **pure, deterministic** `simulate(params) => Frame[]`. Frames extend `BaseFrame` (`caption`, optional `predict`). Use `rng(seed)` from core for any randomness. No React in this file, so it can be tested with Node.
+- `index.tsx`: `export default function …Viz()` using `useSimulation(simulate, params)`, `useFrames(frames)`, `VizFrame`, `Slider` and `Choice` from `../../core`. It renders the current frame as inline SVG with `className="viz-svg"` and a `viewBox` about 600 wide (height 220–360).
+
+Quality bar:
+- **Technically correct:** the semantics must match the real algorithm or protocol and the app's own lesson text. For example, Raft votes once per term and only for a candidate whose log is up to date.
+- **Frames:** 12–40 per run. Every frame has a precise 1–2 sentence caption that names the mechanism and the number that matters. Include ≥ 2 `predict` prompts at the "aha" moments.
+- **Parameters:** 2–4 meaningful ones (sliders or choices) that change the outcome in instructive ways, with sensible defaults that show the key behaviour.
+- **Styling:** use only CSS variables (`var(--good)`, `--bad`, `--warn`, `--accent`, `--muted`, `--border`, `--surface-2`, `--text`, `--text-2`, plus the matching `*-soft` variables) and the existing classes (`viz-svg`, `viz-label`, `viz-edge`, `viz-node`, `viz-node-label`, `viz-dot`, `viz-outage`, `viz-key`). It must look right in **light and dark** themes. **Do not edit** `src/index.css` or `src/viz/core.tsx`. If you truly need something there, say so in your report. Inline SVG `style`/attributes are fine.
+- **Motion:** CSS transitions on SVG attributes are fine, because `.viz` disables them under reduced motion. No JS animation loops.
+- **Accessibility:** the SVG gets `role="img"` and an `aria-label` summarising the current state. Captions are already announced by the framework.
+
+Verify: test `sim.ts` with Node in your scratchpad: invariants, frame counts, and that the predicted outcomes really happen. Then run `npx tsc -p tsconfig.app.json --noEmit` (the whole app must type-check) and `npm run -s build` (your widget must appear as its own lazy chunk).

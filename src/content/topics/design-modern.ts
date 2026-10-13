@@ -784,6 +784,109 @@ ORDER BY rev;`,
         'Scale on leading signals; make every client reconnect a resume.',
       ],
     },
+    {
+      heading: 'Level bar: what mid, senior and staff answers include',
+      body: `**Intuition:** all four designs are real-time, so the level gap shows in *who protects the expensive resource*. That resource is CDN egress, SFU bandwidth, GPU memory or the per-document sequencer. Mid (≈80% breadth / 20% depth, interviewer steers) gets the pipeline right. Senior (≈60/40) skims the HLD, deep-dives the bottleneck unprompted and names trade-offs. Staff (≈40/60) drives, and adds cost, failure drills and rollout without being asked.
+
+**Live streaming (IPL scale)**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | watch live, ABR, chat out of scope | 60M concurrent, latency target (2–5 s vs 10 s), the toss spike | latency tier as a cost decision; rights, ads, multi-CDN |
+| High-level design | ingest → transcode → CDN | dual ingest, aligned-GOP ladder, short-TTL playlists, shield tier | multi-CDN steering, request collapsing, panic mode |
+| Deep dives expected | segments + CDN caching | LL-HLS parts, origin protection | pre-warm ladder, spike game-days |
+| Trade-offs & failure handling | none | latency vs rebuffering | seamless encoder failover; CDN outage steering |
+| Ops/cost/evolution | none | egress estimate (~59 Tbps) | CDN commit contracts, cost per viewer-hour |
+
+*Down-levelled by:* origin serving misses directly; one latency target for every product surface; no egress number.
+
+**Video conferencing**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | N-party call, mute, screen share | ~150 ms one-way budget, max room size, recording | E2EE policy vs recording/captions, residency |
+| High-level design | mesh or a media server | WS signaling + SFU + ICE/STUN/TURN | cascaded SFUs across regions, meeting placement |
+| Deep dives expected | why not mesh | simulcast/SVC layer choice, bandwidth estimation | big rooms (last-N, webinar mode), SFrame E2EE |
+| Trade-offs & failure handling | none | mesh vs SFU vs MCU | SFU crash → ICE restart onto a new SFU |
+| Ops/cost/evolution | none | ~6 Gbps per SFU sizing | TURN relay egress cost; regional capacity |
+
+*Down-levelled by:* transcoding everything in an MCU by default; ignoring NAT and TURN.
+
+**LLM chat service**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | send message, streamed reply, history | TTFT and TPOT targets, context length, token-based limits | cost per 1M tokens, tiered SLAs, model rollout |
+| High-level design | API → model server | SSE + resume, conversation store, router to GPU pools | prefix-cache-aware routing, admission control, multi-model fleet |
+| Deep dives expected | streaming | continuous batching, KV-cache memory | PagedAttention, chunked prefill / disaggregation, overload |
+| Trade-offs & failure handling | none | batch size: throughput vs latency | GPU node loss mid-stream; shedding free tier first |
+| Ops/cost/evolution | none | GPU count estimate | canary of model versions, usage ledger, utilisation targets |
+
+*Down-levelled by:* treating a GPU like a stateless web server; rate limiting by request count.
+
+**Google Docs**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | concurrent edits, cursors | local-echo latency, editors per doc, offline | history, retention, permissions, comments |
+| High-level design | save whole doc | ops over WS to a per-doc owner, op log + snapshots | sharded ownership with leases + fencing, viewer fan-out |
+| Deep dives expected | conflict detection | OT transform with a central sequencer | OT vs CRDT choice argued from requirements |
+| Trade-offs & failure handling | last write wins | ack only after durable append | owner failover without losing acked ops |
+| Ops/cost/evolution | none | snapshot cadence | hot docs (10K viewers), op-log storage cost, migration |
+
+*Down-levelled by:* locking paragraphs; CRDT chosen "because it is modern" with no offline need.`,
+      keyPoints: [
+        'The level gap is who protects the expensive resource: egress, SFU bandwidth, GPU memory, the sequencer.',
+        'Senior names the bottleneck mechanism; staff prices it and plans its failure.',
+        'Each design has a classic down-level trap: origin misses, MCU by default, request-count limits, LWW.',
+      ],
+      source: 'Hello Interview — problem breakdowns, "What is expected at each level"',
+    },
+    {
+      heading: 'Deep-dive ladders: bad → good → great',
+      body: `**Intuition:** each rung removes a specific failure the previous rung has under load. Say the failure out loud before you climb.
+
+**Live streaming — surviving the toss (30M players request the next segment at once)**
+- **Bad:** CDN misses go straight to origin. Every new segment and playlist triggers a miss storm and origin collapses within seconds.
+- **Good:** add a shield tier, so misses are per-PoP, not per-viewer. Origin still sees bursts on every playlist refresh, and cold PoPs spike.
+- **Great:** request collapsing at the shield (one origin fetch per object), so origin load stays flat at tens of req/s regardless of audience. Pre-warm CDN capacity on a concurrency ladder, jitter player reloads, and keep a panic mode that sheds reactions and comments before video.
+
+**Live streaming — latency**
+- **Bad:** 6 s segments with a 3-segment buffer means 20–30 s behind TV.
+- **Good:** 2 s segments give ~6–10 s, at 3× the request rate.
+- **Great:** LL-HLS partial segments with blocking playlist reload give 2–5 s on the same CDN. WebRTC goes only to interactive tiers, because it costs far more per viewer.
+
+**Video conferencing — a 10-person call on mixed networks**
+- **Bad:** in a mesh, each client uploads N−1 streams (9 × 1.5 Mbps), so it collapses at 4–5 people. An MCU fixes the uplink but burns a transcode per room.
+- **Good:** an SFU forwards one stream per publisher. One weak subscriber then forces a choice between degrading everyone and stalling that subscriber.
+- **Great:** simulcast (3 layers) or SVC. The SFU picks a layer per subscriber from transport-cc estimates, switches only on keyframes and rate-limits PLIs. No transcoding, constant uplink, and per-viewer quality.
+
+**Video conferencing — connectivity**
+- **Bad:** assume direct UDP. **Good:** STUN for reflexive candidates. **Great:** TURN fallback, including TURN over TLS on 443 for corporate networks. Budget that ~10–15% of sessions relay, and that relay egress is real cost.
+
+**LLM chat — GPU throughput**
+- **Bad:** one request per GPU, or static batches that wait for the longest generation. Utilisation sits at 10–30% and TTFT queues grow.
+- **Good:** dynamic batching over a short window. That is better, but finished sequences still hold their slot.
+- **Great:** iteration-level (continuous) batching plus paged KV cache (<4% waste, prefix sharing). Chunked prefill stops a 100K-token prompt from stalling everyone's TPOT, and admission is decided by free KV blocks, not request count.
+
+**LLM chat — overload and fairness**
+- **Bad:** requests-per-minute limits, under which a 100K-token prompt costs the same as "hi". **Good:** token buckets on prompt tokens. **Great:** reserve prompt + max_tokens at admission and refund the unused part. Queue with deadlines, route on queue depth and KV pressure, and shed the free tier first.
+
+**Google Docs — two users type at the same position**
+- **Bad:** paragraph locks (latency, abandoned locks) or last-write-wins on the document (lost edits).
+- **Good:** OT with a central per-doc sequencer. Clients transform their pending op against incoming ops, with one in-flight op per client.
+- **Great:** add a deterministic tie-break (site id), dedupe by (clientId, clientSeq), ack only after the durable append, and pick a CRDT only if offline or peer-to-peer editing is a requirement. The cost of a CRDT is metadata and tombstones.
+
+**Google Docs — the owner crashes**
+- **Bad:** state lives in memory, so acked ops are lost. **Good:** append to the op log before acking, and the new owner rebuilds from snapshot + log. **Great:** lease-based ownership fenced by the (doc_id, rev) primary key, so a zombie owner's writes fail. Clients resend unacked ops, and dedupe makes the retries harmless.`,
+      keyPoints: [
+        'Origin protection = shield + request collapsing + pre-warm; latency = LL-HLS parts.',
+        'Simulcast lets an SFU adapt per subscriber with no transcoding.',
+        'Continuous batching + paged KV; token reservations, not request counts.',
+        'OT with a sequencer, durable-before-ack, fencing on (doc_id, rev).',
+      ],
+      source: 'Hello Interview — problem breakdowns (Bad / Good / Great deep dives)',
+    },
   ],
   codeChallenges: [
     {

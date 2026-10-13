@@ -446,6 +446,83 @@ Example: "I'll use a Postgres conditional update per seat because holds must hav
         "Infra designs swap user-facing FRs for throughput/durability/ordering NFRs.",
       ],
     },
+    {
+      heading: 'Staff-level habits under interview conditions',
+      body: `**Intuition:** a senior answer shows you can build the system. A staff answer shows you can be trusted to decide *what* to build, what not to build, and what it will cost the organisation, while the interviewer mostly listens. The same 4-step framework applies. What changes is who drives and where the minutes go (≈40% breadth / 60% depth, versus ≈60/40 for senior and ≈80/20 for mid).
+
+**The habits, and what each sounds like**
+
+| Habit | Sounds like | Why it reads as staff |
+|---|---|---|
+| Talk as a peer | "Standard read-heavy shape: CDN, cache-aside, replicas. I'll skip explaining those unless you want them." | You don't re-teach load balancers to someone who has run them |
+| Name the crux, skip the CRUD | "Profile and settings endpoints are boilerplate. The crux is the 50K holds/s on one event row." | Earmarks the hard part in minute 5 and returns to it |
+| Cut complexity | "Let me check whether we need sharding at all: 2K writes/s fits one Postgres primary with headroom." | Simplest design that meets the numbers; complexity must be earned |
+| Bring related experience | "On our payments ledger the outbox relay lagged under vacuum pressure, so I'd monitor relay lag here too." | Transfers real lessons to an unfamiliar problem |
+| Decide, don't list | "Kafka, because we need replay for the backfill. If ordering per tenant weren't needed, SQS would be cheaper." | A decision + the condition that would flip it |
+| Propose scope yourself | "I'll take ingest, fan-out and delivery guarantees; templates and analytics are out unless you object." | The interviewer only has to nod, not steer |
+| Raise org concerns unprompted | migration from today's system, which team owns the queue, cost per million messages, the on-call story | Influence beyond your own service is the staff job |
+| Choose your battles | Accept the company's existing stack choice unless it breaks a requirement | Spends time on what changes the outcome |
+
+**How down-levelling actually happens** (the write-up says "solid senior" rather than "staff"):
+- The interviewer had to pick every deep dive. Steering is the clearest mid/senior signal.
+- Menus without decisions: three options, pros and cons, then "what do you prefer?"
+- Over-explaining fundamentals, which reads as recently learned rather than lived.
+- Building the scaled version first (sharding, multi-region, Kafka) before showing it is needed.
+- Correct mechanics but no migration path, cost or ops: a design that only works on a green field.
+- No insight the interviewer didn't already have. Staff bars often expect you to teach them one thing.
+
+**In interviews, say this:** "Here's the scope I propose, here's the one hard problem, here's my decision and what would change it, and here's how we'd get there from what you run today."`,
+      keyPoints: [
+        'Staff ≈ 40% breadth / 60% depth: the candidate drives and the interviewer only focuses.',
+        'Decision + flip condition beats a menu of options every time.',
+        'Earn complexity: show the simple design fails the numbers before adding shards or queues.',
+        'Raise migration, ownership, cost and on-call without being prompted.',
+      ],
+      source: 'Hello Interview — "Staff-level system design" blog; Hello Interview problem breakdowns (level expectations)',
+    },
+    {
+      heading: 'Round formats & whiteboarding',
+      body: `**Intuition:** the design is graded on reasoning, not drawing. But the *format* of the round changes how you show that reasoning, so ask your recruiter which one you'll get and rehearse in it.
+
+**Shared diagram tools (most common).** Excalidraw, Whimsical, Google Drawings, Miro, or a company's in-house pad. Polish does not matter: boxes, arrows and labels are enough. What helps:
+- Draw left-to-right in request order (client → edge → service → store), with **numbered arrows** for the write path and a different colour or dashed line for the read path.
+- Keep a small text box for **requirements and numbers** in a corner and point back to it when you justify decisions.
+- Practise the tool beforehand. Fighting the arrow tool for 3 minutes is pure loss.
+
+**Verbal-only rounds (no diagram).** Some screens and full loops (some Amazon and Netflix candidates report this) are a voice or video call with no drawing tool:
+- Announce the structure: "Five components, I'll name them once, then walk the write path, then the read path."
+- **Number the components** and refer to them by number and name.
+- Recap every ~5 minutes in one sentence, and check in more often, since the interviewer can't glance at a board.
+- Keep a paper sketch for yourself if allowed. It organises *your* thinking.
+
+**Multi-part rounds (Stripe-style, also some AI labs).** One problem, 3–5 sequential parts, often in a coding environment where part N+1 unlocks only when part N works:
+- **Ship v1 fast and simple.** The grader needs v1 to pass before you see v2, and an over-designed v1 burns the time later parts need.
+- Keep seams cheap to extend (a clean interface, an id on every record, injected clock) rather than prebuilding features.
+- Expect later parts to add retries, idempotency, ordering, multi-tenancy or persistence. Mention where you would extend, then move on.
+
+**Cost & operations wrap-up checklist** (now an explicit criterion at many companies; raise it before you are asked):
+1. **Dominant cost line:** egress, GPUs, storage or compute, with a rough monthly number.
+2. **Cost levers:** reserved vs spot/preemptible, cache vs recompute, tiered storage, serverless only for spiky low-volume paths.
+3. **SLOs and alerts:** one or two SLIs per critical path, burn-rate alerting.
+4. **Failure drills:** what pages someone, the runbook's first step, the blast radius per cell or region.
+5. **Rollout and migration:** shadow traffic, dual writes or backfill, kill switch.
+6. **Deferred work:** what you'd do with another hour and what you deliberately left out.`,
+      diagram: `Multi-part round (60 min) — each part unlocks the next
+ ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐
+ │ Part 1  │──▶│ Part 2  │──▶│ Part 3  │──▶│ Part 4  │
+ │ core v1 │   │ retries │   │ ordering│   │ tenants │
+ │ ~12 min │   │ ~15 min │   │ ~15 min │   │ ~15 min │
+ └─────────┘   └─────────┘   └─────────┘   └─────────┘
+  ship simple   extend via     same seams    stretch:
+  + clean seams the seam       no rewrite    talk if short`,
+      keyPoints: [
+        'Diagram polish is irrelevant; numbered arrows and a numbers box help.',
+        'Verbal-only: announce structure, number components, recap every ~5 minutes.',
+        'Multi-part: ship v1 fast because later parts are gated on it working.',
+        'Wrap-up: dominant cost, levers, SLOs, drills, rollout, deferred work.',
+      ],
+      source: 'Aced.io — "How to nail the system design interview" (2026 guide); Hello Interview staff-level guide',
+    },
   ],
   codeChallenges: [
     {
@@ -967,6 +1044,161 @@ Requirement → alternative → cost → mitigation → trigger. Neither folding
         'Arguing from brand preference rather than requirements and numbers',
       ],
     },
+    {
+      id: 'fund-requirements-iq-08',
+      difficulty: 'expert',
+      question: 'This is a staff-level loop. The prompt is "Design a notification platform for our company," and after that the interviewer goes quiet and waits. How do you run the next 45 minutes so the write-up says staff rather than strong senior?',
+      context: 'The company already sends email, SMS and push from five product teams, each with its own ad-hoc sender.',
+      whatInterviewerLooksFor: [
+        'Proposes scope and success criteria without being asked, and asks to confirm',
+        'Names the crux early (fan-out bursts, per-channel provider limits, user preferences, dedup) and skips CRUD',
+        'Makes decisions with flip conditions instead of listing options',
+        'Raises migration from the five existing senders, team ownership and cost unprompted',
+        'Keeps the design as simple as the numbers allow',
+      ],
+      modelAnswer: `### Minutes 0–5: propose the scope; don't ask for it
+"I'll treat this as a **shared platform** that the five teams call. In scope: an API to send a notification, user preferences and quiet hours, channel routing (email, SMS, push), delivery guarantees and observability. Out of scope: template authoring UI and marketing campaigns. Success = teams migrate off their senders within two quarters, and duplicate or lost notifications drop below 0.01%." Then confirm with one question: "Are campaigns (10M recipients) in scope, or only transactional?"
+
+### Minutes 5–10: numbers and the crux
+Assume 50M sends/day ≈ 600/s average and ~20K/s campaign bursts. The CRUD (preferences, templates) is boilerplate, and I say so. The **crux** is: bursts against provider rate limits, at-least-once delivery without duplicate SMS (which costs money), and per-user preference checks at 20K/s.
+
+### Minutes 10–20: the simple HLD, with decisions
+- An API writes the request plus an outbox row into Postgres, so a send is durable once accepted (202 + id).
+- **Decision:** Kafka partitioned by user_id, because we need per-user ordering, throttling and replay for incident backfills. If campaigns were out of scope, SQS would be cheaper and enough.
+- Channel workers apply preferences (a cached snapshot), dedupe on (idempotency_key, channel), then call providers through per-provider token buckets.
+
+### Minutes 20–40: two deep dives I choose
+1. **Burst vs provider limits:** separate priority lanes (OTP > transactional > campaign), so a campaign can never delay an OTP, and drain time is computed from provider quotas.
+2. **Exactly-once effect:** a dedup table with a TTL plus provider idempotency keys where they exist, and a reconciliation job on delivery receipts.
+
+### Minutes 40–45: org, cost, ops
+- **Migration:** a client library that dual-sends in shadow mode for one team, then cuts over team by team behind a flag.
+- **Ownership:** the platform team owns the pipeline; product teams own templates and their own SLOs.
+- **Cost:** SMS dominates (~$0.005–0.05 each), so preference suppression and dedup are cost controls, not only UX.
+- **Ops:** SLIs for accept-to-provider latency per lane, and a DLQ with replay.`,
+      followUps: [
+        {
+          q: 'The interviewer interrupts: "Why not let each team keep its sender and just share a library?" How do you respond?',
+          a: 'Treat it as a real option and decide on the requirements: a library cannot enforce global per-user frequency caps, shared provider quotas or cross-team dedup, because each team\'s process sees only its own traffic. So central routing is needed for the problems we listed. I would still ship the client as a library over the API, so migration is a dependency bump. If the org only needed consistent templates, the library alone would be the cheaper answer.',
+        },
+        {
+          q: 'Halfway through you realise campaigns at 20K/s will exceed the SMS provider\'s 1K/s limit. What do you change?',
+          a: 'Nothing in the architecture, but you change the promise. 10M campaign SMS at 1K/s is ~2.8 hours, so campaigns become "delivered within N hours" with scheduled pacing, and a second provider is added for both capacity and failover. OTPs keep a reserved slice of the quota (say 20%) so they are never queued behind a campaign. Saying the new SLA out loud is the staff move: the constraint is commercial, not technical.',
+        },
+        {
+          q: 'What is one insight you would expect to teach the interviewer here?',
+          a: 'For example: preference and dedup checks are the biggest cost lever, because most notification spend is SMS and every suppressed send saves real money. Measure suppression rate as a first-class metric alongside delivery rate. Or: put the idempotency key on the business event (order_shipped:123), not on the send request, so retries from upstream services also dedupe.',
+        },
+      ],
+      pitfalls: [
+        'Asking "what do you want me to design?" and waiting, which hands steering to the interviewer',
+        'Spending ten minutes on the preferences CRUD API',
+        'Listing Kafka, SQS and RabbitMQ without choosing one',
+        'Ending without migration, ownership or cost, a design that only works on a green field',
+      ],
+    },
+    {
+      id: 'fund-requirements-iq-09',
+      difficulty: 'hard',
+      question: 'Your design round turns out to be a voice-only call with no drawing tool. You are asked to design a webhook delivery service (customers register URLs, and you deliver events with retries). How do you keep the interviewer oriented and still show depth without a single diagram?',
+      whatInterviewerLooksFor: [
+        'Announces a structure up front and sticks to it',
+        'Names and numbers components and reuses those names consistently',
+        'Narrates data flow as numbered steps for the write and delivery paths',
+        'Recaps and checks in more frequently than on a whiteboard',
+        'Still reaches a real deep dive (retries, ordering, poison endpoints)',
+      ],
+      modelAnswer: `### Set the map before the content
+"I'll do this in four parts: scope and numbers, then five components, then the delivery path step by step, then two deep dives: retries and slow endpoints. I'll recap after each part."
+
+### Scope and numbers (spoken, short)
+Events at ~5K/s, ~50K customer endpoints, at-least-once delivery, ordering per endpoint optional, and retries for up to 72 hours with exponential backoff.
+
+### Number the components and reuse the names
+"One, the **Ingest API**. Two, the **Event Log** (Kafka). Three, the **Dispatcher**. Four, the **Retry Scheduler**. Five, the **Endpoint Registry**." From then on, always say "the Dispatcher (3)", never "the service" or "that box".
+
+### Walk paths as numbered steps
+1. A producer calls the Ingest API (1), which validates and appends to the Event Log (2) keyed by endpoint_id, then returns 202.
+2. The Dispatcher (3) consumes it, looks up the URL and secret in the Endpoint Registry (5), signs the payload with HMAC and POSTs with a 10 s timeout.
+3. On a non-2xx response or a timeout, it writes to the Retry Scheduler (4) with next_attempt_at = now + backoff (with jitter).
+
+**Recap:** "So far: append, dispatch, schedule a retry. Shall I go into the slow-endpoint problem?"
+
+### Deep dive by contrast, not by picture
+"Without isolation, one endpoint that takes 10 s per request ties up dispatcher concurrency for everyone. So each endpoint gets a concurrency cap and its own circuit breaker. After N consecutive failures we pause it and stop retrying, so its backlog can't starve healthy endpoints." Use numbers instead of visuals: "with 200 dispatcher slots, five dead endpoints at 10 s timeouts would otherwise consume them all."
+
+### Close with a verbal summary
+In one breath: the components in order, the guarantee (at-least-once, consumers dedupe by event_id), and the main trade-off (per-endpoint isolation costs some throughput).`,
+      followUps: [
+        {
+          q: 'The interviewer says "I\'ve lost track. Where does the retry state live again?" How do you recover?',
+          a: 'Don\'t re-explain everything. Re-anchor with the numbered map: "Five components. Retries live in four, the Retry Scheduler, a table keyed by (next_attempt_at, event_id) that a poller scans every second. The Dispatcher (3) writes to it on failure and re-reads from it when an attempt is due." Then offer a 15-second full recap of the path. Take the question as a signal to recap more often, and say so.',
+        },
+        {
+          q: 'Would you still sketch on paper if you can\'t share it?',
+          a: 'Yes, if it\'s allowed. Ask first: "Is it OK if I jot notes on paper for myself?" A private sketch keeps component names and numbers consistent and helps you notice a missing path, such as how a customer re-registers a URL. It doesn\'t replace narration, though: the interviewer grades what you say, so every decision must still be spoken with its reason.',
+        },
+      ],
+      pitfalls: [
+        'Saying "this box talks to that one" as if a diagram existed',
+        'Long monologues with no recap or check-in',
+        'Renaming components mid-way, so the interviewer can\'t tell whether it is a new service',
+        'Staying at breadth only because depth feels hard to convey verbally',
+      ],
+    },
+    {
+      id: 'fund-requirements-iq-10',
+      difficulty: 'hard',
+      question: 'You are in a multi-part round: four parts in 60 minutes, and each part is revealed only after the previous one runs correctly. Part 1 says: "Implement an in-memory service that records payments and returns a merchant\'s balance." How do you approach part 1, and how do you avoid both over-engineering it and painting yourself into a corner?',
+      context: 'This format is reported for Stripe and some AI labs: a single evolving problem on a HackerRank-style platform where tests gate the next part.',
+      whatInterviewerLooksFor: [
+        'Ships a correct, simple v1 quickly (within ~10–15 minutes)',
+        'Chooses cheap seams (ids, injected clock, a clean interface) instead of prebuilt features',
+        'States assumptions such as integer minor units and currency up front',
+        'Anticipates likely later parts verbally without implementing them',
+        'Keeps tests passing as the design evolves',
+      ],
+      modelAnswer: `### Why speed matters here
+The grader needs part 1 to pass before part 2 appears. A 25-minute "production-grade" part 1 leaves ~35 minutes for three parts, and that is where most candidates fail. So the goal is a correct v1 in ~12 minutes.
+
+### Part 1, deliberately small
+- **Interface first:** recordPayment(merchantId, amountMinor, currency, paymentId) and getBalance(merchantId, currency).
+- **Assumptions said out loud:** money in integer minor units (never floats), and balances kept per currency.
+- **Storage:** a Map from merchantId to a Map from currency to balance, plus an append-only list of payment records.
+- **Run the given tests,** then submit.
+
+### Cheap seams, not features
+| Seam (costs ~1 min) | Likely later part it enables |
+|---|---|
+| Every payment carries paymentId | Idempotent retries ("same id twice must not double count") |
+| Keep the event list, not just the balance | Refunds, history and balance-at-time queries |
+| Injected clock | Settlement windows, holds that expire |
+| One class with a narrow interface | Swapping in persistence or multi-tenant limits |
+
+What I do **not** build yet: persistence, locking, multi-currency conversion or rate limiting. I mention in one sentence where each would go.
+
+### When part 2 lands
+If part 2 is "refunds and idempotency", the seams mean it's additive: a processed-id set checked at the top of recordPayment, and refunds appended as negative entries. Re-run all tests after each part, because regressions in part 1 can fail the whole submission.
+
+### What the interviewer is grading
+Not cleverness in part 1, but **velocity with judgment**: correct first, extensible second, and talking through trade-offs while typing ("I'm keeping the event list because balances are derivable; it costs memory, which is fine at this size").`,
+      followUps: [
+        {
+          q: 'Part 3 says "balances must be correct when recordPayment is called concurrently from multiple threads/requests". What do you change?',
+          a: 'In Node, a single in-memory process is already serialised per event-loop turn, provided the update has no await between reading and writing. Say that explicitly and keep the read-modify-write synchronous. If the platform uses threads (Java), guard per merchant with a lock or use an atomic map update, for example ConcurrentHashMap.merge. Mention that in production the same requirement becomes a conditional UPDATE or a ledger insert with a unique paymentId. The seam you kept (an append-only event list keyed by id) makes that migration natural.',
+        },
+        {
+          q: 'You\'re 8 minutes into part 1 and realise your Map-of-balances can\'t answer "balance as of time T". The tests don\'t need it. Do you refactor?',
+          a: 'No. Submit what passes first, because unlocking part 2 is worth more than speculative refactoring. Note the gap aloud: "If a later part asks for point-in-time balances, I\'ll derive them from the event list, which I\'m already storing." Because you kept events, the refactor is a new query, not a rewrite. Refactor only when a revealed requirement actually needs it.',
+        },
+      ],
+      pitfalls: [
+        'Designing a full ledger with persistence and locking in part 1',
+        'Using floating-point amounts',
+        'Not re-running earlier parts\' tests after changes',
+        'Silent coding, with no narration of assumptions and trade-offs',
+      ],
+    },
   ],
   envelopeQuestions: [
     {
@@ -1400,6 +1632,94 @@ type Post { id: ID!, text: String!, author: User! }`,
           "q": "Fifteen minutes in, the interviewer says 'actually, let's talk about recommendations'. What do you do with what you've built?",
           "a": "Accept the redirect gracefully and connect it to the existing design: the view/watch events your playback path already emits become the input. Spend a minute on requirements for recommendations (latency for the home page, freshness of signals, cold start), then sketch the two-stage pipeline: offline candidate generation and embeddings, online ranking with a feature store, served with a cache per user. Mention you'll leave the upload/transcode design as-is unless they want to return to it."
         }
+      ],
+    },
+    {
+      id: 'fund-requirements-mcq-16',
+      difficulty: 'expert',
+      question: 'In a staff-level "Design a ticket booking system" round, which candidate moves raise the level signal rather than lower it? Select ALL that apply.',
+      options: [
+        'Proposing scope and an out-of-scope list in the first two minutes, then asking for a one-word confirmation',
+        'Listing three databases with pros and cons and asking the interviewer which one they prefer',
+        'Saying "the browse endpoints are standard CRUD, so I\'ll skip them; the crux is contention on hot seats during an on-sale"',
+        'Explaining in detail how round-robin and least-connections load balancing differ before drawing the API',
+        'Raising, unprompted, how bookings would migrate off the current monolith with dual writes and a backfill',
+      ],
+      correct: [0, 2, 4],
+      explanation: 'Proposing scope, naming the crux while skipping boilerplate, and raising migration unprompted are all staff signals: the candidate drives and thinks beyond the green field. Handing the interviewer a menu of databases outsources the decision, a classic down-levelling signal. Explaining load-balancer algorithms in depth reads as re-teaching fundamentals to a peer and spends minutes on something that does not change the outcome.',
+      followUps: [
+        {
+          q: 'The interviewer replies to your migration point: "Assume green field." Was raising it wasted time?',
+          a: 'No, as long as it took about 20 seconds and you dropped it when told. You showed that you look for the organisational constraint. The mistake would be arguing or spending five minutes on it. Acknowledge, park it ("then I\'ll optimise for the simplest correct design"), and move on. Raising an unprompted concern is about awareness, and choosing your battles is part of the same signal.',
+        },
+      ],
+    },
+    {
+      id: 'fund-requirements-mcq-17',
+      difficulty: 'hard',
+      question: 'A candidate says: "For the event bus we could use Kafka, SQS or Redis Streams. Kafka has replay, SQS is managed, and Redis is fast." Then they pause and look at the interviewer. Which rewrite best fixes the level signal?',
+      options: [
+        '"I\'ll use Kafka, since it is the industry standard for event-driven systems at scale."',
+        '"Let me add RabbitMQ and NATS to the comparison so we have the full picture before choosing."',
+        '"Kafka partitioned by order_id, because we need per-order ordering and 7-day replay for backfills. If we didn\'t need replay, SQS FIFO would be cheaper to run."',
+        '"Any of them works at our scale, so I\'ll leave the choice to the platform team and continue with the design."',
+      ],
+      correct: [2],
+      explanation: 'The strong rewrite makes a decision tied to the requirements (ordering key and replay) and states the condition that would flip it, which shows judgment and invites targeted push-back. "Industry standard" is a decision without a reason. Widening the menu delays the decision further. Deferring to another team avoids the call the interviewer is grading, even if "any of them works" is partly true.',
+      followUps: [
+        {
+          q: 'The interviewer pushes back: "Our company runs everything on SQS today." Do you change your answer?',
+          a: 'Re-check whether the requirement really needs Kafka. If per-order ordering is the only need, SQS FIFO with MessageGroupId = order_id provides it, and replay can come from an outbox table or S3 archive. Then switch: operating a new Kafka cluster is a real org cost. If 7-day replay at high volume is truly required, say so and quantify it. This is "choose your battles": accept the existing stack unless it breaks a requirement.',
+        },
+      ],
+    },
+    {
+      id: 'fund-requirements-mcq-18',
+      difficulty: 'hard',
+      question: 'A multi-part round has 4 parts in 60 minutes, each unlocked only when the previous part\'s tests pass. Part 1 asks for an in-memory rate limiter: allow(clientId) returns true if the client made fewer than N calls in the last W seconds. Which plan gives the best expected outcome?',
+      code: {
+        language: 'text',
+        code: `Plan A: Sliding-window log per client (array of timestamps), injected clock,
+        submit in ~10 min; mention where Redis would slot in later.
+Plan B: Redis-backed token bucket with Lua scripts and a connection pool,
+        so later parts about distribution are already solved (~30 min).
+Plan C: Fixed-window counter keyed by floor(now / W); a 3-line solution,
+        submit in ~5 min, without checking it against the spec.
+Plan D: Write the full design doc for all likely parts first (~15 min),
+        then implement part 1.`,
+      },
+      options: [
+        'Plan B, because distribution is the hardest likely part and solving it up front avoids a rewrite',
+        'Plan A, because it meets the stated semantics quickly and keeps cheap seams such as an injected clock',
+        'Plan C, because speed is everything in a gated format and any limiter unlocks the next part',
+        'Plan D, because a design doc demonstrates staff-level planning before any code',
+      ],
+      correct: [1],
+      explanation: 'Plan A matches the spec ("fewer than N calls in the last W seconds" is a sliding window) and ships fast with a seam that later parts, such as testing time or windows, will need. Plan B burns half the round on a part that may never be asked and adds failure modes. Plan C is fast but semantically wrong at window boundaries, so it can fail hidden tests and block everything. Plan D delays the gate. Planning can be spoken while coding.',
+      followUps: [
+        {
+          q: 'Part 2 says memory must stay bounded with 10M distinct clients. What breaks in Plan A and how do you fix it?',
+          a: 'A timestamp log per client costs O(N) entries per active client, and idle clients are never evicted, so 10M clients × up to N timestamps is too much. Switch to a sliding-window counter (current + previous window counts weighted by overlap), which uses two integers per client, and evict clients whose last call is older than 2W, using a sweep or a TTL map. The injected clock makes the eviction testable without real sleeps.',
+        },
+      ],
+    },
+    {
+      id: 'fund-requirements-mcq-19',
+      difficulty: 'medium',
+      question: 'Your system design round is voice-only, with no drawing tool and no shared doc. Ten minutes in, you have described six components. Which technique most improves the interviewer\'s ability to follow and grade you?',
+      options: [
+        'Describe each component\'s internals in more detail, so the interviewer can picture it without a diagram',
+        'Number the components, walk the write and read paths as numbered steps using those names, and recap in one sentence before each deep dive',
+        'Ask the interviewer to draw the diagram on their side while you dictate the layout',
+        'Reduce the design to two components so there is less to keep track of verbally',
+      ],
+      correct: [1],
+      explanation: 'A stable, numbered vocabulary plus step-by-step paths and short recaps substitutes for the shared picture and keeps grading anchored. More internal detail increases the cognitive load without giving structure. Asking the interviewer to draw shifts work to them and is rarely allowed. Collapsing the design to two components trades away the depth you are being evaluated on.',
+      followUps: [
+        {
+          q: 'How often should you check in during a verbal-only round compared to a whiteboard round, and what does a good check-in sound like?',
+          a: 'More often, roughly every 5 minutes or at each phase boundary, because the interviewer cannot glance back at a board. Make it short and specific: "So far: Ingest (1) appends to the Log (2), the Dispatcher (3) delivers, and failures go to the Scheduler (4). Next I\'d go into slow endpoints. Does that work, or would you rather see ordering?" This both recaps and offers a choice, without asking open-ended "is this OK?" questions.',
+        },
       ],
     },
   ],

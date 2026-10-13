@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "validate": "node --no-warnings scripts/validate-content.mjs",
-    "prereqs": "node --no-warnings scripts/gen-prereqs.mjs"
+    "prereqs": "node --no-warnings scripts/gen-prereqs.mjs",
+    "project": "node --no-warnings scripts/run-project.mjs"
   },
   "dependencies": {
     "prismjs": "^1.30.0",

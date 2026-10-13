@@ -583,6 +583,84 @@ export class ChunkPrimary {
         'Know the DFS vs object-store trade-off (locality/appends vs scale/flat keys).',
       ],
     },
+    {
+      heading: 'Level bar: what mid, senior and staff answers include',
+      body: `Calibration: **mid** is about 80% breadth / 20% depth, with the interviewer steering. **Senior** is about 60/40: a quick HLD, then deep dives you start yourself on chunking, consistency and failure, backed by numbers. **Staff** is about 40/60: you drive, and you raise durability math, cost per PB, migration and abuse without being asked.
+
+**Dropbox / Google Drive**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Upload, download, sync, share | 50M DAU, 10 GB each ≈ 500 PB logical; files up to 50 GB; sync latency of seconds | Dedup privacy, legal holds, enterprise retention |
+| High-level design | API + S3 + metadata DB | Block server, presigned chunk uploads, metadata DB (sharded by namespace), notification long-poll | Separate sync engine (journal + cursor) from storage; cold-tier blocks |
+| Deep dives expected | Chunking, when asked | Content-defined chunking, dedup by hash, delta sync | Conflict model, cross-tenant dedup risk, migrating storage backends |
+| Trade-offs & failure handling | — | Fixed vs content-defined chunks; LWW vs conflicted copy | Resumable uploads; consistency of metadata commit vs blob upload |
+| Ops/cost/evolution | — | Dedup ratio, sync lag | Moving off S3 (Magic Pocket-style) when cost per PB justifies it |
+
+- Down-levelled: re-uploading the whole file on every edit; silent last-write-wins.
+
+**Distributed email (Gmail-scale)**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Send, receive, list, search | 1B users × 40 mails/day; ~50 KB average with attachments in blobs | Spam/abuse, deliverability (SPF/DKIM/DMARC), legal retention |
+| High-level design | SMTP + DB | SMTP in/out, queues, metadata in a wide-column store keyed by user, blobs in object storage, search index | Per-user locality: mailbox, index and cache together |
+| Deep dives expected | — | Metadata data model (labels, threads), search | Per-user inverted index, IP-reputation management |
+| Trade-offs & failure handling | — | Shared search cluster vs per-user index | Bounce storms, outbound IP warm-up, retry queues |
+| Ops/cost/evolution | — | Inbound queue depth | Attachment dedup, tiering old mail |
+
+- Down-levelled: a relational table with \`LIKE '%term%'\` search; no answer on spam or deliverability.
+
+**Distributed file system (GFS / HDFS)**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Store huge files | 64–128 MB chunks, append-heavy, throughput over latency | Durability target (11 nines), multi-tenant quotas |
+| High-level design | Master + chunk servers | In-memory namespace, op log + checkpoints, 3 replicas, client caches locations | Master HA (Raft/QJM), federation for namespace scale |
+| Deep dives expected | Replication | Leases for a primary, write pipeline, re-replication | Erasure coding for cold data, rack-aware placement |
+| Trade-offs & failure handling | — | Relaxed consistency of record append | Re-replication storms after a rack failure; throttling |
+| Ops/cost/evolution | — | Under-replicated chunk count | 3× vs RS(6,3) at 1.5×; master memory ceiling |
+
+- Down-levelled: one master with no HA story; small-file workloads not called out as an anti-pattern.`,
+      keyPoints: [
+        'Storage designs are judged on durability, chunking and consistency between metadata and bytes.',
+        'Staff candidates bring cost per PB and backend migration without being asked.',
+        'Name the conflict model explicitly; silent overwrites are a down-level.',
+      ],
+      source: 'Hello Interview — problem breakdowns (levelling expectations)',
+    },
+    {
+      heading: 'Deep-dive ladders: bad → good → great',
+      body: `**Dropbox: uploading and syncing big files**
+- **Bad:** send the whole file through app servers on every save. Changing 1 byte of a 1 GB file re-uploads 1 GB, and the app tier pays for all of that bandwidth.
+- **Good:** fixed 4 MB chunks, SHA-256 each, ask the server which hashes are missing, and upload only those straight to S3 with presigned URLs. But inserting bytes near the start shifts every boundary, so every chunk changes.
+- **Great:** content-defined chunking (FastCDC/rolling hash, ~4 MB average), where boundaries follow the content and an insert changes only 1–2 chunks. Dedup within a user or tenant (cross-user dedup lets anyone probe whether a file exists). Commit metadata only after all chunks have arrived, so readers never see half a file. Cost: client CPU, plus garbage collection of unreferenced chunks.
+
+**Dropbox: two devices edit offline**
+- **Bad:** last write wins on the server. One user's edits vanish without any notice.
+- **Good:** each commit carries the parent revision. If the parent is not the current head, the server rejects it and the client retries.
+- **Great:** on a rejected commit the client saves a "conflicted copy", and all changes go into a per-namespace journal that devices read from their own cursor (long-poll wakes them). Cost: users must resolve the conflicts by hand.
+
+**Email: search across a 15-year mailbox**
+- **Bad:** \`LIKE '%invoice%'\` in a shared relational table, which means a full scan per query.
+- **Good:** a shared Elasticsearch cluster indexed asynchronously. Re-index cost and noisy tenants remain, and results can be seconds stale.
+- **Great:** a per-user inverted index co-located with the mailbox shard, updated from the write log, with small user indexes merged LSM-style. Queries never fan out beyond one shard. Cost: custom index infrastructure and index storage of about 30–50% of the mail size.
+
+**DFS: the master is a single point of failure**
+- **Bad:** one master writing metadata to local disk. Losing that disk loses the namespace.
+- **Good:** an in-memory namespace with an op log flushed to remote replicas, plus periodic checkpoints. Failover is manual and replaying the log takes minutes.
+- **Great:** a hot standby tailing a quorum-replicated edit log (QJM or Raft) with automatic failover in seconds, plus fencing so the old master cannot keep writing. Namespace federation lets you scale beyond one master's RAM (~150 bytes per object). Cost: more moving parts and a split-brain risk if fencing is wrong.
+
+**DFS: durability vs cost for cold data**
+- **Bad:** 3 replicas forever, which is 3× raw storage on PBs of cold data.
+- **Good:** RS(6,3) erasure coding at 1.5×, which survives 3 failures.
+- **Great:** 3× while hot, re-encode to EC once cold, with rack- and zone-aware placement and throttled reconstruction. Cost: rebuilds read 6 blocks per lost block, and degraded reads are slower.`,
+      keyPoints: [
+        'Chunking: whole file → fixed chunks → content-defined chunks + per-tenant dedup.',
+        'Conflicts: LWW → parent-revision check → conflicted copy + journal cursors.',
+        'Master HA needs a replicated edit log AND fencing.',
+      ],
+    },
   ],
   codeChallenges: [
     {

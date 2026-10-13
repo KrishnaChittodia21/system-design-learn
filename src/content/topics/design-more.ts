@@ -906,6 +906,118 @@ FROM accepted a;`,
       ],
       source: 'Hello Interview — Online Auction; Alex Xu Vol 2 (job scheduler patterns for timers)',
     },
+    {
+      heading: 'Level bar: what mid, senior and staff answers include',
+      body: `**Intuition:** mid (≈80% breadth / 20% depth) draws a pipeline that works while the interviewer steers. Senior (≈60/40) gets through the HLD in about 10 minutes, then deep-dives the contention point it found itself and names the trade-off. Staff (≈40/60) drives, cuts what isn't needed, and raises cost, abuse, reconciliation and rollout without being asked.
+
+**Web crawler**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | fetch, parse, store pages | purpose (search vs LLM corpus), 5B pages/30 days, freshness | politeness as a legal and reputational limit; robots and opt-out policy |
+| High-level design | queue → fetchers → storage | front/back-queue frontier sharded by host, DNS cache | checkpointed frontier, per-host budgets, re-crawl scheduler |
+| Deep dives expected | URL dedup | politeness heap on nextAllowedAt, SimHash near-dup | traps, re-crawl by importance, conditional GETs |
+| Trade-offs & failure handling | none | Bloom false positive drops a URL | crash resume without re-crawling; bad-host quarantine |
+| Ops/cost/evolution | none | bandwidth is not the hard part (~2K pages/s) | egress and storage cost, abuse complaints workflow |
+
+*Down-levelled by:* a distributed lock for politeness; no canonicalisation; restart-from-scratch on crash.
+
+**Top-K / trending**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | top 10 items | exact vs approximate, windows, K, freshness | trending ≠ popular; abuse and dedup by user |
+| High-level design | count + heap | stream keyed by item, per-window aggregation | lambda: stream for fresh, batch for exact charts |
+| Deep dives expected | min-heap of size K | Count-Min + candidate heap, mergeable sketches | hot-item pre-aggregation, sliding windows, velocity score |
+| Trade-offs & failure handling | none | CMS error ε·N only suits heavy hitters | late events, replay, reconciliation with batch |
+| Ops/cost/evolution | none | memory per window | when exact is worth the batch job's cost |
+
+*Down-levelled by:* summing per-shard top-K lists keyed by anything other than item; no window definition.
+
+**Distributed counters (likes/views)**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | like/unlike, show count | exact edge vs approximate count, unique views | which counts are money (creator payouts) vs vanity |
+| High-level design | UPDATE count+1 | edge table as truth, coalesced deltas keyed by post | sharded counters for hot keys only; HLL for uniques |
+| Deep dives expected | idempotency | write coalescing, cached reads | multi-region merge, reconciliation jobs |
+| Trade-offs & failure handling | none | sharding trades read cost for write scale | drift repair with adjustment events |
+| Ops/cost/evolution | none | none | cost of exactness per counter class |
+
+*Down-levelled by:* incrementing one row per click; summing HLLs.
+
+**Online judge**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | submit, get verdict | languages, limits, contest peak | hostile code threat model, rejudge policy |
+| High-level design | API runs code | 202 + queue + worker pool + SSE | priority queues, test_version on verdicts |
+| Deep dives expected | Docker | seccomp, no network, cgroups, CPU-time judging | gVisor/Firecracker, pre-scaling from the contest calendar |
+| Trade-offs & failure handling | none | container vs microVM | worker crash → requeue with no double verdict |
+| Ops/cost/evolution | none | ~1,000 cores at peak | idle fleet cost vs T+0 spike; rejudge cost |
+
+*Down-levelled by:* running code in the API process; judging on wall time.
+
+**Online auction**
+
+| | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | bid, see highest bid | proxy bidding, soft close, ordering | dispute evidence, fraud, shill bidding |
+| High-level design | bids table | shard by auction, conditional write | single-writer actor for hot auctions |
+| Deep dives expected | race on highest bid | proxy price = second max + increment | anti-sniping extension in the same write as the closer |
+| Trade-offs & failure handling | none | authority clock, not client time | close vs late bid race provably single-winner |
+| Ops/cost/evolution | none | none | append-only bid log for audits; hot-auction fan-out cost |
+
+*Down-levelled by:* trusting client timestamps; accepting bids from a cached price.`,
+      keyPoints: [
+        'Senior finds the contention point itself: the frontier, the hot item, the hot counter, the contest spike, the final-minute bid.',
+        'Staff adds a source of truth, reconciliation and cost of exactness.',
+        'Classic traps: politeness locks, summing HLLs, wall-time judging, client timestamps.',
+      ],
+      source: 'Hello Interview — problem breakdowns, "What is expected at each level"',
+    },
+    {
+      heading: 'Deep-dive ladders: bad → good → great',
+      body: `**Intuition:** each rung fixes the failure the previous rung shows at peak. Name the failure with a number, then climb.
+
+**Crawler — politeness at 2K pages/s across 100M hosts**
+- **Bad:** a global queue plus a distributed lock per host. Lock traffic dominates, fetchers block, and one slow host stalls a worker.
+- **Good:** a per-host back queue with a fixed delay. That is polite, but importance is ignored and hot hosts starve the rest.
+- **Great:** front queues ordered by priority feed back queues, one per host. A min-heap on nextAllowedAt (from robots crawl-delay and observed latency) decides what goes next. The frontier is sharded by host hash, so no lock is ever needed, and it is checkpointed so a crash resumes.
+
+**Crawler — traps and duplicates**
+- **Bad:** exact-URL dedup only, so calendar and session-id traps generate infinite URLs. **Good:** canonicalisation plus depth and per-host page caps. **Great:** add SimHash (Hamming ≤ 3) to drop near-duplicate content, and track per-host novelty so low-yield hosts are quarantined automatically.
+
+**Top-K — trending over 1B events/day**
+- **Bad:** an exact hash map of every key per window. Memory is O(distinct keys), and the merge across shards is wrong if the stream isn't keyed by item.
+- **Good:** key the stream by item, so each partition's local top-K is exact and the merge is correct. Hot items still overload one partition.
+- **Great:** pre-aggregate at the producer to tame hot keys. Use Count-Min (w = e/ε, d = ln 1/δ) beside a candidate heap, and keep per-minute sketches that merge by addition into sliding windows. Rank by velocity against the item's own baseline, with a volume floor. A batch job keeps exact charts.
+
+**Counters — a viral post at 50K likes/s**
+- **Bad:** UPDATE posts SET likes = likes + 1. One row lock serialises everything at ~1–5K/s.
+- **Good:** the edge (post_id, user_id) is the truth, and deltas are coalesced per post in a stream. Write cost is proportional to distinct posts, not clicks.
+- **Great:** sharded counters only for detected hot keys. Reads come from cache with rounding ("1.2M"). "Liked by you" comes from the edge, and a periodic reconciliation emits adjustment events instead of silent overwrites.
+
+**Online judge — hostile code**
+- **Bad:** run code in a plain container with the network on. Fork bombs, crypto miners and reading the expected outputs are all possible.
+- **Good:** no network, read-only root, a non-root user, cap-drop ALL, seccomp, a pids limit, and memory without swap.
+- **Great:** gVisor or Firecracker for a boundary that doesn't share the kernel. Judge on CPU time with pinned cores, keep expected outputs outside the sandbox, and destroy the VM after each run.
+
+**Online judge — the contest spike (~333 submissions/s × 3 CPU-s ≈ 1,000 cores)**
+- **Bad:** reactive autoscaling takes minutes, by which time the contest is ruined. **Good:** priority queues (contest > practice > rejudge), one in-flight submission per user. **Great:** pre-scale from the contest calendar, rank by submission time rather than judging time, and keep a warm pool sized to the peak.
+
+**Auction — the last 10 seconds**
+- **Bad:** read the highest bid, then write. Two bids both "win", and the client's clock decides lateness.
+- **Good:** a conditional write (amount > current AND now < end_at) on the auction's shard, using the server clock.
+- **Great:** a single-writer actor per hot auction. The soft-close extension happens in the same write that accepts the bid, and the closer uses the same predicate, so the bid and the close cannot both win. Fan-out is coalesced to a few updates/s with sequence numbers.`,
+      keyPoints: [
+        'Shard the frontier by host so politeness never needs a lock.',
+        'Key streams by item; sketches merge by addition.',
+        'Edge is truth, counts are derived and reconciled.',
+        'MicroVM sandboxes + calendar pre-scaling; same-write soft close.',
+      ],
+      source: 'Hello Interview — problem breakdowns (Bad / Good / Great deep dives)',
+    },
   ],
   codeChallenges: [
     {

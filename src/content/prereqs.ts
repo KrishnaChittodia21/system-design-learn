@@ -27,6 +27,10 @@ export const PREREQS: Record<string, Record<string, PrereqLink[]>> = {
       {
         "topic": "net-protocols",
         "section": 6
+      },
+      {
+        "topic": "net-protocols",
+        "section": 9
       }
     ],
     "DNS — resolution, caching layers, and the caches you forgot": [
@@ -95,10 +99,6 @@ export const PREREQS: Record<string, Record<string, PrereqLink[]>> = {
       {
         "topic": "net-load-balancing",
         "section": 1
-      },
-      {
-        "topic": "net-load-balancing",
-        "section": 4
       }
     ],
     "L4 vs L7 — what each layer can and cannot see": [
@@ -335,8 +335,8 @@ export const PREREQS: Record<string, Record<string, PrereqLink[]>> = {
         "section": 10
       },
       {
-        "topic": "api-evolution",
-        "section": 6
+        "topic": "ds-theory",
+        "section": 4
       }
     ],
     "Zero-downtime migrations — expand, migrate, contract, with a lock budget": [
@@ -424,7 +424,7 @@ export const PREREQS: Record<string, Record<string, PrereqLink[]>> = {
       },
       {
         "topic": "ds-transactions",
-        "section": 8
+        "section": 1
       }
     ],
     "Distributed transactions / Saga — compensate instead of locking": [
@@ -479,8 +479,8 @@ export const PREREQS: Record<string, Record<string, PrereqLink[]>> = {
         "section": 6
       },
       {
-        "topic": "mq-fundamentals",
-        "section": 8
+        "topic": "rel-production-judgment",
+        "section": 5
       }
     ],
     "Dead Letter Queue — a parking lot with an owner": [
@@ -569,8 +569,8 @@ export const PREREQS: Record<string, Record<string, PrereqLink[]>> = {
         "section": 0
       },
       {
-        "topic": "net-service-mesh",
-        "section": 5
+        "topic": "observability",
+        "section": 4
       }
     ],
     "P95/P99 — percentiles, tail latency, and aggregation pitfalls": [
@@ -599,10 +599,6 @@ export const PREREQS: Record<string, Record<string, PrereqLink[]>> = {
       {
         "topic": "deployment-infra",
         "section": 6
-      },
-      {
-        "topic": "deployment-infra",
-        "section": 0
       }
     ],
     "Feature flags — decouple deploy from release, then clean up": [
@@ -617,8 +613,8 @@ export const PREREQS: Record<string, Record<string, PrereqLink[]>> = {
         "section": 10
       },
       {
-        "topic": "prod-correctness-ops",
-        "section": 5
+        "topic": "fund-scaling-journey",
+        "section": 10
       }
     ],
     "Multi-region — latency, residency, and hidden single-region dependencies": [

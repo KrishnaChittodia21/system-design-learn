@@ -1,0 +1,18 @@
+{
+  "id": "bitcask-kv",
+  "title": "Build a Bitcask Log-Structured Store",
+  "topics": ["fund-os-kernel", "db-postgres-internals", "misc-data"],
+  "difficulty": "hard",
+  "estimatedHours": 6,
+  "summary": "Build Bitcask, the storage engine behind Riak, on real files. You write **append-only data files** of CRC-checked records, an in-memory **keydir** so every read is a single positioned read, **tombstone** deletes, **file rotation** at a size limit, **merge/compaction** that writes **hint files**, **crash recovery** that truncates a torn final record, and a configurable **fsync policy**.\n\nThis is the simplest real storage engine, and it teaches the ideas behind WAL and LSM interview questions: why sequential writes are fast, what `fsync` actually buys you, how you detect a torn write, why tombstones exist, and why compaction must never resurrect deleted keys. Everything runs under an injected temp directory.",
+  "milestones": [
+    { "name": "M1: Record format", "description": "`encodeRecord` / `decodeRecord`: big-endian header (crc32, keyLen, valueLen), UTF-8 keys, tombstone marker; detect truncation and CRC corruption." },
+    { "name": "M2: Append-only store", "description": "put / get / keys over an append-only file and an in-memory keydir. Overwrites append and never rewrite. Data survives reopen." },
+    { "name": "M3: Deletes", "description": "Tombstones are appended only for existing keys, and deleted keys stay deleted after reopen." },
+    { "name": "M4: Rotation", "description": "Rotate the active file before it would exceed `maxFileBytes`; oversized records get their own file; reads find the right file and offset after many rotations." },
+    { "name": "M5: Merge and hint files", "description": "Compaction keeps only live values, shrinks disk use, writes one hint per output, and never resurrects deleted keys. Reopen uses the hints." },
+    { "name": "M6: Crash recovery and integrity", "description": "Truncate a torn or corrupt tail in the last file; refuse corruption in older files; verify the CRC on every read." },
+    { "name": "M7: Durability policy", "description": "fsync `always` / `never` / every N writes, counted in stats; all files stay inside the injected directory." }
+  ],
+  "files": ["src/index.ts"]
+}

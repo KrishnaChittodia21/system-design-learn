@@ -1,0 +1,16 @@
+{
+  "id": "rate-limiter",
+  "title": "Build a Pluggable Rate-Limiting Library",
+  "topics": ["rate-limiting", "lld-cases-2"],
+  "difficulty": "hard",
+  "estimatedHours": 5,
+  "summary": "Build the library behind every API gateway's `429 Too Many Requests`. Two algorithms — a **token bucket** (bursty but bounded) and a **sliding-window counter** (the Cloudflare approximation that fixes the fixed-window boundary burst) — sit behind one **Strategy interface**, so a `RateLimiter` can stack rules like *10/s burst AND 1000/hour* and charge **all of them or none**. Everything runs on an **injected clock**, keys are **memory-bounded** (LRU cap + idle sweep), and every denial carries an exact `retryAfterMs` that becomes a `Retry-After` header.\n\nInterview payoff: you can derive the sliding-window estimate and its retry time on a whiteboard, explain why a failed multi-rule check must not partially charge, and discuss what happens to limits when you evict state (fail-open) — and how this maps onto a Redis Lua script in a distributed deployment.",
+  "milestones": [
+    { "name": "M1: Token bucket", "description": "Lazy continuous refill capped at capacity, `check` (no charge, no state) vs `consume` (charge only when allowed), exact `retryAfterMs`, `Infinity` for cost > capacity, `RangeError` on bad config/cost." },
+    { "name": "M2: Sliding-window counter", "description": "Current + previous fixed-window counts with `prev * (1 - elapsed/W) + curr`. No boundary burst. Exact `retryAfterMs` both inside the current window and when you must wait for the next one." },
+    { "name": "M3: Multi-rule limiter", "description": "`RateLimiter([...rules])`: allowed only if all allow, `remaining = min`, denied → `deniedBy` + `retryAfterMs = max`. A denied request charges no rule. `reset(key)` across rules." },
+    { "name": "M4: Memory bound", "description": "`maxKeys` evicts the least-recently-used key; `sweep()` drops keys that are indistinguishable from fresh (full bucket / empty windows)." },
+    { "name": "M5: Retry-After", "description": "`retryAfterHeader(ms)` → whole seconds rounded up, `null` for never." }
+  ],
+  "files": ["src/index.ts"]
+}

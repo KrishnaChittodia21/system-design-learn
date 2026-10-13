@@ -892,6 +892,137 @@ export class HierarchicalTimingWheel {
         'Design and test for bursts, not averages.',
       ],
     },
+    {
+      heading: 'Level bar: what mid, senior and staff answers include',
+      body: `Calibration: **mid** is about 80% breadth / 20% depth, with the interviewer steering. **Senior** is about 60/40: a quick HLD, then deep dives you start yourself on durability, time and failure. **Staff** is about 40/60: you drive, and you raise multi-tenancy, cost, upgrades and the system's blast radius without being asked. Infra designs are the ones staff candidates are expected to run themselves.
+
+**Distributed message queue (Kafka-like)**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Produce, consume, retain | 1M msgs/s × 1 KB ≈ 1 GB/s; 7 days ≈ 600 TB × RF 3; per-partition ordering | Tenant quotas, geo-replication, schema governance |
+| High-level design | Brokers + topics + consumers | Partitioned append-only log, KRaft metadata, consumer-group offsets | Tiered storage to S3; control plane separate from brokers |
+| Deep dives expected | Partitions | Segments + sparse index, batching, zero-copy, ISR | Cooperative rebalancing, idempotent/transactional producers |
+| Trade-offs & failure handling | — | acks=1 vs all latency | Unclean leader election: availability vs data loss |
+| Ops/cost/evolution | — | Consumer lag, under-replicated partitions | Partition-count limits, throttled reassignment, disk vs tiered cost |
+
+- Down-levelled: "delete on consume" semantics; promising ordering across partitions.
+
+**Metrics monitoring**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Collect, query, alert | 10M series / 10 s ≈ 1M samples/s; 1 year of retention with downsampling | Cardinality governance, monitoring of the monitoring |
+| High-level design | Agents → DB → dashboards | Pull/push collectors → Kafka → TSDB (~1.4 B/sample compressed) → query + alert manager | Independent alert path that survives the main cluster failing |
+| Deep dives expected | — | Gorilla delta-of-delta/XOR, downsampling tiers | Per-tenant series limits, absent-data alerts |
+| Trade-offs & failure handling | — | Pull vs push for short-lived jobs | Dropping samples vs back-pressuring producers |
+| Ops/cost/evolution | — | ≈ 120 GB/day raw | Hot/cold tiers; recording rules to cut query cost |
+
+- Down-levelled: metrics as rows in Postgres; alerts that depend on the cluster being monitored.
+
+**Ad click aggregation**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Count clicks per ad/minute | 1B/day ≈ 12K/s (peak 50K); billing-grade accuracy; minutes of latency | Advertiser audit, fraud filtering, restatement policy |
+| High-level design | Queue → aggregator → DB | Kafka → Flink (event-time windows) → OLAP; raw events to S3 | Kappa replay from raw; daily batch reconciliation |
+| Deep dives expected | Windows | Watermarks, late events, checkpoints | Exactly-once sink, hot-ad key salting |
+| Trade-offs & failure handling | — | Allowed lateness vs freshness | Real-time number vs billed number, and who owns the difference |
+| Ops/cost/evolution | — | Watermark lag | Reprocessing cost; schema evolution of click events |
+
+- Down-levelled: processing-time windows for billing; \`UPDATE count = count + 1\`.
+
+**Distributed job scheduler**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | One-off + cron jobs | 10M jobs/day, ±1 s precision, at-least-once | Tenant fairness; exactly-once effects pushed to job idempotency |
+| High-level design | Cron box + workers | Jobs DB → partitioned schedulers → queue → workers + heartbeats | Timing wheel for near-term jobs, DB for long-term |
+| Deep dives expected | — | Claiming with SKIP LOCKED, leases | Fencing on completion, the :00 thundering herd, DST cron |
+| Trade-offs & failure handling | — | Poll interval vs DB load | Retries vs side effects; poison-job quarantine |
+| Ops/cost/evolution | — | Schedule-delay SLO | Rebalancing scheduler partitions, tenant quotas |
+
+- Down-levelled: a single cron host; no lease, so a slow job runs twice.
+
+**Logging platform**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Collect + search | 1M lines/s × 500 B ≈ 43 TB/day | PII redaction, per-team cost |
+| High-level design | Agents → ES | Agents → Kafka → processors → index + S3 | Label-only index + columnar cold tier |
+| Deep dives expected | — | Hot/warm/cold tiers | Noisy-tenant isolation, sampling |
+| Trade-offs & failure handling | — | Full-text vs label index | Drop debug logs under back-pressure |
+| Ops/cost/evolution | — | Retention per tier | Chargeback, retention compliance |
+
+- Down-levelled: full-text indexing of everything, kept hot for 30 days.`,
+      keyPoints: [
+        'Infra designs give the most credit for durability settings and time semantics.',
+        'Staff candidates raise multi-tenancy, upgrade paths and cost per GB unprompted.',
+        'Billing-grade pipelines need reconciliation, not just a streaming job.',
+      ],
+      source: 'Hello Interview — problem breakdowns (levelling expectations)',
+    },
+    {
+      heading: 'Deep-dive ladders: bad → good → great',
+      body: `**Message queue: never lose an acknowledged write**
+- **Bad:** \`acks=1\`. The leader acks, then dies before followers fetch, and the new leader truncates the write.
+- **Good:** \`acks=all\` with RF 3. But with \`min.insync.replicas=1\` the ISR can shrink to just the leader, so the same loss is possible.
+- **Great:** RF 3, \`min.insync.replicas=2\`, \`acks=all\`, \`unclean.leader.election.enable=false\`, and an idempotent producer so retries do not duplicate. Cost: a few ms of p99, and writes stop while 2 of 3 replicas are down (CP for that partition).
+
+**Ad clicks: exactly-once counts**
+- **Bad:** the consumer increments DB counters, then commits the offset. A crash between the two replays the batch and double-bills. Committing first loses clicks instead.
+- **Good:** dedup by \`click_id\` in Redis with a TTL. The counter write and the offset commit are still not atomic.
+- **Great:** Flink keeps window state in checkpoints, and the sink is either a two-phase-commit (transactional) sink or an idempotent upsert keyed by (ad_id, minute) carrying the checkpoint ID. Raw events in S3 feed a daily batch recompute that reconciles and restates. Cost: checkpoint latency (~1 min of output delay) and a second batch pipeline.
+
+**Scheduler: claim each job exactly once**
+- **Bad:** every scheduler runs \`SELECT ... WHERE run_at <= now()\` and executes the results, so N schedulers run each job N times.
+- **Good:** \`FOR UPDATE SKIP LOCKED\` + status RUNNING. A worker that crashes leaves the job RUNNING forever, and every node polls the same hot index.
+- **Great:** a lease (\`lease_until\`) renewed by heartbeat, a reaper that re-queues expired leases, and the attempt number as a fencing token checked on completion. Jobs are hash-partitioned across scheduler shards, and jobs due in the next minute load into an in-memory timing wheel. Cost: a heartbeat write every ~10 s per running job, and handlers must be idempotent.
+
+**Metrics: cardinality explosion**
+- **Bad:** accept any label. One \`user_id\` label turns a metric into 100M series and the TSDB runs out of memory.
+- **Good:** per-tenant active-series limits that reject new series. This is safe but blunt: the team notices only when dashboards go blank.
+- **Great:** relabel/drop rules at ingest, recording rules for heavy queries, a cardinality report per team, and alerts at 80% of quota. Cost: governance work across teams.
+
+**Logging: cost at 43 TB/day**
+- **Bad:** full-text index of everything, hot for 30 days, with 2 replicas: about 2.6 PB of SSD.
+- **Good:** 3 days hot, then warm, then S3 searchable snapshots.
+- **Great:** a label-only index (Loki-style) over compressed chunks in S3, sampling of debug logs, and per-team quotas with chargeback. Cost: cold-tier searches take seconds to minutes.`,
+      code: [
+        {
+          language: 'sql',
+          title: 'Scheduler claim with lease + fencing (Postgres)',
+          code: `-- Claim up to 100 due jobs without blocking other schedulers
+WITH due AS (
+  SELECT id FROM jobs
+  WHERE status = 'QUEUED' AND run_at <= now()
+  ORDER BY run_at
+  LIMIT 100
+  FOR UPDATE SKIP LOCKED          -- other pollers skip these rows
+)
+UPDATE jobs j
+SET status = 'RUNNING',
+    attempt = j.attempt + 1,      -- fencing token for this run
+    lease_until = now() + interval '30 seconds',
+    worker_id = $1
+FROM due WHERE j.id = due.id
+RETURNING j.id, j.attempt;
+
+-- Completion only wins if this worker still holds the same attempt
+UPDATE jobs SET status = 'DONE'
+WHERE id = $2 AND attempt = $3 AND status = 'RUNNING';
+
+-- Reaper: re-queue jobs whose lease expired (worker died)
+UPDATE jobs SET status = 'QUEUED'
+WHERE status = 'RUNNING' AND lease_until < now();`,
+        },
+      ],
+      keyPoints: [
+        'Durability: acks=all only helps together with min.insync.replicas=2 and no unclean election.',
+        'Exactly-once = checkpointed state + transactional or idempotent sink + batch reconciliation.',
+        'Leases need fencing (an attempt number) or a zombie worker can still complete a job.',
+      ],
+    },
   ],
   codeChallenges: [
     {

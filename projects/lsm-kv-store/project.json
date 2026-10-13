@@ -1,0 +1,16 @@
+{
+  "id": "lsm-kv-store",
+  "title": "Build an LSM-Tree Key-Value Store",
+  "topics": ["db-indexing", "db-postgres-internals", "fund-os-kernel"],
+  "difficulty": "expert",
+  "estimatedHours": 10,
+  "summary": "Build the storage engine design behind LevelDB, RocksDB, Cassandra and ScyllaDB. Writes go to an append-only **write-ahead log** and an in-memory **memtable**; full memtables are flushed to immutable, sorted **SSTable** files with a **sparse index** and a footer; reads search memtable → newest → oldest table; deletes are **tombstones**; and **size-tiered compaction** merges tables, dropping shadowed versions — and tombstones only when it is safe. A MANIFEST file is your atomic commit point, so a crash at any moment leaves a store that reopens correctly.\n\nInterview payoff: you can explain write amplification vs read amplification, why sequential writes beat B-tree page updates on write-heavy workloads, how a torn WAL tail is detected, why compaction can resurrect deleted data if done wrong, and how this contrasts with Postgres' heap + WAL + B-tree design.",
+  "milestones": [
+    { "name": "M1: SSTable file", "description": "Immutable sorted file with a binary format of your choice: records + sparse index + footer. `open` loads only footer + index; `get` reads at most one index block (checked via `bytesRead`); keys outside `[minKey, maxKey]` cost zero I/O; range `entries(start, end)`." },
+    { "name": "M2: Memtable + WAL", "description": "`put`/`delete` append to `wal.log` before touching the memtable. `open` replays the WAL after a crash, ignores a torn final record, and leaves the log appendable." },
+    { "name": "M3: Flush & layered reads", "description": "At `memtableMaxEntries` the memtable becomes a tier-0 SSTable, the WAL is emptied, tables persist across restarts, and reads go memtable → newest → oldest with tombstones hiding older values." },
+    { "name": "M4: Range scan", "description": "`scan(start, end)` merges all layers: newest version wins, tombstones hidden, half-open bounds, ascending order." },
+    { "name": "M5: Size-tiered compaction", "description": "When a tier reaches `compactionThreshold` tables, merge them into one tier+1 table and delete the inputs; drop shadowed versions; keep tombstones unless no older table remains. `compact()` merges everything. Must match an in-memory model over thousands of random ops and a restart." }
+  ],
+  "files": ["src/index.ts"]
+}

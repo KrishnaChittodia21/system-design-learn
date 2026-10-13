@@ -824,6 +824,108 @@ export async function transition(db: Pool, tripId: string, to: TripState, eventI
         'Timestamps + TTLs on every location; treat it as PII.',
       ],
     },
+    {
+      heading: 'Level bar: what mid, senior and staff answers include',
+      body: `Calibration: **mid** is about 80% breadth / 20% depth, with the interviewer steering. **Senior** is about 60/40: HLD done fast, deep dives chosen by you, trade-offs given with numbers. **Staff** is about 40/60: you drive, and you raise ops, cost, privacy and evolution without being asked.
+
+**Proximity service (Yelp)**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Search by radius, business CRUD | 100M DAU × 5 searches ≈ 5K QPS (peak ~25K); writes rare, so next-day freshness is fine | Ranking scope, per-country data residency, freshness SLA as a product decision |
+| High-level design | LBS + business service + DB | Read replicas, in-memory geo index, cache keyed by cell | Index built offline as a versioned artifact and swapped blue/green onto stateless nodes |
+| Deep dives expected | Geohash, when asked | Precision vs radius, the 8-neighbour edge case, quadtree memory/build time | Density-adaptive cells (S2/H3), cross-region queries |
+| Trade-offs & failure handling | — | Geohash in Redis/DB vs in-process quadtree | Staleness vs simpler operations; node warm-up on restart |
+| Ops/cost/evolution | — | Cache hit ratio by cell | Rebuild pipeline, memory per replica vs replica count |
+
+- Down-levelled: two B-tree indexes on lat and lng; forgetting the neighbour cells at boundaries.
+
+**Nearby friends**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Show friends within 5 miles | 10M concurrent × 1 update/30 s ≈ 334K updates/s; ~40 online friends each ≈ 14M pushes/s | Opt-in, precision blurring, battery, no location history by default |
+| High-level design | WebSocket + cache | WS servers, location cache with TTL, Redis pub/sub channel per user, distance filter at the receiver | Regional cells; pub/sub ring managed through service discovery |
+| Deep dives expected | — | Pub/sub sizing, sticky connections | Resharding pub/sub live, connection draining, back-pressure |
+| Trade-offs & failure handling | — | Channel per user vs per geo cell | Lossy is acceptable; the next update heals any gap |
+| Ops/cost/evolution | — | Connection count per node | Reconnect storm after a deploy; jittered reconnects |
+
+- Down-levelled: HTTP polling for 400 friends; writing every ping to a DB.
+
+**Google Maps**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Show map, route, ETA | Static tiles vs dynamic routing/ETA; batched location pings | Offline maps, map-data update cadence, privacy of traces |
+| High-level design | Tile server + routing service | Precomputed tiles per zoom in S3 + CDN; routing tiles; live-traffic ETA; Kafka ingestion | Offline pipelines (map build, traffic aggregation) separated from online serving |
+| Deep dives expected | Shortest path | Hierarchical routing tiles, A*/contraction hierarchies | Incremental graph updates, ETA model feedback, reroute fan-out |
+| Trade-offs & failure handling | — | Vector vs raster tiles | Stale traffic falls back to historical speeds |
+| Ops/cost/evolution | — | CDN hit ratio | Tile count ×4 per zoom level, so precompute only populated areas at high zoom |
+
+- Down-levelled: Dijkstra over the whole world graph; rendering tiles on every request.
+
+**Uber**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Request, match, track | 1M active drivers ping every 4 s ≈ 250K writes/s; match in seconds; never double-book | Marketplace health (surge, fairness), city isolation |
+| High-level design | Rider, driver, location, matching services | In-memory geo index (H3) per city, offers with timeouts, trip state machine in a durable DB | City-sharded dispatch, regional failover of in-flight trips |
+| Deep dives expected | Nearest driver | Driver lock with TTL, offer expiry | Batched matching over a 2 s window |
+| Trade-offs & failure handling | — | Greedy nearest vs batched optimum | Degraded mode when location lag is over 10 s |
+| Ops/cost/evolution | — | Match-latency SLO | Ping retention cost, per-city rollouts |
+
+- Down-levelled: every ping to Postgres; two riders can win the same driver.
+
+**Food delivery**
+
+| Area | Mid | Senior | Staff |
+|---|---|---|---|
+| Requirements & scope | Order, restaurant, rider | Three parties, order states, prep-time ETA | Restaurant capacity, rider earnings, dinner peaks at 3× |
+| High-level design | Order + dispatch | Restaurant tablet channel, delayed rider assignment | Assignment solver timed to the prep-time estimate |
+| Deep dives expected | — | When to assign the rider | Batching several pickups per rider |
+| Trade-offs & failure handling | — | Early assignment (idle riders) vs late (cold food) | Restaurant offline: auto-cancel and refund |
+| Ops/cost/evolution | — | ETA accuracy | Cost per delivery as the metric you optimise |
+
+- Down-levelled: assigning the rider at checkout.`,
+      keyPoints: [
+        'Geo designs reward putting numbers on write rate and fan-out first.',
+        'Senior names the index and its edge cases; staff talks about building, shipping and warming it.',
+        'Privacy and battery are staff-level concerns you raise unprompted.',
+      ],
+      source: 'Hello Interview — problem breakdowns (levelling expectations)',
+    },
+    {
+      heading: 'Deep-dive ladders: bad → good → great',
+      body: `**Proximity: the spatial index**
+- **Bad:** \`WHERE lat BETWEEN ... AND lng BETWEEN ...\` with two B-tree indexes. Each index returns a band around the globe, and intersecting two bands means scanning millions of rows to get 50 results.
+- **Good:** geohash prefix on one indexed column, queried with the 8 neighbours so edge cases work. A fixed precision is still wrong in both directions: a Manhattan cell holds 10K businesses, a desert cell holds none.
+- **Great:** a quadtree split at about 100 businesses per leaf, or an S2 region covering with mixed cell levels. Build it in memory on each LBS node (200M points fit in a few GB) and rebuild offline nightly. Cost: minutes of build at boot, so ship a snapshot and keep the node out of the LB until it is warm.
+
+**Nearby friends: location fan-out**
+- **Bad:** clients poll friends' locations every 30 s. That is 10M users × 1 request per 30 s, and each request does 400 cache lookups.
+- **Good:** one Redis pub/sub channel per user. Each location update publishes once, and the friends' WS servers filter by distance. But 14M deliveries/s overwhelms one Redis, which can only push a few hundred thousand to a million messages/s per core.
+- **Great:** a pub/sub cluster of about 100 nodes, consistent-hashed by user, with the ring kept in etcd. Reshard off-peak and let clients re-subscribe, accepting a few lost updates because the next one heals. Cost: you operate a stateful ring, and subscriptions churn on every reconnect.
+
+**Uber: never double-book a driver**
+- **Bad:** read the nearest available driver, send an offer, then write the trip. Two matchers working concurrently pick the same driver.
+- **Good:** a conditional update, \`UPDATE drivers SET state='OFFERED', trip_id=$1 WHERE id=$2 AND state='AVAILABLE'\`. It is correct, but a DB round trip per offer becomes contention under peak load.
+- **Great:** \`SET driver:{id} {offerId} NX PX 10000\` as the offer lock. The TTL equals the offer window, so a driver who never answers frees himself. Offers go one driver at a time, with a timeout. Only an accepted offer writes the trip durably, guarded by the offer ID as a fencing token. At staff level, collect requests for about 2 s and solve a batch assignment to cut total pickup time. Cost: up to 2 s of added latency, and a Redis outage stops matching in that city.
+
+**Maps: routing at continental scale**
+- **Bad:** Dijkstra over billions of edges, which takes seconds per query and gigabytes of memory.
+- **Good:** A* over routing tiles loaded on demand. Long routes still pull in thousands of tiles.
+- **Great:** hierarchical tiles (local, arterial, highway) or contraction hierarchies with precomputed shortcuts, so a query takes milliseconds. Customisable CH lets live traffic re-weight edges without a full rebuild. Cost: hours of preprocessing, plus a separate pipeline for traffic.
+
+**Food delivery: rider assignment timing**
+- **Bad:** assign at checkout, and the rider waits 20 minutes at the restaurant.
+- **Good:** assign when predicted prep time minus travel time is about 0. Prep-time error (±8 min) still causes waits or cold food.
+- **Great:** a batched solver every 30 s, using restaurant "ready" signals and batching orders on the same route. Cost: solver complexity, and it needs good prep-time ML.`,
+      keyPoints: [
+        'Spatial: two 1-D indexes → geohash → adaptive quadtree/S2 held in memory.',
+        'Fan-out: polling → pub/sub → sharded pub/sub that accepts lossy delivery.',
+        'Dispatch: race → conditional update → TTL lock + fencing + batch matching.',
+      ],
+    },
   ],
   codeChallenges: [
     {

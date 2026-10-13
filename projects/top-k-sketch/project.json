@@ -1,0 +1,16 @@
+{
+  "id": "top-k-sketch",
+  "title": "Build a Count-Min Sketch + Heavy-Hitters Top-K",
+  "topics": ["design-more", "design-advanced"],
+  "difficulty": "hard",
+  "estimatedHours": 5,
+  "summary": "Build the probabilistic data structures behind *\"design top-K / trending hashtags / heavy hitters\"*. You implement a **Count-Min Sketch** (width and depth from ε/δ, seeded MurmurHash3 rows, never underestimates, mergeable across shards), a **top-K heavy-hitters** tracker that pairs the sketch with a size-K min-heap, and **trending in the last N minutes**, which uses time buckets whose sketches are merged at query time.\n\nThe judge streams 100,000 Zipf-distributed events. It checks the ε·N error bound, that merged sketches equal a sketch of the whole stream, and that your top-10 matches the exact top-10, all in a fixed amount of memory that does not grow with the number of distinct items.",
+  "milestones": [
+    { "name": "M1: Hashing and sizing", "description": "MurmurHash3 (x86, 32-bit) that matches the reference vectors; `sketchDimensions(ε, δ)` = ⌈e/ε⌉ × ⌈ln 1/δ⌉." },
+    { "name": "M2: Count-Min Sketch", "description": "add / estimate (min over rows) / total; never underestimates; at most a δ fraction of items exceed ε·N on a Zipf stream; more rows mean less error." },
+    { "name": "M3: Mergeable sketches", "description": "Cell-wise merge equals sketching the concatenated stream, which is how per-shard or per-minute sketches combine. Incompatible sketches are rejected; `clone` is independent." },
+    { "name": "M4: Heavy hitters with a min-heap", "description": "A generic `MinHeap`, then `HeavyHitters`: K candidates ranked by sketch count with deterministic tie-breaks. Matches the exact top-10 on 100k events; late risers get in." },
+    { "name": "M5: Trending in a sliding window", "description": "`TrendingTopK` with time buckets: only the last `windowMs` counts, steady items beat one-minute spikes, and memory is bounded by the bucket count." }
+  ],
+  "files": ["src/index.ts"]
+}

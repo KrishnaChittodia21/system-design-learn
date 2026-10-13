@@ -1,0 +1,16 @@
+{
+  "id": "stream-windows",
+  "title": "Build a Windowed Stream Aggregator with Watermarks",
+  "topics": ["data-pipelines", "ds-theory"],
+  "difficulty": "hard",
+  "estimatedHours": 5,
+  "summary": "Build the core of Flink, Kafka Streams and Beam: **event-time** windowed aggregation per key. You implement **tumbling** and **sliding (hopping)** window assignment, a **watermark** (`max event time − allowed out-of-orderness`), firing on watermark, and **allowed lateness** that re-emits updated results with increasing revisions. Events that are too late are **dropped or sent to a side output**. On the sink side, an **idempotent upsert table** makes re-emission and replays safe.\n\nThis is the vocabulary of every \"design a real-time analytics / metrics / billing pipeline\" interview: *what is a watermark, what happens to late data, how do you avoid double counting with an at-least-once source?* The final test checks your streaming results against a batch computation on a shuffled stream of 3,000 events.",
+  "milestones": [
+    { "name": "M1: Window assignment and aggregators", "description": "Epoch-aligned, half-open tumbling and sliding windows, including negatives and gaps; `sum`, `count`, `max` and `avg` aggregators." },
+    { "name": "M2: Watermarks and firing", "description": "Watermark = max event time − out-of-orderness, monotonic. A window fires once the watermark passes its end. Out-of-order events within the bound land in their event-time window." },
+    { "name": "M3: Late data", "description": "Events behind every one of their windows are dropped and counted, or sent to a side output. A partly-late sliding event still feeds its open windows." },
+    { "name": "M4: Allowed lateness and idempotent sinks", "description": "Late updates re-emit with revision + 1; state is purged after `end + allowedLateness`; a `ResultTable` upsert sink ignores stale and duplicate revisions." },
+    { "name": "M5: Exactly-once-ish results", "description": "Dedupe by event id, explicit watermarks for idle sources, `flush`, deterministic firing order, and equality with a batch computation on a shuffled stream." }
+  ],
+  "files": ["src/index.ts"]
+}

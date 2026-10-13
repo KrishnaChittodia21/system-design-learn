@@ -1,0 +1,18 @@
+{
+  "id": "idempotency-saga",
+  "title": "Build Idempotency Keys + an Orchestrated Saga",
+  "topics": ["ds-transactions", "misc-distributed"],
+  "difficulty": "hard",
+  "estimatedHours": 6,
+  "summary": "Build the two patterns that make money-moving APIs safe without distributed transactions: **idempotency keys** (Stripe-style `Idempotency-Key`: first request runs, a concurrent duplicate gets **409**, a completed duplicate **replays** the stored response, the same key with a different body is **422**, records expire after a TTL) and an **orchestrated saga** with persisted state, retries, compensations in reverse order, crash-resume and a **pivot step** (the point of no return).\n\nInterviewers probe exactly these edges: *what if the client retries while the first request is still running?*, *what if the orchestrator dies between charging the card and saving that it did?*, *what if a compensation fails?* After this project you can answer with code you wrote.",
+  "milestones": [
+    { "name": "M1: Fingerprints and first requests", "description": "Canonical payload fingerprint (sorted keys, SHA-256). `handleIdempotent` runs the handler for a new key and stores the response." },
+    { "name": "M2: Replay and in-flight duplicates", "description": "Completed duplicates replay a **copy** of the stored response (`replayed: true`). A duplicate that arrives while the first is in flight gets **409** and the handler runs exactly once." },
+    { "name": "M3: Misuse and failure", "description": "Same key + different payload → **422**; missing key → **400**; a handler that throws releases the lock so the client can retry; deterministic 4xx results are stored and replayed." },
+    { "name": "M4: TTLs and lock leases", "description": "Completed records expire after `ttlMs`. An in-progress lock left by a crashed worker expires after `lockTtlMs`, so the key is not stuck forever." },
+    { "name": "M5: Saga forward path, compensation and retries", "description": "Run steps in order and merge context patches. On failure, compensate completed steps in **reverse** order. Retries reuse the same idempotency key." },
+    { "name": "M6: Persisted state and crash-resume", "description": "Persist after every transition through an injected `SagaStore`. A new orchestrator can `resume` after a crash at any point; idempotent steps make re-execution safe; `start` on an existing id never restarts." },
+    { "name": "M7: Pivot step and stuck sagas", "description": "After the pivot, failures are retried forward and never compensated; exhausting retries or a failing compensation marks the saga `failed` for a human to fix. Validate step definitions." }
+  ],
+  "files": ["src/index.ts"]
+}

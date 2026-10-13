@@ -1,0 +1,16 @@
+{
+  "id": "parking-lot-lld",
+  "title": "Build the Parking Lot LLD (Machine-Coding Round)",
+  "topics": ["lld-cases-1", "lld-oop-solid", "lld-patterns-concurrency"],
+  "difficulty": "medium",
+  "estimatedHours": 4,
+  "summary": "The most-asked machine-coding problem, built the way a strong candidate would build it in 90 minutes. You write clear entities (`Spot`, `Vehicle`, `Ticket`, `Receipt`), a pluggable **allocation strategy** (EV spots first, then smallest fit, then nearest to the entry gate), **pluggable fee rules in integer paise** (slab pricing with a grace period, wrapped by a daily-cap decorator), ticketed entry and exit, and an async **mutex** that keeps allocation correct under concurrent entries.\n\nThe judge fires 40 concurrent entries at 10 spots with seeded I/O jitter and checks that no spot or plate is ever double-booked. It then registers a **new vehicle type (bus)** with its own spot size and pricing, and the allocator must handle it without any code change. That is the open/closed principle, tested.",
+  "milestones": [
+    { "name": "M1: Fee rules", "description": "`SlabFeeRule` (grace, slabs, per started hour beyond), `PerHourFeeRule`, and a `DailyCapFeeRule` decorator, all in integer paise with input validation." },
+    { "name": "M2: Allocation", "description": "`NearestSmallestFitStrategy`: EV preference, smallest fit, nearest to the gate, id tie-break. Regular cars never take EV spots. `LotFullError`, and validation of gate, type and pricing." },
+    { "name": "M3: Tickets and exit", "description": "Tickets record entry; exit computes the fee, frees the spot and closes the ticket. Double exit and duplicate plates are rejected." },
+    { "name": "M4: Concurrency", "description": "A FIFO `Mutex`; 40 concurrent entries for 10 spots give exactly 10 distinct spots; the same plate at two gates gets one ticket; concurrent double exit pays once." },
+    { "name": "M5: Extensibility", "description": "Register a `bus` type with a size-4 bay and its own pricing, with no allocator change. Inject a different allocation strategy (valet: farthest first)." }
+  ],
+  "files": ["src/index.ts"]
+}
