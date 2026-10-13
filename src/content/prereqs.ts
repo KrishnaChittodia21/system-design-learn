@@ -53,15 +53,19 @@ export const PREREQS: Record<string, Record<string, PrereqLink[]>> = {
     ],
     "Sessions — server-side state that is easy to revoke": [
       {
-        "topic": "fund-scalability",
-        "section": 1
+        "topic": "api-auth-sso",
+        "section": 0
       },
       {
-        "topic": "db-replication",
-        "section": 5
+        "topic": "api-auth-sso",
+        "section": 7
       }
     ],
     "Cookies — attributes, SameSite reality, and scope": [
+      {
+        "topic": "api-auth-sso",
+        "section": 0
+      },
       {
         "topic": "security-general",
         "section": 7
@@ -79,8 +83,8 @@ export const PREREQS: Record<string, Record<string, PrereqLink[]>> = {
         "section": 4
       },
       {
-        "topic": "api-security",
-        "section": 2
+        "topic": "api-auth-sso",
+        "section": 0
       }
     ],
     "Authentication vs Authorization — who you are vs what you may touch": [
@@ -264,7 +268,7 @@ export const PREREQS: Record<string, Record<string, PrereqLink[]>> = {
       },
       {
         "topic": "db-indexing",
-        "section": 2
+        "section": 10
       }
     ],
     "Connection Pooling — a queue in front of a scarce resource": [
@@ -569,8 +573,8 @@ export const PREREQS: Record<string, Record<string, PrereqLink[]>> = {
         "section": 0
       },
       {
-        "topic": "observability",
-        "section": 4
+        "topic": "net-service-mesh",
+        "section": 5
       }
     ],
     "P95/P99 — percentiles, tail latency, and aggregation pitfalls": [

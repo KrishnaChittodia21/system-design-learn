@@ -13,6 +13,8 @@ const topic: Topic = {
     'Apache Kafka documentation (3.x / 4.x)',
     'Kafka: The Definitive Guide, 2nd ed.',
     'RabbitMQ and Amazon SQS documentation',
+    'AWS documentation — Amazon SQS message quotas, Amazon SNS quotas and FIFO topics, Amazon EventBridge quotas and archive/replay, Kinesis Data Streams quotas (2026)',
+    'ByteByteGo — SQS vs SNS vs EventBridge vs Kinesis (2025)',
   ],
   tags: ['kafka', 'rabbitmq', 'sqs', 'pub-sub', 'partitions', 'isr', 'acks', 'consumer-groups', 'offsets', 'exactly-once', 'kraft', 'event-driven', 'kafkajs'],
   cheatSheet: [
@@ -604,6 +606,112 @@ message LineItem {
       ],
       source: 'Confluent Schema Registry docs; Alex Xu — System Design Interview Vol 2, Ch 4',
     },
+    {
+      heading: 'AWS messaging compared: SQS vs SNS vs EventBridge vs Kinesis',
+      body: `**Intuition:** SQS is a pile of work tickets that one worker at a time takes from. SNS is a megaphone that pushes a copy to everyone subscribed. EventBridge is a mail room that opens each envelope, reads the content and routes it by rules. Kinesis is a tape recorder: one ordered tape per shard, and every reader can rewind its own playback head.
+
+**The four models in one table** (default quotas, us-east-1, checked against the AWS quota pages in 2026; most are soft limits you can raise):
+
+| | SQS | SNS | EventBridge (rule bus) | Kinesis Data Streams |
+|---|---|---|---|---|
+| Model | queue, competing consumers | pub/sub push fan-out | event bus + content-based rules | sharded, append-only stream |
+| Consumers | pull (long poll ≤ 20 s), message deleted after processing | pushed to SQS, Lambda, HTTP(S), email, SMS, mobile, Firehose | ≤ 5 targets per rule, 300 rules per bus | pull per shard (GetRecords) or push via enhanced fan-out |
+| Ordering | standard: best effort; FIFO: per \`MessageGroupId\` | standard: none; FIFO topic: per group (SQS subscribers only) | none | strict per shard (partition key → shard) |
+| Retention / replay | 1 min–14 days (4 d default); no replay once deleted | none on standard; FIFO topics can archive and replay | archive + replay to the same bus | 24 h default, up to 365 days; replay from a sequence number or timestamp |
+| Throughput | standard: nearly unlimited; FIFO 300 calls/s per action (3,000 msg/s batched), high-throughput FIFO up to 70K calls/s | 30K publishes/s per account; FIFO 300 msg/s per group | PutEvents 10K requests/s; 18,750 target invocations/s | per shard 1 MB/s or 1,000 records/s in, 2 MB/s out; on-demand scales to 10 GB/s |
+| Max payload | 1 MiB | 256 KiB default, 1 MiB configurable | small JSON events (use claim-check for big data) | 10 MiB record |
+| Delivery | at-least-once (FIFO dedups within 5 min) | at-least-once, retried per delivery policy, then subscription DLQ | at-least-once, retries up to 24 h / 185 attempts, then target DLQ | at-least-once; producer retries can duplicate records |
+
+**What each one is really for:**
+- **SQS** buffers work for one logical consumer: back-pressure, visibility timeout, DLQ redrive. It has no routing and no fan-out on its own.
+- **SNS** copies one message to many endpoints with subscription **filter policies** (≤ 200 per topic). It stores nothing for standard topics, so a subscriber that is down needs a queue in front of it.
+- **EventBridge** routes JSON events by content patterns (prefix, numeric ranges, \`anything-but\`, \`exists\`, wildcards) across accounts and from 200+ AWS and SaaS sources. Its **schema registry** discovers event shapes and generates typed bindings. It also offers **Pipes** (source → filter → enrich → target) and **Scheduler**. Latency is higher than SNS (often hundreds of ms), and there is no ordering. AWS docs now also describe a newer Custom Event Bus with subscribers and stored retention (1–365 days); in interviews, "EventBridge" still usually means the classic rules-and-targets bus.
+- **Kinesis** is the closest thing to Kafka on AWS: shards ≈ partitions, partition key ≈ message key, sequence number ≈ offset, and the KCL lease table in DynamoDB ≈ a consumer group's committed offsets. Enhanced fan-out gives each registered consumer its own 2 MB/s per shard instead of sharing it.
+
+**Typical combinations:**
+1. **SNS → SQS fan-out.** Each consuming service owns its queue, so it gets its own buffer, retry pace and DLQ, and a slow consumer never delays the others. Turn on raw message delivery to skip the SNS JSON envelope.
+2. **EventBridge → SQS → worker.** Rules do the routing; the queue absorbs bursts and protects a rate-limited consumer. Common for SaaS webhooks and cross-account events.
+3. **Kinesis → Lambda.** The event source mapping polls each shard in batches (up to 10 concurrent batches per shard with \`ParallelizationFactor\`, while ordering is kept per partition key). Without bisect-on-error, a bounded retry count and an on-failure destination, one poison record blocks its shard until it expires.
+4. **Kinesis → Firehose → S3** for the data lake; **DynamoDB Streams → Pipes → EventBridge** for change events.
+
+**Mapping to Kafka and RabbitMQ:** SQS ≈ a RabbitMQ quorum queue without exchanges. SNS ≈ a fanout or topic exchange that stores nothing. EventBridge ≈ a managed headers/topic exchange with a schema registry. Kinesis ≈ a small-partition Kafka: 1 MB/s per shard is far below a Kafka partition, there is no log compaction, and retention stops at 365 days. If you need Kafka semantics such as compaction, transactions or Kafka Connect, use **MSK**.
+
+**Decision table:**
+
+| Need | Pick |
+|---|---|
+| Background jobs, one consumer type, retries + DLQ | SQS standard |
+| Per-entity ordering, low volume, exactly-once processing window | SQS FIFO (group = entity id) |
+| Same message to N internal services, each at its own pace | SNS → SQS per service |
+| Route by content across accounts, SaaS sources, many rule owners | EventBridge (+ SQS in front of fragile targets) |
+| High-volume ordered stream, several independent readers, replay | Kinesis (or MSK) |
+| Compaction, exactly-once stream processing, Kafka ecosystem | MSK |
+
+**In interviews say this:** "SQS is a buffer, SNS is a copier, EventBridge is a router and Kinesis is a log. I combine them by role: route or fan out first, then put a queue in front of each consumer that needs its own retries."`,
+      diagram: `   producer                         producer                 producer
+      |                                |                        |
+      v                                v                        v
+ +---------+   +-----------+     +-------------+        +-----------------+
+ |  SNS    |-->| SQS email |     | EventBridge |        | Kinesis stream  |
+ |  topic  |-->| SQS fraud |     |  bus        |        | shard-0 [1 2 3] |
+ |         |-->| SQS search|     |  rule A ----+-> SQS  | shard-1 [1 2]   |
+ +---------+   +-----------+     |  rule B ----+-> SFN  +-----------------+
+  push copies   each consumer    |  rule C ----+-> API    ^ reader A @ seq 3
+  (no storage)  owns buffer+DLQ  +-------------+        ^ reader B @ seq 1
+                                 content-based routing   replay by position`,
+      code: [
+        {
+          language: 'typescript',
+          title: 'AWS SDK v3: SNS→SQS subscription with a filter, EventBridge event, Kinesis keyed write',
+          code: `import { SNSClient, SubscribeCommand } from '@aws-sdk/client-sns';
+import { EventBridgeClient, PutEventsCommand } from '@aws-sdk/client-eventbridge';
+import { KinesisClient, PutRecordsCommand } from '@aws-sdk/client-kinesis';
+
+const sns = new SNSClient({});
+const eb = new EventBridgeClient({});
+const kinesis = new KinesisClient({});
+
+// 1) Fan-out: the fraud queue only receives high-value orders.
+//    (The queue's access policy must allow sns.amazonaws.com with aws:SourceArn = topic ARN.)
+await sns.send(new SubscribeCommand({
+  TopicArn: process.env.ORDERS_TOPIC_ARN,
+  Protocol: 'sqs',
+  Endpoint: process.env.FRAUD_QUEUE_ARN,
+  Attributes: {
+    RawMessageDelivery: 'true', // consumer gets the body, not the SNS JSON envelope
+    FilterPolicyScope: 'MessageBody',
+    FilterPolicy: JSON.stringify({ totalMinor: [{ numeric: ['>=', 5000000] }] }),
+    RedrivePolicy: JSON.stringify({ deadLetterTargetArn: process.env.FRAUD_SUB_DLQ_ARN }),
+  },
+}));
+
+// 2) Router: rules on the bus decide who gets it (partners, audit, workflows).
+const res = await eb.send(new PutEventsCommand({
+  Entries: [{
+    EventBusName: 'commerce',
+    Source: 'orders.service',
+    DetailType: 'OrderPlaced',
+    Detail: JSON.stringify({ orderId: 'o-981', market: 'IN', totalMinor: 7200000 }),
+  }],
+}));
+if (res.FailedEntryCount) throw new Error('retry the failed entries only'); // partial failure is per entry
+
+// 3) Log: the partition key pins every event of one order to one shard (ordering + replay).
+const out = await kinesis.send(new PutRecordsCommand({
+  StreamName: 'order-events',
+  Records: [{ PartitionKey: 'o-981', Data: Buffer.from(JSON.stringify({ type: 'OrderPlaced', v: 1 })) }],
+}));
+console.log('failed records', out.FailedRecordCount); // also per record: resend only those`,
+        },
+      ],
+      keyPoints: [
+        'SQS buffers, SNS copies, EventBridge routes by content, Kinesis keeps an ordered, replayable log per shard.',
+        'Put an SQS queue in front of every consumer that needs its own pace, retries and DLQ (SNS→SQS, EventBridge→SQS).',
+        'Kinesis ≈ Kafka with small partitions: 1 MB/s or 1,000 records/s in per shard, retention up to 365 days, no compaction.',
+        'Every option is at-least-once by default, so consumers stay idempotent; batch APIs fail per entry.',
+      ],
+      source: 'AWS docs: SQS message quotas, SNS quotas and FIFO topics, EventBridge quotas and archive/replay, Kinesis Data Streams quotas (2026); ByteByteGo — SQS vs SNS vs EventBridge vs Kinesis (2025)',
+    },
   ],
   codeChallenges: [
     {
@@ -1143,6 +1251,55 @@ Propagate W3C \`traceparent\` in message headers; dashboards for consumer lag an
         'Dual writes to DB and Kafka',
       ],
     },
+    {
+      id: 'mq-fundamentals-iq-08',
+      difficulty: 'expert',
+      question:
+        'You are all-in on AWS. Every OrderPlaced event must reach six consumers: email, search indexing, a fraud model, a data lake, three partner webhooks with different filters, and an audit account owned by another team. The fraud team needs strict per-order ordering and wants to re-run the last 7 days after shipping a model bug. Which of SQS, SNS, EventBridge and Kinesis do you use, where, and why?',
+      whatInterviewerLooksFor: [
+        'Assigns each service by role (buffer, copier, router, log) instead of picking one for everything',
+        'Notices that only a log gives per-key ordering plus a 7-day replay',
+        'Puts a queue with its own DLQ in front of fragile or slow consumers',
+        'Uses real limits (shard throughput, targets per rule, retention) to size the design',
+        'Keeps one source of truth for publishing (outbox) instead of dual-writing to several services',
+      ],
+      modelAnswer: `### Split by role
+- **Ordering and replay → Kinesis Data Streams** (or MSK if the org already runs Kafka). Partition key = \`orderId\`, so all events of an order land on one shard in order. Retention is set to 7 days (it can go up to 365). The fraud consumer replays with an \`AT_TIMESTAMP\` iterator, or by resetting its KCL checkpoints, without touching anyone else.
+- **Data lake → Kinesis → Firehose → S3** as a second, independent reader. It uses enhanced fan-out if read capacity gets tight, because shared consumers split 2 MB/s per shard.
+- **Routing to partners and the audit account → EventBridge.** A small bridge (Pipes from the stream, or the relay itself) puts events on a \`commerce\` bus. One rule per partner holds that partner's content filter. A cross-account rule sends everything to the audit bus. Each partner rule targets **SQS → a webhook worker**, or an API destination with a DLQ. A partner that is down for 2 hours then only fills its own queue.
+- **Internal fan-out → SNS → SQS** for email and search, or EventBridge rules → SQS if you prefer one routing layer. Each service owns its queue, visibility timeout and DLQ.
+
+### Sizing
+Assume 2,000 orders/s at peak with about 1 KB per event: 2 MB/s in and 2,000 records/s, so at least **2 shards**, plan 4 for headroom and hot keys, or use on-demand mode. Readers: fraud, Firehose and the bridge share 2 MB/s per shard; switch to enhanced fan-out once you pass two or three readers.
+
+### Correctness
+- Publish **once**, from the order service's **transactional outbox** to Kinesis. Everything else derives from the stream, so there is no dual write to SNS, EventBridge and Kinesis.
+- Every hop is at-least-once: consumers dedupe on \`eventId\`, and the fraud model uses \`aggregateVersion\` to drop stale events.
+- Kinesis → Lambda: enable bisect-on-error, cap retries, set an on-failure destination and report partial batch failures, so a poison record cannot stall a shard for its whole retention period.
+
+### Why not one service for everything?
+SNS and EventBridge can't replay per consumer and don't keep order. SQS consumption deletes the message, so a second reader never sees it. Kinesis alone has no content routing, cross-account rules or webhook retries. Each tool covers one role.`,
+      followUps: [
+        {
+          q: 'A partner webhook starts returning 500s for 3 hours. What happens in your design, and what would happen if the EventBridge rule targeted the API destination directly?',
+          a: 'With rule → SQS → worker, events pile up in that partner\'s queue (retention up to 14 days). The worker backs off, other partners are unaffected, and the backlog drains when the partner recovers. If the rule targets the API destination directly, EventBridge retries for up to 24 h by default (185 attempts) and then sends the event to the target\'s DLQ if one is configured. Without a DLQ the event is dropped. The queue also gives you rate control and visibility into the backlog.',
+        },
+        {
+          q: 'Fraud replays 7 days. Why does that not spam email customers again?',
+          a: 'The replay happens only in the fraud consumer\'s own position on the Kinesis stream (a new iterator or reset KCL checkpoints). Email reads from its own SQS queue, fed by SNS or EventBridge, and those messages were deleted long ago. That isolation is why replay belongs on a log with per-reader positions, not on a broker that pushes to everyone. Even so, fraud must write idempotently (upsert by orderId + version) so the replay converges on the same state.',
+        },
+        {
+          q: 'One mega-merchant produces 30% of all orders. Does that break the Kinesis design?',
+          a: 'Not if the key is orderId: many orders spread across shards. If someone keys by merchantId, that merchant\'s shard hits 1 MB/s or 1,000 records/s, and you see WriteProvisionedThroughputExceeded on one shard while the others idle. Keep the key at the granularity where ordering is actually needed (per order), or salt merchant keys when cross-order ordering doesn\'t matter.',
+        },
+      ],
+      pitfalls: [
+        'Picking Kinesis for everything and hand-building routing, webhooks and cross-account delivery',
+        'Expecting SNS or EventBridge to preserve order or to replay for one consumer',
+        'Publishing the same event separately to SNS, EventBridge and Kinesis from application code (dual or triple writes)',
+        'Sending rules straight to fragile HTTP targets without a queue or DLQ',
+      ],
+    },
   ],
   envelopeQuestions: [
     {
@@ -1581,6 +1738,71 @@ Propagate W3C \`traceparent\` in message headers; dashboards for consumer lag an
           "q": "The command already ran in production 10 minutes ago. What do you check and do now?",
           "a": "First, the blast radius: which consumers rely on per-key ordering, and do they guard with versions? Check the new partitions for data and lag. Order breaks only if a key's old event in its old partition is still unconsumed when its new event is processed elsewhere, so if consumer lag was near zero at change time the window was tiny. Look for anomalies such as projections with version regressions or state-machine errors, and reconcile affected keys from the source of truth. Partitions can't be reduced, so move forward: add version guards in consumers and document the change."
         }
+      ],
+    },
+    {
+      id: 'mq-fundamentals-mcq-16',
+      difficulty: 'expert',
+      question:
+        'A Lambda consumes a 4-shard Kinesis stream (24 h retention) with the mapping below. At 10:00 a producer writes one malformed record to shard-2, and the handler throws on it every time. What do you observe over the next hours?',
+      code: {
+        language: 'yaml',
+        title: 'template.yaml (AWS SAM) — event source mapping',
+        code: `OrderEventsFn:
+  Type: AWS::Serverless::Function
+  Properties:
+    Handler: dist/handler.main
+    Events:
+      Stream:
+        Type: Kinesis
+        Properties:
+          Stream: !GetAtt OrderEvents.Arn
+          StartingPosition: LATEST
+          BatchSize: 100
+          MaximumRetryAttempts: -1          # retry forever
+          BisectBatchOnFunctionError: false
+          # no DestinationConfig.OnFailure, no FunctionResponseTypes`,
+      },
+      options: [
+        'Lambda moves the failing batch to a built-in DLQ after 3 attempts and shard-2 continues',
+        'Shard-2 is stuck re-processing the same batch until the record expires about 24 h later; IteratorAge on that shard climbs while the other 3 shards stay current',
+        'All four shards stop, because the event source mapping pauses the whole stream when any batch fails',
+        'Kinesis skips the bad record after the visibility timeout, so only that record is lost and the shard continues',
+      ],
+      correct: [1],
+      explanation:
+        'Kinesis event source mappings keep order per shard, so a failing batch blocks only its own shard. With MaximumRetryAttempts -1 and no bisect, the same 100 records are retried until the bad record falls out of retention (24 h), and the good records in that batch are reprocessed many times. Other shards are independent and keep going. There is no built-in DLQ: you must configure an on-failure destination. Visibility timeout is an SQS concept and does not apply to Kinesis.',
+      followUps: [
+        {
+          q: 'Fix the mapping so a poison record costs seconds, not a day, without losing it.',
+          a: 'Set `BisectBatchOnFunctionError: true` so failing batches split until the bad record is isolated. Cap `MaximumRetryAttempts` (e.g. 3) and `MaximumRecordAgeInSeconds`. Add `DestinationConfig.OnFailure` pointing to an SQS queue or S3, which receives metadata about the failed batch (shard, sequence range) for later re-read. Better still, enable `FunctionResponseTypes: [ReportBatchItemFailures]` and return the failed sequence number, so Lambda checkpoints up to the record before it instead of retrying the whole batch.',
+        },
+        {
+          q: 'The good records in the stuck batch were processed thousands of times. What breaks, and what protects you?',
+          a: 'Every non-idempotent side effect repeats: emails, counters, payments, outbound API calls. Protection is an idempotency key per record (eventId, or shardId + sequenceNumber) stored with the side effect, e.g. a conditional write in DynamoDB or `INSERT … ON CONFLICT DO NOTHING`. Kinesis and Lambda are at-least-once even without failures, because retries after a timeout or a resharding can redeliver.',
+        },
+      ],
+    },
+    {
+      id: 'mq-fundamentals-mcq-17',
+      difficulty: 'hard',
+      question:
+        'Select ALL that apply. OrderPlaced is published to an SNS standard topic with three SQS subscriptions: email, fraud and search. Which statements are true?',
+      options: [
+        'A slow fraud consumer does not delay email: each queue has its own backlog, visibility timeout and DLQ',
+        'Setting RawMessageDelivery to false makes consumers receive only the original body, without the SNS envelope',
+        'All three queues receive messages in the same relative order, because one topic publishes them',
+        'A new analytics service subscribing today can replay the last 3 days from the standard topic',
+        'If a subscribed queue\'s access policy is broken, SNS retries delivery for a long time and then drops the message unless that subscription has a dead-letter queue',
+      ],
+      correct: [0, 4],
+      explanation:
+        'Fan-out through a queue per consumer isolates pace and failure, which is why SNS → SQS is the standard pattern. SNS keeps retrying an SQS endpoint under its delivery policy and then discards the message; a subscription-level redrive policy (DLQ) keeps it. RawMessageDelivery is the reverse of option B: true strips the envelope, false wraps the body in SNS JSON. Standard topics give no ordering guarantee across or within subscribers. Archive and replay exist only for FIFO topics, so a standard topic stores nothing to replay.',
+      followUps: [
+        {
+          q: 'Fraud now needs per-order ordering. What is the smallest change, and what does it cost you?',
+          a: 'Move to an SNS FIFO topic with SQS FIFO subscriptions and set `MessageGroupId = orderId`. Ordering then holds per order, with deduplication in a 5-minute window. Costs: FIFO topics deliver only to SQS queues, FIFO throughput is lower (300 msg/s per message group, about 3,000 msg/s per topic by default unless you set FifoThroughputScope=MessageGroup), and one slow message blocks its own group. If volumes are high or several readers need replay, Kinesis with key = orderId is the better fit.',
+        },
       ],
     },
   ],

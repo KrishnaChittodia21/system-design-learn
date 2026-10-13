@@ -1018,6 +1018,345 @@ FROM accepted a;`,
       ],
       source: 'Hello Interview — problem breakdowns (Bad / Good / Great deep dives)',
     },
+    // ------------------------------------------------------------ APPENDED: NETFLIX COUNTER + STREAMING STRUCTURES
+    {
+      heading: 'Netflix\'s Distributed Counter Abstraction: event log, time buckets and rollups',
+      body: `**Intuition:** don't keep one number and make every writer fight over it. Keep a **ledger** of every +n and −n, as a bank statement does, and every so often **close the books** for a period that can no longer change. The balance you show is the last closing balance. Netflix published this design in November 2024 (Shringi, Tkachuk and Sathyanarayanan). It runs on their TimeSeries Abstraction over Cassandra and is deployed through the Data Gateway control plane.
+
+**Why the simpler designs fail** (Netflix rejects four of them before choosing):
+
+| Approach | What breaks |
+|---|---|
+| One row per counter, CAS or transaction | No idempotency key, so retries over-count. Hot keys contend. Static sub-buckets still leave hot keys, and dynamic ones are hard across millions of counters |
+| Each instance aggregates in memory and flushes | A crash or deploy loses the in-memory deltas. Instances can't agree on when a reset happened. Still not idempotent |
+| Kafka keyed by counter + windowed stream aggregation | Lag piles up on a hot partition, and partitions need rebalancing as cardinality grows. Pre-aggregation discards the individual increments, so you can neither **audit** nor **recount** |
+| Raw event log, summed on every read | Reads scan every increment, readers repeat the same work, partitions grow too wide, and storage keeps growing |
+
+Netflix's answer combines the last two: **log every increment, roll it up in the background over a lagged time window, and bucket the log so no partition gets too wide.**
+
+**Three counter types, chosen per namespace** (each namespace also sets TTL and expected cardinality):
+
+| Type | Built on | Guarantees | Fits |
+|---|---|---|---|
+| **Best-effort regional** | EVCache (Memcached) \`incr\`/\`decr\` with TTL | Very fast and cheap. No cross-region replication of increments, no consistency guarantee, no idempotency (so retries are unsafe) | Short-lived A/B experiment counts |
+| **Eventually consistent global** | TimeSeries event log + rollup store + EVCache | Durable, idempotent, converges within seconds | Durable product and business counts |
+| **Accurate** (experimental) | Same, plus a live delta on read | \`lastRollupCount + delta since lastRollupTs\` | Fresher reads, costlier when the delta is large |
+
+**API** (shaped like Java's \`AtomicInteger\`): \`AddCount\` / \`AddAndGetCount\` take \`namespace\`, \`counter_name\`, a signed \`delta\` and an \`idempotency_token { token, generation_time }\`. \`GetCount\` takes the namespace and counter name. \`ClearCount\` resets to 0 and also carries a token. Because of the token, clients can **retry and hedge** requests safely (send a duplicate to a second server when the first is slow, as in "The Tail at Scale").
+
+**Write path, step by step**
+1. The gateway durably writes an **event** to TimeSeries. The partition key is \`(counter, time_bucket, event_bucket)\`. In Netflix's sample config each time bucket is **600 s** and each counter is split into **4** event buckets per time bucket, which keeps one hot counter from forming a wide Cassandra partition.
+2. \`(event_time, event_id, event_item_key)\` is the idempotency key, so a retried write lands on the same row and does not count twice.
+3. The **last-write timestamp** for the counter is updated in the rollup table with Cassandra \`USING TIMESTAMP\` (set to the event time), so last-write-wins applies predictably.
+4. Once the write is durable, a **fire-and-forget rollup event** \`{namespace, counter}\` goes to a rollup server. It carries **no delta**. It only says "this counter is dirty", so the rollup never has to scan the whole dataset to find what changed.
+
+**Rollup pipeline, step by step**
+1. **XXHash(counter)** picks one of the server's **in-memory queues** (8 in the sample config), so the same counter always lands on the same queue.
+2. The queue is drained into a **Set**, so 10,000 events for one counter cause **one** rollup per window.
+3. Consumers roll up batches of counters (\`rollup_batch_count\` 32 in the sample) with parallel range scans. They shrink the batch when counters touch many time partitions (**dynamic batching**) and wait longer between batches when the last batch was slow (**adaptive back-pressure**).
+4. **The immutable window.** TimeSeries **rejects** events whose timestamp is older than \`acceptLimit\` (5 s in the sample). A window that ends at \`now − acceptLimit − skew margin\` can therefore never receive another event. The rollup sums events in \`[lastRollupTs, windowEnd)\` onto \`lastRollupCount\` and checkpoints the pair.
+5. The checkpoint goes to a Cassandra **rollup table** (one per dataset) and to **EVCache as one combined value** \`{count, lastRollupTs}\`, so a reader never pairs a count with the wrong timestamp.
+6. **No locks.** Two rollup servers (or old and new instances during a deploy) may both roll up the same counter. Each sums the same immutable window, so overwrites are safe. Values can briefly fluctuate because each thread has a slightly different now(), but they converge.
+7. **Convergence.** Low-cardinality counters stay in rollup circulation. High-cardinality counters are re-queued only while \`lastWriteTs > lastRollupTs\`.
+
+**Read path.** \`GetCount\` is a point read of the cached rollup, a few seconds stale. It also **triggers a rollup**, which self-heals a counter whose earlier rollup was lost. The **accurate** type adds the delta since \`lastRollupTs\`, scanned at read time. That is cheap when the counter is read often (the gap stays narrow) and expensive when it is not.
+
+**Numbers and retention.** At publication the service handled about **75K count requests/s globally** with **single-digit-millisecond** latency on every endpoint. In the sample config, events close after 6 days (518,400 s) and are deleted after 7 days (604,800 s). Once aggregated, events can move to cheaper storage for audits.
+
+**Trade-offs to say out loud**
+- Counts lag by seconds (\`acceptLimit\` plus the skew margin plus rollup delay). That is the price of a lock-free, exact window.
+- The idempotency window is bounded: a retry whose \`generation_time\` is older than \`acceptLimit\` is **rejected**, not deduplicated. Clients must mint a new token and accept the risk, or give up.
+- Rollup queues live in memory, so a crash drops "dirty" signals. Rarely read counters stay stale until their next read triggers a rollup. Netflix lists durable queues and rollup handoffs as future work.
+- Cross-region replication delay can let an event arrive after its window has closed, so it is missed. The planned fix is per-region rollups tallied into a global rollup table, where propagating a ClearCount across regions is the hard part.
+- Netflix chose not to use HLL or Count-Min: HLL counts distinct items and can't apply +n/−n to a key, and neither sketch natively supports per-key reset or TTL. They also preferred stores they already operate.`,
+      diagram: `  client: AddCount(ns, counter, delta, token{id, genTime})
+     |
+     v
+  Data Gateway / Counter API
+     | 1. durable write                     | 2. lastWriteTs (USING TIMESTAMP)
+     v                                      v
+  TimeSeries event store (Cassandra)      Rollup store (Cassandra, per dataset)
+  PK (counter, time_bucket=600s,          counter -> {count, lastRollupTs,
+      event_bucket 0..3)                              lastWriteTs}
+  rows: event_time, event_id, delta            ^                 |
+     ^                                         | 6. checkpoint   v
+     | 5. range scan [lastRollupTs, windowEnd) |     EVCache {count, rollupTs}
+     |                                         |                 ^
+  +--+-----------------------------------------+--+              |
+  | Rollup server: XXHash(counter) -> queue 0..7  |   7. GetCount: cached count
+  |  drain to Set -> batch of 32 -> parallel scan |      (+ live delta if the
+  |  -> adaptive wait before the next batch       |       type is Accurate)
+  +-----------------------------------------------+
+     ^ 3/4. fire-and-forget {ns, counter} after the ack (and on every read)
+
+  time -------------------------------------------------------------------> now
+  | rolled up |   immutable window: aggregate   | skew  |  acceptLimit 5s  |
+           lastRollupTs                     windowEnd         (writes land)`,
+      code: [
+        {
+          language: 'typescript',
+          title: 'Event-log counter (1/2): bucketed, idempotent writes and the rollup trigger',
+          code: `import { createHash } from 'node:crypto';
+
+type IdempotencyToken = { token: string; generationTime: number };   // epoch ms
+type CountEvent = { eventTime: number; eventId: string; delta: number; clear: boolean };
+type Rollup = { count: number; lastRollupTs: number };   // cached as ONE value
+
+const SECONDS_PER_BUCKET = 600;      // time_bucket width (Netflix sample: 600 s)
+const BUCKETS_PER_ID = 4;            // event_bucket fan-out per time bucket
+const ACCEPT_LIMIT_MS = 5_000;       // reject events stamped older than now - 5 s
+const SKEW_MS = 2_000;               // extra margin for clock skew between writers
+
+const h32 = (s: string) => createHash('md5').update(s).digest().readUInt32LE(0);
+
+export class EventLogCounter {
+  private readonly store = new Map<string, Map<string, CountEvent>>(); // partition -> rows
+  readonly rollups = new Map<string, Rollup>();                         // rollup store + cache
+  readonly rollupQueue = new Set<string>();                             // dedups triggers
+  private readonly now: () => number;
+  constructor(now: () => number) { this.now = now; }
+
+  private partition(counter: string, t: number, eventId: string): string {
+    const timeBucket = Math.floor(t / (SECONDS_PER_BUCKET * 1000));
+    const eventBucket = h32(eventId) % BUCKETS_PER_ID;  // splits one hot counter 4 ways
+    return \`\${counter}|\${timeBucket}|\${eventBucket}\`;
+  }
+
+  private write(counter: string, tok: IdempotencyToken, delta: number, clear: boolean): void {
+    if (tok.generationTime < this.now() - ACCEPT_LIMIT_MS) throw new Error('outside acceptLimit');
+    const pk = this.partition(counter, tok.generationTime, tok.token);
+    const rows = this.store.get(pk) ?? new Map<string, CountEvent>();
+    this.store.set(pk, rows);
+    const idemKey = \`\${tok.generationTime}:\${tok.token}\`;   // (event_time, event_id)
+    if (!rows.has(idemKey)) rows.set(idemKey, { eventTime: tok.generationTime, eventId: tok.token, delta, clear });
+    this.rollupQueue.add(counter);   // fire-and-forget "this counter is dirty"
+  }
+
+  addCount(counter: string, delta: number, tok: IdempotencyToken): void { this.write(counter, tok, delta, false); }
+  clearCount(counter: string, tok: IdempotencyToken): void { this.write(counter, tok, 0, true); }`,
+        },
+        {
+          language: 'typescript',
+          title: 'Event-log counter (2/2): rollup over the immutable window, eventual and accurate reads',
+          code: `  /** Sum events in [from, to) by scanning only the time buckets that overlap the range. */
+  private scan(counter: string, from: number, to: number, base: number): number {
+    const width = SECONDS_PER_BUCKET * 1000;
+    const events: CountEvent[] = [];
+    for (let tb = Math.floor(from / width); tb <= Math.floor((to - 1) / width); tb++) {
+      for (let eb = 0; eb < BUCKETS_PER_ID; eb++) {
+        for (const e of this.store.get(\`\${counter}|\${tb}|\${eb}\`)?.values() ?? []) {
+          if (e.eventTime >= from && e.eventTime < to) events.push(e);
+        }
+      }
+    }
+    events.sort((a, b) => a.eventTime - b.eventTime || a.eventId.localeCompare(b.eventId));
+    return events.reduce((n, e) => (e.clear ? 0 : n + e.delta), base);   // a clear resets
+  }
+
+  /** Background rollup: aggregate only the immutable window, then checkpoint. */
+  rollup(counter: string): Rollup {
+    const prev = this.rollups.get(counter) ?? { count: 0, lastRollupTs: 0 };
+    const windowEnd = this.now() - ACCEPT_LIMIT_MS - SKEW_MS;  // no new event can land below this
+    if (windowEnd <= prev.lastRollupTs) return prev;
+    const next = { count: this.scan(counter, prev.lastRollupTs, windowEnd, prev.count), lastRollupTs: windowEnd };
+    this.rollups.set(counter, next);     // overwrite is safe: same window => same answer
+    return next;
+  }
+
+  /** Eventually consistent read: cached checkpoint, plus a trigger to catch up. */
+  getCount(counter: string): number {
+    this.rollupQueue.add(counter);
+    return this.rollups.get(counter)?.count ?? 0;
+  }
+
+  /** "Accurate" (experimental at Netflix): checkpoint + live delta since lastRollupTs. */
+  getAccurateCount(counter: string): number {
+    const r = this.rollups.get(counter) ?? { count: 0, lastRollupTs: 0 };
+    return this.scan(counter, r.lastRollupTs, this.now() + 1, r.count);
+  }
+}`,
+        },
+      ],
+      keyPoints: [
+        'Log every increment with (event_time, event_id) as the idempotency key, and bucket partitions by time and event bucket so hot counters never form wide partitions.',
+        'Roll up only an immutable window that ends before now − acceptLimit − skew. Racing rollup servers then compute the same answer, so no locks are needed.',
+        'The rollup trigger carries no delta: it marks the counter dirty, and a Set collapses many triggers into one rollup.',
+        'GetCount returns the cached {count, lastRollupTs} and triggers a rollup. The accurate variant adds a live delta scan.',
+        'Costs: seconds of lag, idempotency only inside acceptLimit, lost in-memory triggers, and cross-region events that miss their window.',
+      ],
+      source: 'Netflix TechBlog — Netflix\'s Distributed Counter Abstraction (Shringi, Tkachuk, Sathyanarayanan, Nov 2024); ByteByteGo — How Netflix Built a Distributed Counter (2025)',
+    },
+    {
+      heading: 'More streaming & probabilistic structures: lossy counting and cuckoo filters',
+      body: `Two more structures that keep turning up in interview algorithm lists (ByteByteGo's "12 algorithms" and "6 data structures to save storage"). Each fixes a specific weakness of a structure taught earlier: **lossy counting** keeps the keys and errs downwards, while Count-Min errs upwards and stores no keys. A **cuckoo filter** supports deletes, which a Bloom filter cannot.
+
+### Lossy counting (Manku & Motwani, VLDB 2002)
+
+**Intuition:** you are counting with a notebook that has limited pages. Every w items you cross out anyone who hasn't earned their place. A newcomer gets credit for the counts they might have missed earlier, so a genuinely frequent item is never crossed out.
+
+**Mechanics**, for error parameter **ε**:
+1. Split the stream into buckets of width **w = ⌈1/ε⌉**. After N items the current bucket is **b = ⌈N/w⌉**.
+2. Keep entries **(item, f, Δ)**, where f is the count since the entry was created and Δ is the most it could have missed before that.
+3. On an arrival: if the item has an entry, \`f++\`. Otherwise insert \`(item, 1, b − 1)\`.
+4. At each bucket boundary (N mod w = 0), delete every entry with **f + Δ ≤ b**.
+5. To get items above support **s**, output the entries with **f ≥ (s − ε)·N**.
+
+**Guarantees** (deterministic, no randomness):
+- **No false negatives:** every item with true frequency > s·N is output.
+- No item with true frequency < (s − ε)·N is output.
+- **f ≤ true ≤ f + ε·N.** The estimate never overstates.
+- At most **(1/ε)·log(ε·N)** entries in the worst case, and far fewer on skewed streams.
+
+**Worked example:** ε = 0.1%, s = 1%, N = 1M. Then w = 1,000, and items are reported at f ≥ 9,000. In a simulation of the code below on a Zipf(1.1) stream over 50K keys (about 4K distinct seen), the table peaked at **524 entries**. All 10 items above 10,000 were reported, plus 2 borderline ones, and the reported counts were exact because heavy items enter early.
+
+| | Lossy counting | Count-Min Sketch | Space-Saving |
+|---|---|---|---|
+| Error direction | **Under**, by ≤ εN | **Over**, by ≤ εN w.p. 1−δ | Over, by ≤ N/m |
+| Stores keys | Yes | No (needs a heap beside it) | Yes |
+| Memory | Grows like (1/ε)·log(εN) | Fixed: e/ε × ln(1/δ) | Fixed: m counters |
+| Randomness | None | Hash functions | None |
+| Merge shards | Approximate | Exact, cell-wise add | Approximate |
+| Typical use | Heavy hitters in network traffic and web analytics | Frequency of any key, sliding windows of sketches | Top-K with a fixed budget |
+
+**Interview line:** "If the business must never *overstate* a count (abuse thresholds, quota warnings), lossy counting's one-sided downward error is easier to reason about than Count-Min's."
+
+### Cuckoo filter (Fan, Andersen, Kaminsky & Mitzenmacher, CoNEXT 2014)
+
+**Intuition:** a hotel where every guest has exactly two possible rooms. If both are full, the newcomer evicts a resident, who moves to their *other* room, possibly evicting someone else.
+
+**Mechanics:**
+- Store only a short **fingerprint** of each item (f bits) in a table of buckets with **b = 4 slots** each.
+- Two candidate buckets: **i1 = hash(x)** and **i2 = i1 XOR hash(fingerprint)**. This is **partial-key cuckoo hashing**: the alternate bucket is computed from the fingerprint alone, so a fingerprint can be kicked out and relocated without the original key. Because XOR undoes itself, \`alt(alt(i)) = i\`. The bucket count must therefore be a power of two.
+- **Lookup:** read 2 buckets (2 cache lines) and compare fingerprints.
+- **Insert:** use a free slot in either bucket. Otherwise swap with a random resident and move it to its alternate bucket, up to **500 kicks**. If that fails, the filter is full: rebuild it larger.
+- **Delete:** remove one matching fingerprint from either bucket. This is safe **only for items that were really inserted**. Deleting a never-inserted item can remove another item's identical fingerprint and create a false negative. Inserting the same key twice stores two copies, and one key can have at most 2b = 8 copies.
+- **False-positive rate** ≤ 2b / 2^f. With b = 4 and f = 12 that is ≤ 0.2%. A 100K-item simulation of the code below measured 0.16% at 76% load, and inserts only started failing at about 96% load (the paper reports ~95% for b = 4).
+
+**Space vs Bloom.** An optimal Bloom filter needs 1.44·log2(1/ε) bits per item: 9.6 bits at 1%, 14.4 at 0.1%. A cuckoo filter needs about (log2(1/ε) + 3)/α bits, where α is the load factor: 10.1 bits at 1% and 13.7 at 0.1% when α = 0.95. The paper's semi-sorted bucket variant saves another bit per item, which is why the authors report cuckoo filters winning below roughly **3%** FPR. The plain version wins only below about 0.4%.
+
+| | Bloom filter | Cuckoo filter |
+|---|---|---|
+| Delete | No (needs a counting Bloom filter, about 4× the space) | Yes, for inserted items |
+| Memory reads per lookup | k random bits (about 7 at 1%) | 2 buckets |
+| As it fills | FPR rises gradually, inserts never fail | Inserts slow down sharply, then fail near 95% |
+| Union of two filters | Bitwise OR | Not supported |
+| Redis | \`BF.ADD\` / \`BF.EXISTS\` | \`CF.ADD\` / \`CF.DEL\` / \`CF.EXISTS\` |
+
+**Use a cuckoo filter when membership must shrink:** revoked tokens that expire, "already notified" sets with unsubscribes, cache admission where entries get evicted.
+
+**Also on those lists, in one line each:** **MinHash** keeps the k minimum hashes of a set. The chance that two sets share a minimum equals their Jaccard similarity, which makes it useful for near-duplicate detection beside SimHash. A **skip list** is a probabilistic multi-level linked list with O(log n) search; Redis sorted sets use one. **Ray casting** tests whether a point lies inside a polygon by counting edge crossings (odd means inside), which is how a geofence check works.`,
+      code: [
+        {
+          language: 'typescript',
+          title: 'Lossy counting: deterministic heavy hitters with one-sided error',
+          code: `/** Manku & Motwani lossy counting: frequencies within epsilon*N, using O((1/eps) log(eps*N)) entries. */
+export class LossyCounter {
+  private readonly width: number;                 // bucket width w = ceil(1/eps)
+  private readonly eps: number;
+  private n = 0;                                  // items seen so far
+  private readonly table = new Map<string, { f: number; delta: number }>();
+
+  constructor(eps: number) {
+    this.eps = eps;
+    this.width = Math.ceil(1 / eps);
+  }
+
+  add(item: string): void {
+    this.n++;
+    const bucket = Math.ceil(this.n / this.width);          // current bucket id, 1-based
+    const e = this.table.get(item);
+    if (e) e.f++;
+    else this.table.set(item, { f: 1, delta: bucket - 1 }); // could have been missed in buckets 1..b-1
+    if (this.n % this.width === 0) {                        // bucket boundary: prune
+      for (const [k, v] of this.table) if (v.f + v.delta <= bucket) this.table.delete(k);
+    }
+  }
+
+  /** Items whose true frequency may exceed s*N. No false negatives; f underestimates by <= eps*N. */
+  frequent(s: number): Array<[string, number]> {
+    const out: Array<[string, number]> = [];
+    for (const [k, v] of this.table) if (v.f >= (s - this.eps) * this.n) out.push([k, v.f]);
+    return out.sort((a, b) => b[1] - a[1]);
+  }
+
+  get entries(): number { return this.table.size; }
+  get total(): number { return this.n; }
+}`,
+        },
+        {
+          language: 'typescript',
+          title: 'Cuckoo filter: fingerprints, two buckets, bounded kicks and deletes',
+          code: `import { createHash } from 'node:crypto';
+
+const SLOTS = 4;                     // b = 4 fingerprints per bucket -> ~95% achievable load
+const FP_BITS = 12;                  // f = 12 bits -> FPR <= 2b / 2^f = 8 / 4096 ~ 0.2%
+const MAX_KICKS = 500;               // the paper's MaxNumKicks
+
+export class CuckooFilter {
+  private readonly slots: Uint16Array;               // 0 marks an empty slot
+  private readonly mask: number;                     // bucket count is a power of two
+  private victim: { i: number; fp: number } | null = null; // parked when a kick chain fails
+
+  constructor(capacity: number) {
+    const buckets = 2 ** Math.ceil(Math.log2(Math.max(1, capacity / SLOTS / 0.95)));
+    this.slots = new Uint16Array(buckets * SLOTS);
+    this.mask = buckets - 1;
+  }
+
+  private locate(item: string): { fp: number; i1: number; i2: number } {
+    const d = createHash('sha256').update(item).digest();
+    const fp = (d.readUInt16LE(0) % ((1 << FP_BITS) - 1)) + 1;      // never 0
+    const i1 = d.readUInt32LE(4) & this.mask;
+    return { fp, i1, i2: this.alt(i1, fp) };
+  }
+  // Partial-key cuckoo hashing: the other bucket is derived from the fingerprint alone,
+  // so a kicked-out fingerprint can move without knowing its original key. XOR is an involution.
+  private alt(i: number, fp: number): number { return (i ^ Math.imul(fp, 0x5bd1e995)) & this.mask; }
+  private find(i: number, fp: number): number {      // slot index holding fp (fp = 0 finds a hole)
+    for (let s = i * SLOTS; s < (i + 1) * SLOTS; s++) if (this.slots[s] === fp) return s;
+    return -1;
+  }
+
+  add(item: string): boolean {
+    if (this.victim) return false;                   // full: rebuild bigger
+    let { fp, i1: i, i2 } = this.locate(item);
+    for (const b of [i, i2]) { const s = this.find(b, 0); if (s >= 0) { this.slots[s] = fp; return true; } }
+    if (Math.random() < 0.5) i = i2;
+    for (let n = 0; n < MAX_KICKS; n++) {            // evict a random resident to ITS other bucket
+      const s = i * SLOTS + Math.floor(Math.random() * SLOTS);
+      [fp, this.slots[s]] = [this.slots[s], fp];
+      i = this.alt(i, fp);
+      const hole = this.find(i, 0);
+      if (hole >= 0) { this.slots[hole] = fp; return true; }
+    }
+    this.victim = { i, fp };                         // keep the homeless fp: no false negative
+    return true;
+  }
+
+  has(item: string): boolean {                       // touches at most 2 buckets
+    const { fp, i1, i2 } = this.locate(item);
+    if (this.victim?.fp === fp && (this.victim.i === i1 || this.victim.i === i2)) return true;
+    return this.find(i1, fp) >= 0 || this.find(i2, fp) >= 0;
+  }
+
+  delete(item: string): boolean {                    // ONLY for items you know were added
+    const { fp, i1, i2 } = this.locate(item);
+    const s = this.find(i1, fp) >= 0 ? this.find(i1, fp) : this.find(i2, fp);
+    if (s < 0) return false;
+    this.slots[s] = 0;
+    return true;
+  }
+}`,
+        },
+      ],
+      keyPoints: [
+        'Lossy counting: w = ⌈1/ε⌉, prune entries with f + Δ ≤ b at each bucket boundary, report f ≥ (s − ε)N. No false negatives, and estimates are under by at most εN.',
+        'Count-Min overestimates and stores no keys. Lossy counting underestimates and stores keys, but its memory grows like (1/ε)·log(εN).',
+        'Cuckoo filter: i2 = i1 XOR hash(fp) lets fingerprints move without their keys. Lookups read 2 buckets, b = 4 reaches ~95% load, and FPR ≤ 2b/2^f.',
+        'Cuckoo deletes are only safe for items that were inserted. The filter fails inserts near capacity, where a Bloom filter degrades gradually instead.',
+      ],
+      source: 'Manku & Motwani — Approximate Frequency Counts over Data Streams (VLDB 2002); Fan, Andersen, Kaminsky & Mitzenmacher — Cuckoo Filter: Practically Better Than Bloom (CoNEXT 2014); ByteByteGo — 12 Algorithms for System Design Interviews; 6 Data Structures to Save Storage (2025)',
+    },
   ],
   codeChallenges: [
     {
@@ -1704,6 +2043,98 @@ export async function placeBid(pool: Pool, cmd: { bidId: string; auctionId: stri
         'Letting rejected bids extend the auction, which bots can abuse',
       ],
     },
+    {
+      id: 'design-more-iq-12',
+      difficulty: 'expert',
+      question:
+        'Your platform team must offer counting as a shared service: product teams call add(counter, delta) about 60K times a second across three regions. Finance also needs to audit how a counter reached its value and to recount a day after a bug. Clients retry and hedge requests. Design it around an event log instead of a counter row, and explain how aggregation avoids racing writers without locks.',
+      whatInterviewerLooksFor: [
+        'Rejects a single CAS row and pure pre-aggregation with specific reasons (contention, retries, no audit or recount)',
+        'Picks an idempotency key and a partitioning scheme that bounds partition width for hot counters',
+        'Explains an immutable aggregation window tied to a write-acceptance limit, and why that makes lock-free rollups safe',
+        'Designs a cheap read path and states the staleness, cost and failure trade-offs honestly',
+      ],
+      modelAnswer: `**Why not a row or a stream pre-aggregate.** A counter row needs CAS or a transaction on every add, so a hot counter serialises, and a retry double-counts unless the token is stored somewhere else. Kafka keyed by counter plus windowed sums fixes contention, but it throws the individual increments away. Audit and recount are then impossible, and that is a stated requirement.
+
+**Write path.**
+- Each add is an **event row**: \`(counter, time_bucket, event_bucket) → (event_time, event_id, delta)\`. Use 10-minute time buckets and a few event buckets chosen by hashing event_id, so a viral counter spreads over several Cassandra partitions instead of one wide one.
+- The client supplies \`token + generation_time\`. \`(event_time, event_id)\` is the clustering key, so a retry or a hedged duplicate overwrites the same row. Idempotency is a property of the data model, not of a separate lookup table.
+- After the write is acknowledged, send a **fire-and-forget "dirty" signal** for the counter. It carries no delta.
+
+**Aggregation without locks.**
+- The store **rejects** events stamped older than \`acceptLimit\` (say 5 s). A window that ends at \`now − acceptLimit − skew\` is therefore **immutable**.
+- A rollup worker sums events in \`[lastRollupTs, windowEnd)\` onto the checkpoint and writes \`{count, lastRollupTs}\` as one value. Two workers rolling up the same counter compute the same result for the same window, so last-write-wins is harmless and no distributed lock is needed.
+- Route counters to in-memory queues by hash and drain each queue into a set, so a burst of 10K signals causes one rollup. Batch the rollups and back off when the store slows.
+
+**Read path.** Return the cached checkpoint (a single point read, typically under 5 ms, a few seconds stale) and trigger a rollup, which also repairs counters whose signal was lost. Where freshness matters, add a live scan of the delta since \`lastRollupTs\`.
+
+**Audit and recount.** Events are retained for about 7 days in the hot store and then archived. A recount replays a day of events into a new checkpoint. Netflix's Counter Abstraction does this at about 75K requests/s with single-digit ms latency.
+
+**Trade-offs.** Counts lag by seconds. A retry after \`acceptLimit\` is rejected, not deduplicated. In-memory signals can be lost on a crash. Cross-region replication lag can drop an event behind a closed window, so per-region rollups summed globally are the more robust choice for three regions.`,
+      followUps: [
+        {
+          q: 'A client retries 9 seconds after its first attempt because of a long GC pause, and acceptLimit is 5 s. What happens, and what should the client do?',
+          a: 'The retry carries the original generation_time, which is now older than the 5 s acceptLimit, so the store rejects it rather than deduplicating it. If the first attempt did land, the count is correct. If not, the increment is lost unless the client acts. The client should surface a definite error, not retry with a fresh timestamp blindly, because that could double count if the first write succeeded. Options: read back the event by its id, or accept a rare loss for best-effort uses. Keeping acceptLimit a little above the client retry budget avoids most of these cases.',
+        },
+        {
+          q: 'A rollup server crashes with 40K dirty signals in its in-memory queues. Which counters stay wrong, and for how long?',
+          a: 'Nothing is lost from the event log, only the reminders. Counters that are read or written again soon re-enter a queue, because every add and every GetCount sends a signal, so they heal within one rollup cycle. The exposed ones are counters that are written once and then go quiet: their cached value stays stale until someone reads them, and that first read is stale too. Fixes: a periodic sweep for rows where lastWriteTs > lastRollupTs, or durable queues, which Netflix lists as future work.',
+        },
+        {
+          q: 'How would ClearCount work when three regions roll up independently?',
+          a: 'A clear is itself an event with a timestamp, and the rollup resets the running sum at that point in time order. With per-region rollups summed globally, every region must apply the reset at the same logical point. Otherwise one region\'s pre-clear increments survive in the global sum. One option is to write the clear to every region\'s log with one timestamp and have the global tally ignore regional checkpoints older than the latest clear. That cross-region coordination is the hard part Netflix calls out.',
+        },
+      ],
+      pitfalls: [
+        'Rolling up up to now(), so late but accepted events fall behind the checkpoint and are never counted',
+        'Implementing idempotency as a separate "seen tokens" table checked before the increment, which races and doubles the writes',
+        'Putting every event for a counter in one partition, which creates a wide partition for viral counters',
+        'Claiming exactly-once across regions without addressing replication lag or how resets propagate',
+      ],
+    },
+    {
+      id: 'design-more-iq-13',
+      difficulty: 'hard',
+      question:
+        'A payments fraud team wants two things from the card-authorisation stream (40K auths/s): every merchant whose share of declines exceeds 0.5% in the last hour, and a "recently blocked device" check on every auth, where devices are unblocked after review. Each scoring node has about 50 MB to spare. Which data structures do you use, and why those rather than Count-Min and a Bloom filter?',
+      whatInterviewerLooksFor: [
+        'Matches the direction of each structure\'s error to the business risk',
+        'Sizes lossy counting with ε and support s, and states its guarantees',
+        'Sees that unblocking needs deletes and picks a cuckoo filter, knowing its delete caveat',
+        'Handles windowing, multiple nodes and the fallback to an exact check',
+      ],
+      modelAnswer: `**Heavy-hitter merchants: lossy counting.**
+- Support s = 0.5%. Pick ε = 0.05% (a tenth of s), so the bucket width is w = 2,000 declines.
+- Output every merchant with f ≥ (s − ε)·N. Guarantees: **no merchant above 0.5% is missed**, nothing below 0.45% is reported, and each estimate is low by at most 0.05% of N.
+- Memory is at most (1/ε)·log(εN) entries. At 1M declines per hour, εN = 500 and ln 500 ≈ 6.2, so about 12.4K entries, a few MB.
+- Why not Count-Min: it overestimates and stores no keys. You would need a candidate heap beside it, and every alert would be "possibly inflated". Lossy counting is deterministic and errs downwards, so an alert means the merchant really is above 0.45%.
+- For the last hour, keep 12 five-minute lossy tables and combine them, or partition the stream by merchant_id so each node counts its merchants exactly and the sketch only bounds memory.
+
+**Blocked devices: a cuckoo filter in front of the exact list.**
+- Devices get **unblocked**, and a Bloom filter cannot delete. A rebuild every few minutes would keep wrongly declining users who were just cleared.
+- A cuckoo filter with 4-slot buckets and 12-bit fingerprints has FPR ≤ 0.2% and uses about 13 bits per device. 10M blocked devices is about 16 MB.
+- A filter hit means "maybe blocked": confirm against the exact store (Redis set or DB). A miss is definitive, so 99.8% of auths skip the remote call.
+- Delete only devices you know were inserted, by driving deletes from the block table's change stream. Deleting a never-inserted id can remove another device's fingerprint and let a blocked device through.
+- Plan capacity for no more than ~95% load and rebuild at a larger size before that, because inserts fail near full.
+
+**Operations.** Rebuild filters from the source of truth on deploy, version them, and monitor the confirm-hit ratio to catch FPR drift.`,
+      followUps: [
+        {
+          q: 'Product now wants each flagged merchant\'s decline count shown exactly on the analyst dashboard. Does lossy counting still work?',
+          a: 'Use it for detection, not reporting. Lossy counting tells you which merchants to look at, with counts that may be low by up to εN (500 declines here). For the dashboard, run an exact GROUP BY over the hour for just the flagged merchants against the event store or an OLAP table. That query is cheap because it covers a few dozen merchant ids, not millions. Showing sketch values as exact would mislead analysts.',
+        },
+        {
+          q: 'A bug sends DELETE for 20K device ids that were never blocked. What is the impact on the cuckoo filter?',
+          a: 'Each bogus delete can remove a fingerprint that matches in one of the two candidate buckets, and that fingerprint may belong to a different, genuinely blocked device. That device then gets a definitive miss and bypasses the block, a false negative that a filter must never produce. With 12-bit fingerprints the chance per bogus delete is small but real, and across 20K deletes some blocked devices can slip through. Recovery: rebuild the filter from the block table. Prevention: only delete in response to an unblock event for an id that exists in the table.',
+        },
+      ],
+      pitfalls: [
+        'Choosing Count-Min for alerts without noticing that it inflates counts and stores no keys',
+        'Using a Bloom filter for a set that shrinks, then rebuilding it hourly and blocking users who were already cleared',
+        'Treating a filter hit as a definitive "blocked" instead of confirming it against the exact store',
+        'Deleting from a cuckoo filter ids that were never inserted',
+      ],
+    },
   ],
   envelopeQuestions: [
     {
@@ -2255,6 +2686,109 @@ return { ...s, price: Math.min(s.leaderMax, maxBid + inc) };   // leader defends
         {
           q: 'A watcher reconnects after 20 seconds on a flaky mobile network. What do they see, and how?',
           a: 'On reconnect the client sends its last seen seq. The gateway (or a REST call) returns the current snapshot (price, leader, endsAt, seq) rather than replaying 20 seconds of coalesced updates, since only the latest state matters for an auction. Then the client resubscribes. If the user has an active bid, the snapshot also says whether they were outbid, and an outbid push notification was already sent through the notification path.',
+        },
+      ],
+    },
+    {
+      id: 'design-more-mcq-20',
+      difficulty: 'hard',
+      question:
+        'A team copies the event-log counter idea, but their rollup job uses the code below. The store accepts events stamped up to 5 s in the past. Over a week, counters end up slightly LOWER than a full recount of the event log. What is the cause?',
+      code: {
+        language: 'typescript',
+        code: `async function rollup(counter: string): Promise<void> {
+  const cp = await checkpoints.get(counter);          // { count, lastRollupTs }
+  const windowEnd = Date.now();                         // roll up "everything so far"
+  const events = await eventLog.scan(counter, cp.lastRollupTs, windowEnd);
+  const sum = events.reduce((n, e) => n + e.delta, 0);
+  await checkpoints.put(counter, { count: cp.count + sum, lastRollupTs: windowEnd });
+}`,
+      },
+      options: [
+        'Events that arrive after a rollup but are stamped before its windowEnd fall behind the checkpoint and are never summed',
+        'Two rollup workers overwrite each other\'s checkpoint, and the last writer drops the other worker\'s increments',
+        'Date.now() on the rollup host drifts ahead of the writers\' clocks, so events from the near future get counted twice',
+        'Retried AddCount calls are deduplicated by the event log, so the recount includes retries that the rollup skipped',
+      ],
+      correct: [0],
+      explanation:
+        'The window [lastRollupTs, now) is still mutable: the store accepts events stamped up to 5 s in the past, so some land below the new checkpoint after it is written. The next scan starts at lastRollupTs and never sees them, which gives a permanent undercount. Ending the window at now − acceptLimit − skew makes it immutable. Racing workers cannot lose increments here, because each recomputes from the same checkpoint over the same range. Clock drift would cause missed events, not double counts. Idempotent dedup affects the recount and the rollup the same way.',
+      followUps: [
+        {
+          q: 'You fix it with windowEnd = now − 5 s − 2 s. What do users observe, and how would the accurate variant change that?',
+          a: 'GetCount now lags real activity by at least 7 s plus the time until the next rollup, so a counter can briefly read lower than the writes a user just made. The accurate variant returns checkpoint + a live scan of events since lastRollupTs. It is fresh, but every read pays for the scan, which is cheap for frequently rolled-up counters (narrow gap) and expensive for quiet counters whose gap spans many time buckets.',
+        },
+      ],
+    },
+    {
+      id: 'design-more-mcq-21',
+      difficulty: 'expert',
+      question:
+        'About Netflix\'s eventually consistent counter (event log in TimeSeries on Cassandra, background rollups, EVCache), which statements are accurate? Select ALL that apply.',
+      options: [
+        'The rollup trigger carries only the namespace and counter name, so the rollup server learns which counters changed without scanning the dataset',
+        'The cached value combines count and lastRollupTs in one entry, so a reader can never pair a count with another checkpoint\'s timestamp',
+        'Concurrent rollups of one counter are serialised with a distributed lock, which is what keeps the value from fluctuating',
+        'Increments are stored in a single partition per counter so that a rollup can read them with one sequential scan',
+        'A GetCount also triggers a rollup, which self-heals a counter whose earlier rollup signal was lost',
+      ],
+      correct: [0, 1, 4],
+      explanation:
+        'The light-weight rollup event only marks a counter dirty. Storing {count, lastRollupTs} together prevents mismatched pairs. Reads enqueue a rollup, which repairs stale counters. Netflix deliberately avoids distributed locks: overlapping rollups are safe because they aggregate an immutable window, and values may fluctuate briefly before converging. Events are spread across time buckets and event buckets precisely to avoid one wide partition per counter.',
+      followUps: [
+        {
+          q: 'Netflix runs fewer, larger rollup instances rather than many small ones. Why does instance count matter if correctness does not need a lock?',
+          a: 'Correctness holds either way, but efficiency does not. With many instances, the same counter\'s signals can land on different servers, and each repeats the same range scans against TimeSeries, wasting read capacity. Hashing counters to queues on a few large instances concentrates each counter\'s signals so the Set dedup collapses them into one rollup per window. The trade-off is availability: fewer instances means a crash drops a larger share of in-memory signals.',
+        },
+      ],
+    },
+    {
+      id: 'design-more-mcq-22',
+      difficulty: 'expert',
+      question:
+        'Lossy counting runs with ε = 0.01 over N = 10,000 items, and you query for support s = 0.05. One item\'s true frequency is 520. Which outcome is guaranteed?',
+      code: {
+        language: 'typescript',
+        code: `const w = Math.ceil(1 / eps);                    // 100
+// new item:  table.set(x, { f: 1, delta: bucket - 1 })
+// boundary:  delete entries with f + delta <= bucket
+// query:     report entries with f >= (s - eps) * N  // (0.05 - 0.01) * 10_000 = 400`,
+      },
+      options: [
+        'It is reported with an f anywhere from 420 to 520',
+        'It is reported with an f anywhere from 520 to 620',
+        'It may be pruned, since lossy counting only promises to keep items above s·N = 500 most of the time',
+        'It is reported with f exactly 520, because entries are never pruned once they pass s·N',
+      ],
+      correct: [0],
+      explanation:
+        'Lossy counting guarantees f ≤ true ≤ f + εN, so f lies in [520 − 100, 520] = [420, 520]. Every possible f is at least the 400 threshold, so the item is always reported. The error is one-sided downward, so an overestimate to 620 describes Count-Min, not lossy counting. The guarantee is deterministic ("no false negatives"), not "most of the time". f can be below 520 because the entry may have been created late with Δ covering counts it missed, or pruned and re-created.',
+      followUps: [
+        {
+          q: 'Another item has a true frequency of 430. Can it be reported, and what does that tell you about tuning ε?',
+          a: 'It may or may not be. Its f lies in [330, 430], so it is reported only if f ≥ 400. Items between (s − ε)N = 400 and sN = 500 are the grey zone where false positives are allowed, and items below 400 are never reported. Shrinking ε narrows the zone and tightens counts, but the table grows like (1/ε)·log(εN). Halving ε roughly doubles the worst-case memory. A common rule is ε ≈ s/10.',
+        },
+      ],
+    },
+    {
+      id: 'design-more-mcq-23',
+      difficulty: 'hard',
+      question:
+        'You replace a Bloom filter of revoked session ids with a cuckoo filter (4-slot buckets, 12-bit fingerprints), so ids can be removed when a session expires. Select ALL statements that are true.',
+      options: [
+        'Calling delete for an id that was never inserted can remove a different id\'s matching fingerprint and create a false negative',
+        'Inserting the same id nine times can fail even in a mostly empty filter, because its two buckets hold at most eight copies',
+        'Moving a fingerprint during a kick requires re-reading the original id, so the ids must be stored next to the filter',
+        'Near ~95% load, inserts start failing, but lookups of ids already stored still never return false negatives',
+        'Two regional filters can be merged into a global one by OR-ing their slot arrays, as with Bloom filters',
+      ],
+      correct: [0, 1, 3],
+      explanation:
+        'Deletes remove any matching fingerprint from either candidate bucket, so deleting a non-member can evict someone else\'s entry. Duplicates are stored as separate copies, and 2 buckets × 4 slots cap one key at 8 copies. Inserts fail as kick chains exhaust near full load, but stored fingerprints stay findable (a correct implementation parks the last homeless one). Partial-key cuckoo hashing computes the alternate bucket from the fingerprint alone (i XOR hash(fp)), so the original id is not needed. OR-ing slot arrays would mix fingerprints into meaningless values. Cuckoo filters do not support union the way Bloom filters do.',
+      followUps: [
+        {
+          q: 'Sessions expire at a steady 200K per hour and new revocations arrive at the same rate. How do you keep the filter healthy over months?',
+          a: 'Drive deletes from the authoritative revocation table (or its CDC stream), so only real members are deleted, and size for the steady-state live count plus headroom, keeping load at or below about 90%. Because deletes free slots, a steady churn does not degrade a cuckoo filter, unlike a Bloom filter, which would need periodic rebuilds. Still rebuild from the source of truth on deploy or when monitoring shows confirm-store false-positive hits rising, which signals drift such as missed deletes.',
         },
       ],
     },

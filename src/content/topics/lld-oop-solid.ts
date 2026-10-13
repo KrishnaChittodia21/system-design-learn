@@ -18,6 +18,10 @@ const topic: Topic = {
     'Barbara Liskov & Jeannette Wing — A Behavioral Notion of Subtyping (1994)',
     'NestJS documentation — Custom providers, injection tokens, testing',
     'Sandi Metz — "The Wrong Abstraction" (2016)',
+    'Alistair Cockburn — Hexagonal Architecture (Ports and Adapters), 2005',
+    'Jeffrey Palermo — The Onion Architecture (2008)',
+    'Robert C. Martin — The Clean Architecture (blog, 2012)',
+    'ByteByteGo — How Clean Architecture Works; Key Terms in Domain-Driven Design (2025)',
   ],
   tags: ['lld', 'oop', 'solid', 'composition', 'uml', 'value-objects', 'aggregates', 'ddd', 'dependency-injection', 'nestjs', 'typescript'],
   cheatSheet: [
@@ -754,6 +758,234 @@ export class SubscriptionModule {}
         'Deterministic tests reveal real bugs (month overflow on Jan 31).',
       ],
     },
+    {
+      heading: '12. DDD vocabulary for LLD rounds: ubiquitous language, entities, value objects, aggregates and aggregate roots, repositories, domain events, bounded contexts, anti-corruption layer',
+      body: `**Intuition:** DDD gives you two toolkits. **Tactical** patterns shape the classes *inside* one model: entity, value object, aggregate, repository, domain event. **Strategic** patterns decide *where one model ends and the next begins*: bounded context, context map, anti-corruption layer. LLD rounds mostly test tactical patterns. Senior rounds add "and how does this talk to the rest of the company?", which is strategic.
+
+**Tactical glossary** (section 10 covers aggregate rules in depth):
+
+| Term | One-line meaning | How it shows up in code | Smell in an LLD round |
+|---|---|---|---|
+| **Ubiquitous language** | the same words in conversations, code, tests and events | \`booking.confirm()\`, \`SeatHeld\` event | \`setStatus(2)\`, a \`Manager\`/\`Helper\` class, "trip" in code but "ride" in the spec |
+| **Entity** | identity that persists while attributes change | \`Booking\` with \`id\`, equality by id | entity with public setters for every field |
+| **Value object** | defined by its values, immutable, self-validating | \`Money\`, \`SeatNo\`, \`DateRange\` | primitive obsession: \`price: number\`, \`currency: string\` passed separately |
+| **Aggregate / root** | consistency boundary; outsiders talk only to the root | \`show.holdSeats(...)\` checks rules, then changes child seats | code reaching into \`show.seats[3].status = ...\` |
+| **Factory** | creation that has to enforce invariants | \`Booking.request(...)\` static method or a factory class | constructors with 9 optional params |
+| **Repository** | collection-like access to **whole aggregates**, one per root | \`ShowRepository.byId()\` / \`save(show, version)\` | a repository per table, or \`updateSeatStatus(seatId)\` bypassing the root |
+| **Domain service** | rule that belongs to no single entity | \`PricingPolicy.quote(show, seats, coupon)\` | everything becomes a service → anemic model |
+| **Application service / use case** | orchestrates: load → call domain → save → publish; owns the transaction | \`HoldSeatsHandler\` | business rules inside the handler |
+| **Domain event** | past-tense fact raised by an aggregate | \`SeatsHeld { showId, seats, until }\` | events named like commands (\`SendEmail\`) |
+
+**Domain event vs integration event:** a domain event lives inside one context and can be dispatched in-process. An **integration event** is the published, versioned contract other contexts consume, sent through an outbox to Kafka/SNS. Keep them separate so internal refactors don't break consumers.
+
+**Strategic patterns:**
+- **Bounded context:** the boundary inside which a word has exactly one meaning. "Show" in *Catalogue* is a title, cast and poster. In *Booking* it is a seat map with holds. In *Settlement* it is revenue share and tax. Forcing one shared \`Show\` class on all three is how god-objects are born. One team usually owns a context, and it often (not always) maps to one service or one NestJS module.
+- **Context map relationships:** customer–supplier (upstream plans with downstream needs), conformist (downstream adopts upstream's model as-is), shared kernel (small co-owned code, high coordination), open host service + published language (upstream offers a stable API/event schema for many), separate ways, and **anti-corruption layer**.
+- **Anti-corruption layer (ACL):** a translation layer *owned by the downstream context*. It converts a foreign or legacy model (status codes, odd field names, overloaded records) into your own value objects, so the foreign model never leaks into your domain. In Nest it is an adapter provider that implements your port and contains every mapping and every "unknown code" decision.
+
+**In an LLD round say this:** "Inside the Booking context, \`Show\` is the aggregate root that guards seat holds. Other contexts learn about bookings through a versioned \`BookingConfirmed\` integration event. The legacy payment switch sits behind an ACL, so its codes never appear in our domain."`,
+      diagram: `  [Catalogue]  --- open host / published language ---+
+   Show = title, cast, poster                         |
+                                                      v  ShowScheduled v1
+  [Booking]  (Show = seat map + holds; root = Show)   <----------------+
+     |  BookingConfirmed v2 (integration event, outbox)
+     v
+  [Settlement]  customer-supplier: Booking is upstream
+     |
+     | ACL (adapter owned by Settlement)
+     v
+  {Legacy payment switch}  codes '00','05','91', amounts in paise strings`,
+      code: [
+        {
+          language: 'typescript',
+          title: 'Booking context in NestJS: aggregate, repository port, ACL adapter, use case',
+          code: `import { Inject, Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+
+// ---- booking/domain: no Nest, no ORM ----
+export type SeatNo = string & { readonly __brand: 'SeatNo' };
+export type SeatsHeld = { type: 'SeatsHeld'; showId: string; seats: SeatNo[]; until: Date };
+
+export class Show {                                   // aggregate root
+  private readonly events: SeatsHeld[] = [];
+  constructor(readonly id: string, private readonly held: Map<SeatNo, Date>, public version: number) {}
+
+  holdSeats(seats: SeatNo[], now: Date, ttlMs: number): void {
+    if (seats.length === 0 || seats.length > 10) throw new RangeError('1-10 seats per hold');
+    for (const s of seats) {
+      const until = this.held.get(s);
+      if (until && until > now) throw new Error('seat ' + s + ' already held');  // invariant
+    }
+    const until = new Date(now.getTime() + ttlMs);
+    seats.forEach((s) => this.held.set(s, until));
+    this.events.push({ type: 'SeatsHeld', showId: this.id, seats, until });
+  }
+  pullEvents(): SeatsHeld[] { return this.events.splice(0); }
+}
+
+export interface ShowRepository {                     // one repository per aggregate root
+  byId(id: string): Promise<Show | null>;
+  save(show: Show, expectedVersion: number): Promise<void>; // throws on version conflict
+}
+export const SHOW_REPO = Symbol('SHOW_REPO');
+
+// ---- booking/infra: anti-corruption layer for the legacy seat-map API ----
+type LegacySeat = { SEAT_CD: string; STS: 'A' | 'B' | 'H' | 'X' }; // their model, not ours
+export function toSeatNo(raw: LegacySeat): SeatNo | null {
+  if (raw.STS === 'X') return null;                   // 'X' = removed seat: drop, never leak it
+  if (!/^[A-Z]\\d{1,2}$/.test(raw.SEAT_CD)) throw new Error('unmapped seat code ' + raw.SEAT_CD);
+  return raw.SEAT_CD as SeatNo;
+}
+
+// ---- booking/application: the use case orchestrates, the root decides ----
+@Injectable()
+export class HoldSeatsHandler {
+  constructor(@Inject(SHOW_REPO) private readonly shows: ShowRepository,
+              private readonly bus: EventEmitter2) {}
+
+  async execute(cmd: { showId: string; seats: SeatNo[] }): Promise<void> {
+    const show = await this.shows.byId(cmd.showId);
+    if (!show) throw new Error('unknown show');
+    const expected = show.version;
+    show.holdSeats(cmd.seats, new Date(), 8 * 60_000); // 8-minute hold
+    await this.shows.save(show, expected);              // optimistic lock on the aggregate
+    for (const e of show.pullEvents()) this.bus.emit(e.type, e); // in-process domain event
+  }
+}`,
+        },
+      ],
+      keyPoints: [
+        'Tactical DDD shapes classes inside a model; strategic DDD draws the boundaries between models.',
+        'Repositories load and save whole aggregates, one per root, never per table or per child entity.',
+        'Domain events stay inside the context; integration events are versioned contracts sent through an outbox.',
+        'A bounded context is where a word has exactly one meaning; the same noun can be three different classes.',
+        'The downstream team owns the ACL, and every foreign code is mapped or rejected there.',
+      ],
+      source: 'Eric Evans — Domain-Driven Design (2003), Parts II and IV; Vaughn Vernon — Implementing Domain-Driven Design (2013), Ch 2–3, 8, 10, 12; ByteByteGo — Key Terms in Domain-Driven Design (2025)',
+    },
+    {
+      heading: '13. Clean, Hexagonal and Onion architecture: dependency rule, ports & adapters, use cases',
+      body: `**Intuition:** all three architectures describe the same idea in different pictures. Business rules sit in the middle, I/O sits at the edge, and **source-code imports point inward only**. The database, the web framework and Kafka are plug-ins to your application, not its foundation.
+
+| | Hexagonal (Ports & Adapters) | Onion | Clean |
+|---|---|---|---|
+| Author, year | Alistair Cockburn, 2005 | Jeffrey Palermo, 2008 | Robert C. Martin, 2012 |
+| Core idea | app talks to the world only through **ports** (purpose-named interfaces); **adapters** translate a technology to a port | concentric rings: domain model → domain services → application services → infrastructure/UI | four circles: entities → use cases → interface adapters → frameworks & drivers |
+| Emphasis | symmetry: a test harness, REST, a CLI and a queue can all **drive** the same port; DB, mail and payments are **driven** | the domain model has zero outward dependencies | the **Dependency Rule** plus simple data structures (DTOs) at each boundary |
+
+**The dependency rule vs the flow of control.** At runtime the use case *calls* the Postgres adapter, so control flows outward. At compile time the adapter *imports* the port that the use case owns, so dependencies point inward. Dependency inversion (section 6) is what lets the two point in opposite directions.
+
+**Vocabulary you should use correctly:**
+- **Driving (primary) port:** what the outside world calls, usually the use case's input interface (\`ReserveSeat.execute(cmd)\`). Driving adapters: Nest controller, GraphQL resolver, Kafka consumer, CLI, test.
+- **Driven (secondary) port:** what the application needs from the world (\`SeatInventory\`, \`Clock\`, \`Notifier\`). Driven adapters: Postgres, Redis, SES, an in-memory fake.
+- **Use case (interactor):** one application operation per class. It takes a plain input DTO and returns a plain result. It has no HTTP types, no ORM entities and no framework decorators in the signature.
+- **Data crossing boundaries:** pass DTOs or domain values, never an ORM row or an Express \`req\`.
+
+**Folder layout (Nest service, one bounded context):**
+
+| Folder | Contains | May import |
+|---|---|---|
+| \`domain/\` | entities, value objects, domain events, domain services | nothing outside \`domain/\` |
+| \`application/\` | use cases, driven-port interfaces, DTOs | \`domain/\` |
+| \`adapters/in/\` | controllers, resolvers, consumers (driving) | \`application/\` |
+| \`adapters/out/\` | pg / Redis / HTTP implementations of ports (driven) | \`application/\`, \`domain/\`, libraries |
+| \`main/\` (Nest module) | composition root: binds ports to adapters | everything |
+
+**When it is overkill:** CRUD admin screens, internal tools, prototypes and thin "validate-and-save" services. There the layers turn into pass-through mappers (an entity, a DTO, a persistence model and a response model with four identical fields each). Signals that it pays off: non-trivial rules, **more than one delivery mechanism** (REST + GraphQL + Kafka + cron calling the same operation), infrastructure that changes (SQS today, Kafka next year), and a codebase that must live 5+ years. A pragmatic middle ground is to add ports **only where volatility or testing pain exists** (payments, messaging, time) and keep plain repositories elsewhere. Vertical slices (one folder per feature) fit well with this.
+
+**Enforce it or it decays:** a dependency-cruiser or eslint-plugin-boundaries rule in CI that fails when \`domain/\` imports \`@nestjs/*\`, \`typeorm\` or \`adapters/\`.
+
+**In a 90-minute machine-coding round:** show the folders, one or two ports (repository + external gateway), **in-memory adapters**, and a CLI or REST driver. That demonstrates the idea without five layers of mappers. Say out loud which adapter you would add for production.`,
+      code: [
+        {
+          language: 'typescript',
+          title: 'Driven port owned by the application, two adapters, two driving adapters',
+          code: `// ---- application/ports.ts (inner: no framework, no driver imports) ----
+export interface SeatInventory {
+  tryReserve(showId: string, seat: string, holder: string, until: Date): Promise<boolean>;
+}
+export interface Clock { now(): Date; }
+
+// ---- application/reserve-seat.ts (use case = driving port implementation) ----
+export type ReserveSeatCmd = { showId: string; seat: string; userId: string };
+export type ReserveSeatResult = { ok: true; until: Date } | { ok: false; reason: 'TAKEN' };
+
+export class ReserveSeat {
+  constructor(private readonly seats: SeatInventory, private readonly clock: Clock) {}
+  async execute(cmd: ReserveSeatCmd): Promise<ReserveSeatResult> {
+    const until = new Date(this.clock.now().getTime() + 8 * 60_000);
+    const ok = await this.seats.tryReserve(cmd.showId, cmd.seat, cmd.userId, until);
+    return ok ? { ok: true, until } : { ok: false, reason: 'TAKEN' };
+  }
+}
+
+// ---- adapters/out/pg-seat-inventory.ts (outer: depends inward on the port) ----
+import type { Pool } from 'pg';
+export class PgSeatInventory implements SeatInventory {
+  constructor(private readonly pool: Pool) {}
+  async tryReserve(showId: string, seat: string, holder: string, until: Date) {
+    const r = await this.pool.query(
+      'UPDATE seats SET holder = $3, held_until = $4 WHERE show_id = $1 AND seat_no = $2 ' +
+      'AND (holder IS NULL OR held_until < now())',   // atomic check-and-set: no double booking
+      [showId, seat, holder, until]);
+    return r.rowCount === 1;
+  }
+}
+
+// ---- adapters/out/in-memory-seat-inventory.ts (tests and machine-coding demo) ----
+export class InMemorySeatInventory implements SeatInventory {
+  private readonly held = new Map<string, Date>();
+  async tryReserve(showId: string, seat: string, _holder: string, until: Date) {
+    const key = showId + ':' + seat;
+    const cur = this.held.get(key);
+    if (cur && cur > new Date()) return false;
+    this.held.set(key, until);                          // single-threaded: no await in between
+    return true;
+  }
+}
+
+// ---- adapters/in: both drivers call the same use case ----
+// @Post(':showId/seats/:seat/reserve') reserve(...) { return this.reserveSeat.execute({ ... }); }
+// @EventPattern('seat.reserve.requested') onMsg(m) { return this.reserveSeat.execute(m); }
+// main/booking.module.ts: { provide: ReserveSeat, inject: [SEATS, CLOCK],
+//   useFactory: (s: SeatInventory, c: Clock) => new ReserveSeat(s, c) }`,
+        },
+        {
+          language: 'javascript',
+          title: '.dependency-cruiser.cjs — fail CI when the dependency rule is broken',
+          code: `module.exports = {
+  forbidden: [
+    {
+      name: 'domain-is-pure',
+      severity: 'error',
+      from: { path: '^src/[^/]+/domain/' },
+      to: { path: ['^src/[^/]+/(application|adapters|main)/', 'node_modules/(@nestjs|typeorm|pg|kafkajs)'] },
+    },
+    {
+      name: 'application-ignores-adapters',
+      severity: 'error',
+      from: { path: '^src/[^/]+/application/' },
+      to: { path: ['^src/[^/]+/(adapters|main)/', 'node_modules/(typeorm|pg|kafkajs|@aws-sdk)'] },
+    },
+    {
+      name: 'no-cross-context-internals',   // contexts talk via published APIs/events only
+      severity: 'error',
+      from: { path: '^src/([^/]+)/' },
+      to: { path: '^src/([^/]+)/(domain|application)/', pathNot: '^src/$1/' },
+    },
+  ],
+};`,
+        },
+      ],
+      keyPoints: [
+        'Hexagonal, Onion and Clean are one idea: rules in the centre, I/O at the edge, imports point inward.',
+        'The application owns the ports; adapters implement them, and controllers, consumers and tests all drive the same use case.',
+        'Only plain DTOs or domain values cross a boundary, never ORM rows or HTTP request objects.',
+        'It is overkill for CRUD; add ports where volatility, multiple drivers or testing pain exist.',
+        'Enforce the dependency rule in CI (dependency-cruiser or eslint boundaries), or it decays.',
+      ],
+      source: 'Alistair Cockburn — Hexagonal Architecture (2005); Jeffrey Palermo — The Onion Architecture (2008); Robert C. Martin — The Clean Architecture (2012) and Clean Architecture (2017); ByteByteGo — How Clean Architecture Works (2025)',
+    },
   ],
   codeChallenges: [
     {
@@ -1484,6 +1716,66 @@ Pros: the interface stays purely structural (fakes are object literals) and ther
         'Leaving gateway-specific status mapping in shared jobs',
       ],
     },
+    {
+      id: 'lld-oop-solid-iq-10',
+      difficulty: 'expert',
+      question:
+        'In a food-delivery LLD round: "Order" means a cart-turned-purchase to the customer app, a ticket with prep time to the restaurant, a pickup-and-drop task to the rider app, and a payable with commission to finance. The current NestJS monolith has one 60-column Order entity shared by all four teams. How would you model this, and how do the parts talk to each other?',
+      whatInterviewerLooksFor: [
+        'Recognises four bounded contexts with four different models behind the same word',
+        'Names an aggregate root and its invariants per context instead of one shared entity',
+        'Uses versioned integration events (via an outbox) between contexts, with clear upstream/downstream roles',
+        'Places an anti-corruption layer where a foreign model (restaurant POS, payment gateway) enters',
+        'Plans an incremental split of the shared entity and knows when not to over-engineer',
+      ],
+      modelAnswer: `### Contexts and their own models
+| Context | Aggregate root | Invariants it guards |
+|---|---|---|
+| **Ordering** | \`Order\` (lines, address, price snapshot) | can't change items after \`PLACED\`; total = sum(lines) + fees − discount |
+| **Kitchen** | \`KitchenTicket\` | states ACCEPTED → PREPARING → READY; prep ETA only moves forward once READY |
+| **Delivery** | \`DeliveryJob\` | one active rider; pickup before drop; proof-of-delivery required to complete |
+| **Settlement** | \`Payable\` | commission computed once at a frozen rate; payout only after delivery confirmed |
+
+Each one has its own table(s) and its own NestJS module, and maybe its own service later. They share **IDs** (\`orderId\`), never classes.
+
+### How they talk
+- Ordering publishes \`OrderPlaced v1\` (integration event, transactional outbox → Kafka). Kitchen consumes it and creates a \`KitchenTicket\`. Ordering is **upstream**, Kitchen is a **customer**.
+- Kitchen publishes \`OrderReady\` → Delivery assigns a rider. Delivery publishes \`OrderDelivered\` → Settlement creates the \`Payable\`.
+- Queries spanning contexts ("order status screen") use a **read model** built from these events, not joins across modules.
+- **ACL** in Kitchen for each restaurant POS integration (a cloud POS API, a legacy XML feed): their status codes become \`KitchenTicket\` commands, and unknown codes go to a quarantine queue. **ACL** in Settlement for the payment gateway's settlement files.
+
+### Inside one context (Ordering)
+\`domain/\` (Order, Money, OrderLine), \`application/\` (PlaceOrder use case, OrderRepository port, PaymentAuthorizer port), \`adapters/\` (pg repository, gateway client, controller). Repository per **root**; optimistic locking via \`version\`.
+
+### Migration from the 60-column entity
+1. Draw the context map and assign column ownership per context.
+2. Strangle by context: introduce the Kitchen module with its own table, fed by \`OrderPlaced\`, and dual-read during cutover.
+3. Make other modules stop writing Kitchen's columns; then drop them.
+4. Add a CI boundary rule so modules can't import each other's \`domain/\`.
+
+### Don't overdo it
+Four contexts, yes. Microservices for each on day one, no: modules with separate schemas inside the monolith give most of the benefit. Avoid a shared kernel beyond small value objects such as \`Money\`.`,
+      followUps: [
+        {
+          q: 'The customer cancels 30 seconds after placing the order, but the kitchen already accepted it. Who decides, and how?',
+          a: 'Ordering owns the customer\'s intent, and Kitchen owns whether food is being made. Ordering sends `CancellationRequested`. Kitchen replies `CancellationAccepted` if the ticket is still ACCEPTED, or `CancellationRejected { reason: PREPARING }`. Ordering then moves to CANCELLED, or to CANCEL_FAILED with a partial refund policy. It is a small saga: no context reaches into another\'s aggregate, and each keeps its own invariant.',
+        },
+        {
+          q: 'Finance wants the order\'s item list in Settlement. Do you share the Ordering Order class or copy data?',
+          a: 'Copy the data you need, frozen, in the integration event or fetched once through Ordering\'s published API: item ids, quantities, prices and the tax snapshot. Settlement needs the values *as they were at settlement time*, not a live object that Ordering may change. Sharing the class creates a shared kernel that couples deploys and invites Settlement to call Ordering\'s methods.',
+        },
+        {
+          q: 'In a 90-minute machine-coding version, how much of this do you build?',
+          a: 'One context end to end (Ordering): domain classes with invariants, a PlaceOrder use case, an in-memory repository, and an in-memory event bus that a stub Kitchen handler subscribes to, to show the flow. Mention the outbox, Kafka and ACLs verbally. Evaluators look for clear boundaries, invariants enforced in the root, and testable code, not for four services.',
+        },
+      ],
+      pitfalls: [
+        'Keeping one shared Order class and adding nullable columns per team',
+        'Calling other contexts\' repositories directly or joining their tables',
+        'Turning every context into a microservice immediately',
+        'Letting POS or gateway status codes leak into domain enums',
+      ],
+    },
   ],
   envelopeQuestions: [
     {
@@ -2042,6 +2334,102 @@ const handlers = new Map<string, PaymentHandler>([
         {
           q: 'Can you get registry-style extensibility with compile-time completeness?',
           a: 'Yes, for a closed set: type the registry as `Record<Payment[\'kind\'], PaymentHandler>` (or use `satisfies Record<...>`). Then adding `WALLET` to the union makes the object literal fail to compile until a handler is supplied, while each handler stays its own class. For a truly open set (plugins loaded at runtime) you give that up and add a boot-time check that every configured kind has a handler.',
+        },
+      ],
+    },
+    {
+      id: 'lld-oop-solid-mcq-18',
+      difficulty: 'hard',
+      question:
+        'This use case lives in src/booking/application/. The team says it follows Clean Architecture "because Nest injects the repository". What is the real problem?',
+      code: {
+        language: 'typescript',
+        code: `import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { SeatRow } from '../adapters/out/seat.row';   // @Entity() class with TypeORM decorators
+
+@Injectable()
+export class ReserveSeat {
+  constructor(@InjectRepository(SeatRow) private readonly seats: Repository<SeatRow>) {}
+
+  async execute(showId: string, seatNo: string, userId: string): Promise<SeatRow> {
+    const seat = await this.seats.findOneByOrFail({ showId, seatNo });
+    if (seat.holder) throw new Error('taken');
+    seat.holder = userId;
+    return this.seats.save(seat);                     // returns the ORM row to the controller
+  }
+}`,
+      },
+      options: [
+        'Nothing structural: dependency injection already decouples the use case from TypeORM',
+        'The application layer imports an outer adapter and the ORM types, and returns an ORM row across the boundary, so the dependency rule is broken in both directions of data flow',
+        'It violates LSP, because Repository<SeatRow> could be replaced by a subclass with different behaviour',
+        'The only problem is performance: findOneByOrFail followed by save is two round trips',
+      ],
+      correct: [1],
+      explanation:
+        'The dependency rule concerns source imports: application/ imports adapters/out and typeorm, so an inner circle names an outer one. It also leaks an ORM row outward, which couples controllers to persistence. Injection is just the wiring mechanism; the imports still point outward. The fix is a SeatInventory port owned by application/, a pg/TypeORM adapter implementing it, and plain result DTOs. The read-then-write is also a race (two users reserve the same seat), but that is a concurrency bug, not the structural issue asked about, and LSP is unrelated.',
+      followUps: [
+        {
+          q: 'After you add a port, the reserve still double-books under load. Where does the fix belong: use case, port or adapter?',
+          a: 'The port\'s contract should say "atomic reserve: returns false if already held" (`tryReserve`), and the adapter implements that atomically, e.g. `UPDATE … WHERE holder IS NULL` checking `rowCount`, or a unique constraint on (show, seat) with insert-on-hold. The use case must not do read-then-write itself, because no in-process lock helps across 10 pods. Making atomicity part of the port contract also forces the in-memory fake to honour it.',
+        },
+      ],
+    },
+    {
+      id: 'lld-oop-solid-mcq-19',
+      difficulty: 'expert',
+      question:
+        'Select ALL that apply. Your Settlement context must ingest a legacy ERP "CUSTOMER" record that mixes billing and shipping data and uses status codes A, S, X and blanks. Which choices fit an anti-corruption layer done right?',
+      options: [
+        'The Settlement team owns a translator/adapter that maps ERP records into its own value objects (e.g. BillingAccount, Gstin)',
+        'Import the ERP DTO types into Settlement\'s domain, to avoid writing mapping code that can drift',
+        'Unknown or blank status codes are rejected or quarantined in the translator, not passed through as strings',
+        'The ERP team should change its schema to match Settlement\'s model, since the ACL is their responsibility',
+        'Declare the ERP CUSTOMER schema a shared kernel so both sides evolve it together',
+      ],
+      correct: [0, 2],
+      explanation:
+        'An ACL protects the downstream model, so the downstream team builds and owns it, and every translation decision lives there, including what to do with codes it doesn\'t understand. Importing ERP types into the domain is the conformist relationship, the opposite of an ACL. Asking upstream to change is a customer–supplier negotiation, not an ACL, and legacy ERPs rarely change. A shared kernel over a legacy schema couples both teams to its worst parts.',
+      followUps: [
+        {
+          q: 'The ERP adds a new status "P" without notice and 4% of records start failing translation. What should happen operationally?',
+          a: 'The ACL sends the records to a quarantine/DLQ with the raw payload, increments a `acl_unmapped_code{code="P"}` metric and alerts. It must not guess a mapping. Settlement keeps processing the other 96%. Once the business confirms what "P" means, add the mapping and a test with the raw sample, then replay the quarantined records idempotently. That is the value of keeping all translation in one place.',
+        },
+      ],
+    },
+    {
+      id: 'lld-oop-solid-mcq-20',
+      difficulty: 'expert',
+      question:
+        'The Order aggregate enforces "max 10 units per SKU and total ≤ ₹2,00,000" in order.addItem(). A teammate adds the repository methods below for a new "edit quantity" screen. What is the most important problem?',
+      code: {
+        language: 'typescript',
+        code: `export interface OrderRepository {
+  byId(id: string): Promise<Order | null>;
+  save(order: Order, expectedVersion: number): Promise<void>;
+  // new:
+  findLines(orderId: string): Promise<OrderLineRow[]>;
+  updateLineQty(lineId: string, qty: number): Promise<void>;   // UPDATE order_lines SET qty = $2 WHERE id = $1
+}
+
+// controller
+await repo.updateLineQty(body.lineId, body.qty);`,
+      },
+      options: [
+        'It causes an N+1 query when the screen loads many lines, so findLines should join orders',
+        'The repository should be a generic Repository<T> so lines and orders share one implementation',
+        'It changes a child entity behind the aggregate root, bypassing the invariants and the version check, so limits and status rules can be broken and concurrent edits are lost',
+        'It is acceptable as long as updateLineQty runs inside a database transaction',
+      ],
+      correct: [2],
+      explanation:
+        'Repositories exist per aggregate root and load or save the whole aggregate, so every change goes through the root\'s methods. updateLineQty skips addItem/changeQty rules (per-SKU cap, order total, "no edits after PAID") and skips the optimistic version, so two concurrent edits silently overwrite each other. A transaction gives atomicity, not business invariants. The N+1 and generic-repository points are secondary or unrelated. The fix is order.changeQty(sku, qty) and then repo.save(order, version).',
+      followUps: [
+        {
+          q: 'Loading the whole Order to change one line feels wasteful. When is it a real problem, and what do you do then?',
+          a: 'It is a problem only when the aggregate is large (hundreds of lines) or heavily contended, which usually means the boundary is wrong. Keep aggregates small: an order with ≤ 50 lines loads in one indexed query in ~1 ms. If a sub-part changes independently and has its own invariants (e.g. a cart vs a placed order), split it into its own aggregate referenced by id. For read-heavy screens, use a separate read model; the write path still goes through the root.',
         },
       ],
     },

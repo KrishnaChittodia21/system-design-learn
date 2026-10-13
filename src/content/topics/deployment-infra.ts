@@ -12,6 +12,9 @@ const topic: Topic = {
     'Mastering API Architecture — Ch 5 Deploying and Releasing APIs',
     'Kubernetes documentation — Pods, Probes, HPA, Resource Management',
     'Argo Rollouts documentation — Canary & Analysis',
+    'Kubernetes documentation — Cluster components, Pod lifecycle, Init and sidecar containers, Vertical Pod Autoscaling, In-place resize (v1.33–v1.37)',
+    'KEDA documentation — ScaledObject, ScaledJob, Kafka scaler; Karpenter documentation — NodePools and disruption',
+    'ByteByteGo — How Kubernetes Works, Top Kubernetes Scaling Strategies, The Lifecycle of a Kubernetes Pod, Kubernetes cheatsheet (2025)',
   ],
   tags: ['kubernetes', 'docker', 'canary', 'blue-green', 'hpa', 'probes', 'feature-flags', 'graceful-shutdown', 'migrations', 'rollback'],
   cheatSheet: [
@@ -795,6 +798,222 @@ kubectl patch hpa orders-api -p '{"spec":{"minReplicas":30,"maxReplicas":120}}'`
         'Exit codes (1, 137, 143, 127) point to the cause before you read a single log line.',
       ],
     },
+    {
+      heading: '13. Kubernetes under the hood: control plane and the pod lifecycle',
+      body: `**Intuition:** Kubernetes is a group of independent robots that never call each other. They all read and write one shared notebook (the API server, backed by etcd). Each robot watches for a mismatch between "desired" and "actual" and fixes its own small part. That loop is called **reconciliation**.
+
+**Control plane:**
+
+| Component | Job | What breaks when it is unhealthy |
+|---|---|---|
+| **kube-apiserver** | the only door to cluster state: authentication, RBAC, admission (mutating webhooks, then validating), persistence, and **watch** streams to every other component | nothing can change; running pods keep running |
+| **etcd** | Raft-replicated key-value store holding every object (3 or 5 members; quorum = majority) | lose quorum → API becomes read-only/unavailable |
+| **kube-scheduler** | watches pods with an empty \`nodeName\`; **filters** nodes (requests fit, taints/tolerations, affinity, topology spread), **scores** the survivors, then writes a **Binding** | new pods stay Pending; existing pods are unaffected |
+| **kube-controller-manager** | dozens of control loops: Deployment → ReplicaSet → Pods, Node lifecycle, Job, EndpointSlice, namespace GC… | no self-healing: dead pods are not replaced |
+
+**On every node:** the **kubelet** watches pods bound to its node and drives the container runtime through **CRI** (containerd). It asks the **CNI** plugin for a pod IP, mounts volumes (CSI), runs probes and reports status back. **kube-proxy** turns Services + EndpointSlices into iptables/IPVS/nftables rules, unless an eBPF dataplane such as Cilium replaces it.
+
+**From \`kubectl apply\` to traffic (a concrete trace, warm node, cached image):**
+
+| t | Event | Who |
+|---|---|---|
+| 0.0 s | Deployment stored in etcd | apiserver |
+| 0.1 s | ReplicaSet created, then 3 Pod objects (\`nodeName\` empty) → phase **Pending** | controllers |
+| 0.2 s | each pod bound to a node | scheduler |
+| 0.3 s | sandbox created, CNI assigns IP, volumes mounted → reason **ContainerCreating** | kubelet, CNI, CSI |
+| 1–2 s | init containers run **one at a time**, each to completion (still Pending, STATUS \`Init:0/1\`) | kubelet |
+| 2 s | app containers start → phase **Running**, \`Ready=False\` | kubelet |
+| 2–40 s | startupProbe passes, then readinessProbe passes → \`Ready=True\` | kubelet |
+| +~1 s | EndpointSlice gains the pod IP; kube-proxy/ingress update → **traffic arrives** | controllers, kube-proxy |
+
+**Pod phases are a summary, not a state machine:** **Pending** (accepted, not all containers up: unscheduled, pulling images, init containers), **Running** (bound, at least one container running or restarting), **Succeeded** (all exited 0, no restart), **Failed** (all terminated, at least one non-zero and not restarted), **Unknown** (node not reporting). **CrashLoopBackOff, ContainerCreating and Terminating are not phases.** They are reasons or display statuses that kubectl derives from container state.
+
+**Container states and the reasons you will meet:**
+
+| State / reason | Meaning | Usual cause |
+|---|---|---|
+| Waiting: \`ContainerCreating\` | sandbox, IP or volume not ready yet | CNI out of IPs (e.g. AWS VPC CNI ENI limits), EBS volume in another AZ, Secret volume missing |
+| Waiting: \`ErrImagePull\` → \`ImagePullBackOff\` | pull failed, retried with backoff (cap 5 min) | wrong tag, no imagePullSecret, registry rate limit |
+| Waiting: \`CreateContainerConfigError\` | spec can't be materialised | ConfigMap/Secret key referenced but missing |
+| Waiting: \`CrashLoopBackOff\` | container keeps exiting; kubelet waits before restarting | restart delay **10 s, 20 s, 40 s … capped at 300 s**, reset after **10 min** of clean running |
+| Terminated: \`OOMKilled\` (exit 137) | memory limit hit, SIGKILL | leak, heap flag above limit |
+| Terminated: \`Error\` / \`Completed\` | non-zero / zero exit | app crash / job done |
+
+Newer kubelets can shorten the backoff: v1.35 has a per-node \`crashLoopBackOff.maxContainerRestartPeriod\` (beta), and v1.33 added an alpha gate that starts at 1 s and caps at 60 s. The defaults above are still what most clusters run.
+
+**Init containers vs native sidecars:** init containers run sequentially before app containers, so a failing one keeps the pod in \`Init:CrashLoopBackOff\` and the app never starts. A **native sidecar** is an init container with \`restartPolicy: Always\` (stable since v1.33). It starts before the app containers, keeps running beside them, and is stopped *after* the last app container exits, in reverse order. This fixes the old "mesh proxy died before the app finished draining" problem.
+
+**How probes move the pod:** startupProbe blocks the other two probes until it passes. A readiness failure flips \`Ready=False\` and removes the IP from EndpointSlices, with **no restart**. A liveness failure kills the container, \`restartCount\` goes up, and repeated failures turn into CrashLoopBackOff. \`readinessGates\` (e.g. "the AWS load balancer target is healthy") must also be True before the pod counts as Ready.
+
+**Termination (details in section 10):** on delete the pod gets a \`deletionTimestamp\` (kubectl shows Terminating). **In parallel**, endpoints are marked not ready and the kubelet runs **preStop**, then sends **SIGTERM** to PID 1. The **grace period (default 30 s) includes preStop**. When it expires, the kubelet sends SIGKILL.`,
+      diagram: `            +----------- control plane -----------+
+ kubectl -->| apiserver <--> etcd (Raft x3)       |
+            |   ^  watch      ^ watch             |
+            | scheduler   controller-manager      |
+            +---^--------------------------^------+
+                | bind pod -> node          | ReplicaSet -> Pods
+   node-1       v                           v
+   kubelet --CRI--> containerd   CNI -> pod IP   kube-proxy -> iptables
+
+ Pod: Pending ----------------------------> Running -------> Succeeded
+      [unscheduled][ContainerCreating]       | Ready=F/T      \\-> Failed
+      [Init:0/2][ImagePullBackOff]           | liveness fail -> restart
+                                             | 10s,20s..300s = CrashLoopBackOff
+ Unknown = node stopped reporting            delete->preStop->SIGTERM->SIGKILL`,
+      code: [
+        {
+          language: 'yaml',
+          title: 'Pod template: init migration, native sidecar, probes and readiness gate',
+          code: `spec:
+  terminationGracePeriodSeconds: 45     # covers preStop + app drain
+  readinessGates:
+    - conditionType: target-health.elbv2.k8s.aws/orders-tg   # set by the AWS LB controller
+  initContainers:
+    - name: wait-for-schema              # runs to completion first; pod stays Pending
+      image: registry.example.com/orders-migrate@sha256:9ab1...
+      command: ['node', 'dist/check-schema.js']   # exit 1 -> Init:CrashLoopBackOff
+    - name: log-shipper                  # native sidecar (restartPolicy Always, stable v1.33)
+      image: fluent/fluent-bit:3.1.9
+      restartPolicy: Always              # starts before app, stops after app, reverse order
+  containers:
+    - name: app
+      image: registry.example.com/orders-api@sha256:4f2c...
+      startupProbe:
+        httpGet: { path: /health/started, port: 3000 }
+        periodSeconds: 5
+        failureThreshold: 24             # up to 120 s to boot before liveness may act
+      readinessProbe:
+        httpGet: { path: /health/ready, port: 3000 }
+        periodSeconds: 5
+      livenessProbe:
+        httpGet: { path: /health/live, port: 3000 }
+        periodSeconds: 10
+        failureThreshold: 6
+      lifecycle:
+        preStop:
+          sleep: { seconds: 5 }          # let endpoint removal propagate before SIGTERM`,
+        },
+        {
+          language: 'bash',
+          title: 'Reading phase, conditions and container state reasons',
+          code: `# Phase vs the STATUS column: STATUS is derived from container states
+kubectl get pod orders-api-5f7c-abc -o jsonpath='{.status.phase}{"\\n"}'
+#   Pending
+
+# Conditions in order: PodScheduled, Initialized, ContainersReady, Ready
+kubectl get pod orders-api-5f7c-abc \\
+  -o jsonpath='{range .status.conditions[*]}{.type}={.status} {end}{"\\n"}'
+#   PodScheduled=True Initialized=False ContainersReady=False Ready=False
+
+# Why is an init container waiting? (reason + restart count)
+kubectl get pod orders-api-5f7c-abc -o jsonpath=\\
+'{range .status.initContainerStatuses[*]}{.name} {.state.waiting.reason} {.restartCount}{"\\n"}{end}'
+#   wait-for-schema CrashLoopBackOff 5
+
+# Scheduler's verdict for an unschedulable pod
+kubectl get events --field-selector involvedObject.name=orders-api-5f7c-abc,reason=FailedScheduling`,
+        },
+      ],
+      keyPoints: [
+        'Everything goes through the apiserver; components watch and reconcile, they never call each other.',
+        'Phases are Pending, Running, Succeeded, Failed and Unknown; CrashLoopBackOff is a container waiting reason.',
+        'Restart backoff runs 10 s → 20 s → … → 300 s cap and resets after 10 min healthy.',
+        'Readiness removes the pod from endpoints without a restart; liveness restarts the container.',
+        'Native sidecars (init containers with restartPolicy Always) start first and stop last.',
+      ],
+      source: 'Kubernetes docs — Cluster components, Pod lifecycle, Init containers, Sidecar containers (v1.33–v1.37); ByteByteGo — How Kubernetes Works, The Lifecycle of a Kubernetes Pod, Kubernetes cheatsheet (2025)',
+    },
+    {
+      heading: '14. Kubernetes scaling strategies: HPA, VPA, Cluster Autoscaler/Karpenter and KEDA',
+      body: `**Intuition:** there are three knobs. **How many** pods (HPA, KEDA), **how big** each pod is (VPA), and **how many machines** they sit on (Cluster Autoscaler, Karpenter). Each autoscaler owns exactly one knob. Most scaling incidents happen when two of them turn the same knob, or when a pod knob turns but nobody turns the machine knob.
+
+| | Scales | Signal | Typical reaction time | Scale to zero | Main pitfall |
+|---|---|---|---|---|---|
+| **HPA** (section 6) | replicas of a Deployment/StatefulSet | CPU/memory utilisation vs *requests*, custom or external metrics | 15 s loop + metric window | no (alpha \`HPAScaleToZero\` gate only) | wrong requests → wrong utilisation |
+| **VPA** (add-on) | CPU/memory **requests** (and limits proportionally) | usage histograms + OOM events | minutes to hours; applied on pod (re)creation | n/a | evicts pods to apply; fights HPA on the same metric |
+| **Cluster Autoscaler** | node-group size (ASG, MIG) | **Pending pods** that would fit in a group; nodes under ~50% *requested* for 10 min → remove | 10 s scan + 1–3 min node boot | nodes, yes | reacts only to requests; node groups must be pre-defined |
+| **Karpenter** | individual nodes, any instance type allowed by a NodePool | Pending pods' requirements (CPU, arch, zone, spot) | ~seconds to decide; node ready in ~1 min | nodes, yes | consolidation disrupts pods; needs PDBs and disruption budgets |
+| **KEDA** | replicas via an HPA it manages, plus 0 ↔ 1 itself | 70+ event sources: Kafka lag, SQS depth, Prometheus, cron, Redis | \`pollingInterval\` 30 s default | **yes** (\`cooldownPeriod\` 300 s) | cold start for the first event after zero |
+
+**VPA in practice.** It has three parts: the **recommender** computes target, lower bound and upper bound per container; the **updater** evicts pods whose requests drift too far (it respects PDBs); and an **admission webhook** rewrites requests on new pods. Modes: \`Off\` (recommend only), \`Initial\` (set at creation), \`Recreate\` (evict to apply), and \`InPlaceOrRecreate\` in newer releases (try an in-place resize first; in-place pod resize is GA in Kubernetes v1.35). \`Auto\` is deprecated. A safe start is **Off**: read the recommendation, then fix your Helm values.
+
+**HPA + VPA on CPU is a feedback loop.** VPA raises the CPU request from 500m to 1 → the same usage is now 40% utilisation instead of 80% → HPA scales in → each remaining pod is busier → VPA raises requests again… Replica count and pod size oscillate, with evictions on top. Rules: HPA on a **load** metric (RPS, lag, in-flight requests) while VPA manages memory (\`controlledResources: ['memory']\`), or VPA in \`Off\` mode only.
+
+**Node autoscalers never look at real usage.** Cluster Autoscaler and Karpenter add capacity only for **Pending** pods and remove it based on **requests**. Requests of 2 CPU on pods that use 0.3 CPU give you a cluster that is "full" at 15% real CPU. Right-sizing requests (VPA recommendations) is what saves money.
+
+**Karpenter vs Cluster Autoscaler.** CA scales pre-built node groups up or down and can only choose among them. Karpenter reads the pending pods' constraints and launches a fitting instance directly (for example a spot c7g.2xlarge in ap-south-1a). It also **consolidates**: it bin-packs pods onto fewer or cheaper nodes and removes the empty ones. Cost: more pod churn, so set PDBs, the \`karpenter.sh/do-not-disrupt\` annotation on critical pods, and NodePool disruption budgets.
+
+**KEDA and scale to zero.** A \`ScaledObject\` creates and owns an HPA. KEDA itself activates 0 → 1 when the trigger crosses its *activation* threshold, and the HPA handles 1 → N. After \`cooldownPeriod\` with no activity, KEDA goes back to 0. The first message after idle waits for poll interval + scheduling + image pull + boot, often 30–90 s. That is fine for queue workers and unacceptable for synchronous HTTP unless something buffers the request (the KEDA HTTP add-on or Knative). For long jobs, use **ScaledJob** (one Job per batch of messages), so scale-in never kills a job halfway through.
+
+**A sane combined setup:** KEDA (or HPA) on a load signal for replicas, VPA in Off/Initial mode for right-sizing, Karpenter or CA for nodes, PDBs on everything, plus a few low-priority "balloon" pods for instant headroom. Remember the hard caps: **a Kafka consumer group can't use more replicas than partitions**, and the DB connection pool is the next ceiling.`,
+      code: [
+        {
+          language: 'yaml',
+          title: 'KEDA on Kafka lag (scale to zero) + VPA recommending memory only',
+          code: `apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: { name: invoice-worker }
+spec:
+  scaleTargetRef: { name: invoice-worker }   # Deployment; KEDA creates the HPA
+  minReplicaCount: 0                         # KEDA owns 0 <-> 1
+  maxReplicaCount: 24                        # = topic partitions; more would idle
+  pollingInterval: 15                        # seconds between trigger checks
+  cooldownPeriod: 300                        # idle seconds before returning to 0
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: kafka-0.kafka:9092
+        consumerGroup: invoice-worker
+        topic: invoices.v1
+        lagThreshold: '500'                  # target lag per replica (1 -> N via HPA)
+        activationLagThreshold: '10'         # wake from 0 only above this lag
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata: { name: invoice-worker }
+spec:
+  targetRef: { apiVersion: apps/v1, kind: Deployment, name: invoice-worker }
+  updatePolicy:
+    updateMode: 'Off'                        # recommend only; humans/CI apply it
+  resourcePolicy:
+    containerPolicies:
+      - containerName: app
+        controlledResources: ['memory']      # never touch CPU: replicas scale on lag
+        minAllowed: { memory: 256Mi }
+        maxAllowed: { memory: 2Gi }`,
+        },
+        {
+          language: 'yaml',
+          title: 'Karpenter NodePool: let it choose instances, but bound disruption',
+          code: `apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata: { name: general }
+spec:
+  template:
+    spec:
+      requirements:
+        - { key: karpenter.sh/capacity-type, operator: In, values: ['spot', 'on-demand'] }
+        - { key: kubernetes.io/arch, operator: In, values: ['arm64', 'amd64'] }
+        - { key: karpenter.k8s.aws/instance-category, operator: In, values: ['c', 'm'] }
+      nodeClassRef: { group: karpenter.k8s.aws, kind: EC2NodeClass, name: default }
+  limits:
+    cpu: '400'                               # hard ceiling for this pool
+  disruption:
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 2m
+    budgets:
+      - nodes: '10%'                         # at most 10% of nodes disrupted at once`,
+        },
+      ],
+      keyPoints: [
+        'HPA and KEDA set how many pods, VPA sets how big, CA and Karpenter set how many nodes: one owner per knob.',
+        'Never let HPA and VPA both act on CPU; scale replicas on load and let VPA handle memory or only recommend.',
+        'Node autoscalers react to Pending pods and requests, never to real usage.',
+        'KEDA does 0 ↔ 1 itself and hands 1 ↔ N to an HPA; the first event after idle pays the cold start.',
+        'Replica ceilings come from partitions and DB connections, not from the autoscaler.',
+      ],
+      source: 'Kubernetes docs — Autoscaling workloads, Vertical Pod Autoscaling, In-place resize (v1.35+); KEDA docs — ScaledObject, Kafka scaler; Karpenter docs — NodePools and disruption; ByteByteGo — Top Kubernetes Scaling Strategies (2025)',
+    },
   ],
   codeChallenges: [
     {
@@ -1381,6 +1600,53 @@ Cache the hot computation, split the tenant's work, or add randomness to the sha
         'Not checking per-pod RPS before profiling.',
       ],
     },
+    {
+      id: 'deployment-infra-iq-09',
+      difficulty: 'expert',
+      question:
+        'Our invoice workers consume a 24-partition Kafka topic on EKS. Someone added an HPA on CPU 70% and a VPA in Auto mode on CPU and memory. Every night when the batch lands, replica counts swing between 4 and 40, pods get evicted mid-batch, new pods sit Pending for about 3 minutes, and lag still reaches 2 hours. Redesign the scaling.',
+      whatInterviewerLooksFor: [
+        'Diagnoses the HPA/VPA feedback loop on the same CPU signal',
+        'Picks a load signal that matches the work (consumer lag) and caps replicas at the partition count',
+        'Separates the three knobs: replicas, pod size, nodes',
+        'Explains the Pending time as node provisioning and knows how to pre-warm or buffer it',
+        'Protects in-flight work during scale-in and evictions (PDB, graceful shutdown, commit-after-process)',
+      ],
+      modelAnswer: `### What is going wrong
+1. **HPA and VPA both act on CPU.** VPA raises requests, so HPA's utilisation (usage ÷ request) drops and it scales in. Fewer pods are busier, so VPA raises requests again. Meanwhile VPA's updater **evicts** pods to apply new sizes, which triggers a Kafka **rebalance** each time and pauses consumption for the whole group.
+2. **CPU is the wrong signal.** Invoice workers wait on Postgres and a PDF service. Lag can be 2 hours at 40% CPU.
+3. **40 replicas > 24 partitions.** 16 pods sit idle but still hold requests and still trigger rebalances.
+4. **About 3 min Pending** = there are no free nodes, so the node autoscaler launches instances (decision, about 60 s EC2 boot, kubelet join, image pull).
+
+### Redesign
+- **Replicas: KEDA ScaledObject on consumer-group lag.** \`lagThreshold\` of about 5,000 per replica (measured throughput of about 80 msg/s per pod clears 5K in about 1 min), \`maxReplicaCount: 24\`, \`minReplicaCount\` of 2 at night (or a KEDA **cron** trigger that pre-scales to 16 at 01:50 before the batch at 02:00). Scale-down behaviour: stabilisation 300–600 s, at most 25% per minute.
+- **Pod size: VPA in \`Off\` mode** (or \`Initial\`, memory only). Copy its recommendations into the chart through review. No evictions during the batch.
+- **Nodes: Karpenter** with a NodePool that allows several instance families, plus a **balloon** Deployment of low-priority pause pods reserving about 4 vCPU, so the first scale-up preempts the balloons in seconds while Karpenter backfills. Or pre-scale nodes with the cron trigger.
+- **Safety:** a PDB (\`maxUnavailable: 1\`), the cooperative-sticky assignor or static membership (\`group.instance.id\`) to shrink rebalance pauses, commit offsets only after processing, and a SIGTERM handler that stops fetching, finishes the current batch and commits within \`terminationGracePeriodSeconds\`.
+
+### Check the ceiling
+24 pods × 80 msg/s ≈ 1,900 msg/s. If the batch is 15M messages, that is about 2.2 h, which is the lag we saw. So scaling alone can't fix it: increase partitions (for example to 48, which changes key placement, so do it in a quiet window), raise per-pod throughput (batch DB writes, concurrency per partition with key ordering), and confirm Postgres can take about 2× the writes.`,
+      followUps: [
+        {
+          q: 'Why does each VPA eviction hurt more than a lost pod would in a stateless HTTP service?',
+          a: 'A Kafka consumer pod is a member of a consumer group. Every leave or join triggers a rebalance. With the eager protocol all members stop consuming until assignment completes (often 10–60 s with slow `max.poll.interval.ms` handling). Uncommitted work on the evicted pod is re-processed by the new owner. Ten evictions in a batch can mean minutes of total pause plus duplicates. Cooperative rebalancing, static membership and no evictions mid-batch avoid this.',
+        },
+        {
+          q: 'Product wants zero pods outside the batch window to save cost. What changes, and what is the risk?',
+          a: 'Set `minReplicaCount: 0` with an `activationLagThreshold` (e.g. 10). KEDA wakes the deployment when lag appears and returns it to zero after `cooldownPeriod`. Risk: the first invoices after idle wait for poll interval (15–30 s) + node provisioning (about 1–2 min if Karpenter also scaled nodes to zero) + boot. For a nightly batch that is fine. For daytime invoices with an SLA, keep 1–2 warm replicas or use a cron trigger.',
+        },
+        {
+          q: 'Karpenter consolidation keeps moving the workers between nodes during the batch. How do you stop that without disabling consolidation everywhere?',
+          a: 'Annotate the worker pods with `karpenter.sh/do-not-disrupt: "true"` during critical windows, or put them on a dedicated NodePool whose disruption budget is `nodes: "0"` on a schedule (budgets accept a cron `schedule` and `duration`). A PDB also limits voluntary evictions. Consolidation stays active for the rest of the cluster.',
+        },
+      ],
+      pitfalls: [
+        'Raising maxReplicas above the partition count and expecting more throughput',
+        'Keeping VPA in an evicting mode on a consumer group or any long-running batch',
+        'Blaming the HPA for the 3-minute Pending without noticing node provisioning',
+        'Scaling only replicas without checking the downstream database limit',
+      ],
+    },
   ],
   envelopeQuestions: [
     {
@@ -1920,6 +2186,106 @@ spec:
           "q": "Every scale event triggers a consumer-group rebalance. How do you keep that from making lag worse?",
           "a": "Classic eager rebalancing stops all consumers while partitions are reassigned, so frequent scaling causes repeated pauses. Use cooperative incremental rebalancing (only moved partitions pause), static group membership (`group.instance.id`) so restarts within the session timeout don't trigger rebalances, and HPA or KEDA behaviour policies with a scale-down stabilisation of ~5 minutes and step limits. Also commit offsets on partition revocation so the new owner doesn't reprocess a big chunk."
         }
+      ],
+    },
+    {
+      id: 'deployment-infra-mcq-16',
+      difficulty: 'expert',
+      question:
+        'A new pod of orders-api shows the output below. Its init container has now failed 6 times in a row. What is the most accurate description of the pod right now?',
+      code: {
+        language: 'bash',
+        title: 'kubectl output',
+        code: `$ kubectl get pod orders-api-7c9d-qk2
+NAME                  READY   STATUS                  RESTARTS      AGE
+orders-api-7c9d-qk2   0/1     Init:CrashLoopBackOff   6 (2m ago)    7m
+
+$ kubectl describe pod orders-api-7c9d-qk2 | sed -n '/Init Containers/,/Containers:/p'
+  wait-for-schema:
+    State:          Waiting
+      Reason:       CrashLoopBackOff
+    Last State:     Terminated
+      Reason:       Error
+      Exit Code:    1
+    Restart Count:  6`,
+      },
+      options: [
+        'Phase is CrashLoopBackOff; the Deployment controller replaces the pod on another node after the 6th failure',
+        'Phase is Running because the init container was started; the app container is up but not Ready, so it receives no traffic',
+        'Phase is Pending; the app container was never created; the kubelet retries the init container on this node with a delay that is now at the 5-minute cap',
+        'Phase is Failed; the pod stays dead until someone deletes it, because init container failures are not retried',
+      ],
+      correct: [2],
+      explanation:
+        'Pod phase stays Pending until all init containers succeed. CrashLoopBackOff is a container waiting reason, not a phase. App containers are never created while init is failing, so there is nothing to be "not Ready". With restartPolicy Always, the kubelet keeps retrying on the same node with backoff 10, 20, 40, 80, 160 s, then the 300 s cap, which applies after the 6th failure. Controllers don\'t reschedule the pod: a pod is bound to one node for life and is replaced only if it is deleted or evicted.',
+      followUps: [
+        {
+          q: 'This pod is part of a rolling update with maxUnavailable 0. What happens to the rollout and to traffic?',
+          a: 'The new ReplicaSet\'s pod never becomes Ready, so the Deployment controller won\'t scale the old ReplicaSet down further: traffic stays on the old pods and service is fine. After `progressDeadlineSeconds` (default 600 s) the Deployment gets `Progressing=False, reason=ProgressDeadlineExceeded`. It does not roll back on its own. CI should run `kubectl rollout status` and either `rollout undo` or fix the schema check.',
+        },
+        {
+          q: 'The schema check fails only because the migration Job has not finished yet. How do you avoid burning through the backoff?',
+          a: 'Make the init container wait instead of exit: poll the schema version with a bounded loop (e.g. every 5 s for up to 5 min) and exit 0 when it is ready, non-zero only on timeout. Each crash grows the delay toward 300 s, so after a few failures the pod can sit idle for 5 minutes even after the migration completes. Alternatively, sequence the deploy in CD: run the migration Job, wait for completion, then roll out.',
+        },
+      ],
+    },
+    {
+      id: 'deployment-infra-mcq-17',
+      difficulty: 'hard',
+      question:
+        'Select ALL that apply. A NestJS SQS worker uses a KEDA ScaledObject with minReplicaCount: 0, pollingInterval: 30 and cooldownPeriod: 300, triggered on queue length. Which statements are true?',
+      options: [
+        'KEDA activates the Deployment from 0 to 1 itself; scaling from 1 to N is done by an HPA that KEDA creates and manages',
+        'Messages that arrive while the worker is at zero are lost, because SQS has no consumer to deliver them to',
+        'A plain HPA could do the same, because minReplicas: 0 is accepted by default in every cluster',
+        'The first message after an idle period can wait for the polling interval plus scheduling, image pull and boot',
+        'The deployment returns to zero only after the trigger has been inactive for the cooldown period',
+      ],
+      correct: [0, 3, 4],
+      explanation:
+        'KEDA handles activation (0 ↔ 1) and feeds external metrics to the HPA it owns for 1 ↔ N. Cooldown applies to the return to zero. SQS keeps messages for up to 14 days, so nothing is lost while no consumer exists; they just wait. HPA scale to zero is behind the alpha HPAScaleToZero feature gate and is off by default. The cold-start chain (up to 30 s polling + scheduling + pull + boot, plus node provisioning if the node pool also went to zero) is the real cost of scaling to zero.',
+      followUps: [
+        {
+          q: 'Jobs take 20 minutes each. During scale-in, pods get SIGTERM mid-job. What do you change?',
+          a: 'Switch to a KEDA **ScaledJob**: each Job pulls one message (or a small batch), runs to completion and exits, and scale-in never kills running work. If you keep a Deployment, set `terminationGracePeriodSeconds` above the max job time (about 1,300 s), stop receiving on SIGTERM, and extend the SQS visibility timeout while working. Otherwise the message reappears and another pod starts a duplicate.',
+        },
+      ],
+    },
+    {
+      id: 'deployment-infra-mcq-18',
+      difficulty: 'expert',
+      question:
+        'Your 30-node cluster runs at about 22% real CPU, yet the Cluster Autoscaler keeps adding nodes and almost never removes any. Given the output below, what is the root cause?',
+      code: {
+        language: 'bash',
+        title: 'one of the nodes',
+        code: `$ kubectl describe node ip-10-0-7-41 | sed -n '/Allocated resources/,/Events/p'
+  Resource           Requests      Limits
+  --------           --------      ------
+  cpu                3650m (93%)   0 (0%)
+  memory             9.1Gi (62%)   9.1Gi (62%)
+
+$ kubectl top node ip-10-0-7-41
+NAME           CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%
+ip-10-0-7-41   820m         21%    6.2Gi           42%
+
+$ kubectl get pods -A --field-selector status.phase=Pending | wc -l
+14`,
+      },
+      options: [
+        'The Cluster Autoscaler reads kubectl top and is lagging; give metrics-server more resources so it sees the real 21%',
+        'CPU requests are about 4× real usage; scheduling and the autoscaler both work on requests, so nodes look full and new pods stay Pending',
+        'Missing CPU limits let pods burst, so the autoscaler adds nodes to prevent CFS throttling',
+        'A PodDisruptionBudget is blocking scale-down, and that is also what keeps 14 pods Pending',
+      ],
+      correct: [1],
+      explanation:
+        'The scheduler fits pods by requests (93% requested here) and the Cluster Autoscaler adds nodes only when Pending pods could fit in a new node. Its scale-down check also uses requested, not used, CPU (default threshold 50%). Actual usage from metrics-server plays no role in either decision. Missing limits don\'t trigger node scale-up. A PDB can block removing a node, but it can\'t make pods Pending. The fix is right-sizing requests, e.g. from VPA recommendations in Off mode.',
+      followUps: [
+        {
+          q: 'You cut every service\'s CPU request to its p50 usage. Two weeks later, latency incidents appear on busy nodes. Why?',
+          a: 'Requests are also the guaranteed CPU share under contention (CFS weights). At p50, half the time a pod needs more than it reserved. On a packed node, every pod bursts at once during peaks, and each gets only its request share, so latency-sensitive pods are starved. Size requests near p90–p95 of real usage for latency-critical services (VPA\'s target is roughly a high percentile with a margin), and use lower percentiles only for batch work.',
+        },
       ],
     },
   ],

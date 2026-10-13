@@ -555,6 +555,198 @@ ALTER ROLE migrator    SET lock_timeout = '2s';`,
         'statement_timeout and lock_timeout are non-negotiable guardrails.',
       ],
     },
+    // ------------------------------------------------------------ APPENDED: INDEX DATA STRUCTURES
+    {
+      heading: 'Index data structures compared: B-tree vs B+ tree, hash, bitmap and inverted indexes',
+      body: `**Intuition:** a database index is a **phone book with tabs**. A few small pages of tabs, each saying "names from Mehta to Mishra are on page 412", get you to the right page in two or three flips. What matters is how many flips (disk pages) you need, and whether you can keep reading *forward* once you land. That is why every mainstream relational engine uses a **B+ tree**, even though the docs call it a "B-tree": Postgres nbtree, InnoDB, SQL Server and Oracle all do.
+
+**The five structures at a glance**
+
+| Structure | Answers fast | Can't answer | Write cost | Typical home |
+|---|---|---|---|---|
+| **B-tree** (classic) | =, ranges | Long range scans efficiently (walks up and down the tree) | Moderate | Textbooks, some embedded stores |
+| **B+ tree** | =, ranges, ORDER BY, prefix | "Contains a word", suffix match | Moderate: page splits | Default index in Postgres, MySQL, SQL Server, Oracle |
+| **Hash** | = only, O(1) | Range, sort, prefix | Low | Postgres \`USING hash\`, in-memory key directories |
+| **Bitmap** | AND/OR/COUNT over low-cardinality columns | Selective lookups on high-cardinality columns | **High** under concurrent DML | Oracle DW, Druid/Pinot, Lucene filter caches |
+| **Inverted** | "Rows containing term X (and Y)" | Ranges over scalars | High: one row touches many keys | Postgres GIN, Lucene/Elasticsearch |
+
+**B-tree vs B+ tree: the difference that decides everything**
+- A **B-tree** keeps each key's payload (row pointer or row) **in whatever node holds the key**, internal nodes included. A lookup can stop early at an internal node, but internal pages hold fewer keys, and a range scan must walk the tree in order, bouncing between levels.
+- A **B+ tree** keeps **only separator keys and child pointers in internal nodes**. All payloads live in the **leaves**, and the leaves are **linked** to their siblings (Postgres links both directions, so \`ORDER BY ... DESC\` scans backwards).
+- Result 1, **fan-out**: an 8 KB internal page with ~16-byte entries holds up to 512 children. With 100-byte payloads inside it would hold only about 70.
+- Result 2, **predictable cost**: every lookup reaches the leaf level, so cost is always the tree's height.
+- Result 3, **range scans**: one descent finds the first key, then sequential sibling hops read the rest. No re-descending.
+- Result 4, **cache-friendly**: the internal levels are tiny and stay in the buffer pool.
+
+**Height math (say this in interviews)**
+- Fan-out 500, 3 levels: 1 root → 500 internal pages → 250,000 leaves × 500 entries = **125M rows**.
+- The internal levels are 501 pages ≈ **3.9 MiB**, always cached. A cold point lookup therefore costs **one leaf page read** (plus one heap read in Postgres).
+- A balanced binary tree over 125M keys would be log2(125M) ≈ **27 levels**, with a random read at nearly every level.
+- Real pages aren't full: random inserts leave B+ tree pages about 70–75% full. At fan-out 384 (75% of 512), 384³ = 56.6M < 125M, so the same table needs **4 levels**, with inner levels of about 6.7 MiB. Still one uncached read.
+- 1B rows at fan-out 500 → 4 levels. Height grows with log base ~500, which is why depth 3–4 covers almost every OLTP table.
+- With payloads in internal nodes, as in a classic B-tree (fan-out ~70), 125M rows need 4 levels and about 28 MiB of internal pages. That is more RAM to cache and more levels to miss.
+
+**Insert and split, step by step** (toy tree: leaves hold at most 3 keys, internal nodes at most 2 separators):
+1. Insert 18. Descend: root [40] → internal [15 | 28] → leaf [15 21 24], which is full.
+2. **Leaf split:** [15 18 21 24] becomes [15 18] and [21 24]. Link the new leaf into the sibling chain and **copy** the separator 21 up to the parent, so 21 stays in the leaf as well.
+3. The parent becomes [15 | 21 | 28], which overflows. **Internal split:** [15] and [28], and the middle key 21 is **moved** (not copied) up to the root.
+4. The root becomes [21 | 40]. If the root had overflowed, a new root would be created. The tree only grows at the top, so **all leaves stay at the same depth**.
+5. Real engines tune this. Postgres leaves 10% free space at build time (B-tree fillfactor 90). When the rightmost page splits, as with sequential ids, it keeps the left page nearly full instead of splitting 50/50. That is why random UUIDv4 keys give bigger, emptier indexes than sequential or UUIDv7 keys.
+
+**Range scan, step by step:** \`WHERE k BETWEEN 20 AND 50\` descends root → internal → the leaf where 20 belongs (3 page reads), then follows right-links leaf by leaf until a key > 50 appears. Cost = height + leaf pages touched + heap fetches. The heap fetches dominate unless the index is covering or the table is clustered on k.`,
+      diagram: `  B+ tree, toy order (leaf <= 3 keys). Internal nodes: separators + pointers.
+
+  level 2 (root)                       [ 40 ]
+                                      /      \\
+  level 1 (internal)        [ 15 | 28 ]        [ 55 | 70 ]
+                           /    |     \\       /    |     \\
+  level 0 (leaves)   [3 9]<>[15 21 24]<>[28 33]<>[40 47]<>[55 61]<>[70 88]
+                      each leaf entry: key -> TID (Postgres) or the full row
+                      (InnoDB clustered PK); <> = sibling links
+
+  INSERT 18:  leaf [15 21 24] is full -> [15 18] + [21 24], COPY 21 up
+              internal [15|21|28] overflows -> [15] + [28], MOVE 21 up
+              root becomes [21 | 40]; all leaves still at level 0
+
+  RANGE 20..50:  root -> internal -> leaf [15 18] (where 20 belongs), then
+                 follow links: [21 24] -> [28 33] -> [40 47] -> stop at 55`,
+      code: [
+        {
+          language: 'typescript',
+          title: 'B+ tree height and the RAM needed to cache its internal levels',
+          code: `const PAGE_BYTES = 8192;                       // Postgres page; InnoDB uses 16 KB
+
+/** Entries per page = usable bytes / bytes per entry (key + pointer + tuple overhead). */
+export function fanout(entryBytes: number, fill = 1.0): number {
+  return Math.floor((PAGE_BYTES * fill) / entryBytes);
+}
+
+/** Levels needed so that fanout^levels >= rows, plus the RAM the inner levels take. */
+export function treePlan(rows: number, leafFanout: number, innerFanout = leafFanout) {
+  let pages = Math.ceil(rows / leafFanout);    // leaf level
+  const leafPages = pages;
+  let levels = 1, innerPages = 0;
+  while (pages > 1) {                          // build parents until one root remains
+    pages = Math.ceil(pages / innerFanout);
+    innerPages += pages;
+    levels++;
+  }
+  return { levels, leafPages, innerPages, innerMiB: +((innerPages * PAGE_BYTES) / 2 ** 20).toFixed(1) };
+}
+
+// fanout(16) = 512 at 100% full, fanout(16, 0.75) = 384
+// treePlan(125e6, 500)     -> 3 levels, 250,000 leaves, 501 inner pages ~ 3.9 MiB
+// treePlan(125e6, 384)     -> 4 levels (384^3 = 56.6M < 125M), inner ~ 6.7 MiB
+// treePlan(1e9, 500)       -> 4 levels, inner ~ 31 MiB
+// treePlan(125e6, 500, 70) -> 4 levels: a classic B-tree's fatter inner nodes`,
+        },
+        {
+          language: 'sql',
+          title: 'Measure a real Postgres B-tree: levels, leaf density, fan-out',
+          code: `CREATE EXTENSION IF NOT EXISTS pgstattuple;
+CREATE EXTENSION IF NOT EXISTS pageinspect;
+
+-- tree_level counts from 0 at the leaves: tree_level = 2 means 3 levels in total
+SELECT tree_level, internal_pages, leaf_pages, avg_leaf_density, leaf_fragmentation
+  FROM pgstatindex('orders_pkey');
+
+-- Root location and level straight from the metapage
+SELECT root, level, fastroot, fastlevel FROM bt_metap('orders_pkey');
+
+-- Entries per leaf page = effective fan-out (page 1 is usually the leftmost leaf)
+SELECT live_items, avg_item_size, free_size FROM bt_page_stats('orders_pkey', 1);
+
+-- Same 50M rows, two key types: random UUIDv4 splits pages 50/50 (~70% full),
+-- sequential keys fill the rightmost page and split near fillfactor (90%).
+-- Compare pg_relation_size() of both indexes after loading.`,
+        },
+      ],
+      keyPoints: [
+        'B+ tree: internal nodes hold only separators, so fan-out is in the hundreds. All rows sit in linked leaves, so a range is one descent plus sequential hops.',
+        'Fan-out 500: three levels cover 125M rows, the inner levels are ~4 MiB and cached, so a cold lookup is ~1 leaf read. A binary tree would need ~27 levels.',
+        'Leaf splits copy the separator up and internal splits move it up. Height grows only at the root, so every leaf has the same depth.',
+        'Page fill matters: random keys leave pages ~70% full and can add a level. Sequential keys pack pages near the fillfactor.',
+      ],
+      source: 'Bayer & McCreight — Organization and Maintenance of Large Ordered Indexes (1972); Comer — The Ubiquitous B-Tree (1979); PostgreSQL 16 docs — B-Tree Indexes, pgstattuple, pageinspect; ByteByteGo — 5 Data Structures That Make DB Queries Super Fast; Database Index Types Every Developer Should Know (2025)',
+    },
+    {
+      heading: 'Beyond the B+ tree: hash limits, bitmap indexes vs Postgres bitmap scans, and inverted (GIN) indexes',
+      body: `**Intuition:** a B+ tree answers "where is this key, and what comes next?". Three other questions need other shapes. "Exactly this key, nothing else" suits a **hash**. "Which rows match these three flags at once?" suits a **bitmap**. "Which documents contain this word?" suits an **inverted index**.
+
+**Hash indexes: fast, narrow, rarely worth it**
+- A lookup hashes the key to a bucket, giving O(1) for **equality only**: no \`<\`, \`BETWEEN\`, \`ORDER BY\` or prefix \`LIKE\`.
+- **Postgres** hash indexes are crash-safe and replicated since v10. They are single-column only, cannot enforce \`UNIQUE\`, and store just the 32-bit hash code, so they can't do index-only scans and every match is rechecked against the heap.
+- Their one niche is **long keys** looked up by equality (URLs, API tokens): storing 4-byte hash codes can make the index much smaller than a B-tree over 200-byte strings.
+- **InnoDB** silently builds a B-tree when you write \`USING HASH\`. Its *adaptive hash index* is an internal, automatic cache over hot B-tree pages, not something you design with.
+- Hash-indexed KV engines (Bitcask-style) keep every key in RAM, which is the same limit at storage-engine scale.
+
+**Bitmap indexes: analytics gold, OLTP poison**
+- One bitmap per distinct value, one bit per row.
+- Sizes: 100M rows → 12.5 MB per value uncompressed, so a 5-value \`status\` column takes 62.5 MB. Run-length or Roaring compression shrinks that a lot when the data is sorted or clustered.
+- \`status = 'shipped' AND region = 'EU' AND channel = 'app'\` is an AND of three bitmaps: 100M bits ÷ 64 = about 1.56M word operations each, a few milliseconds. COUNT(*) is just a popcount, and no rows are read.
+- **Why OLTP avoids them:** a single bitmap entry covers **many rows**. In Oracle, DML on a bitmap-indexed column locks the bitmap piece for a whole range of rows, so two sessions updating *different* rows with the same value block each other or deadlock. Every update also rewrites compressed bit runs. Use them in read-mostly warehouses, Druid/Pinot dimension filters and Lucene filter caches.
+- **Postgres has no persistent bitmap index.** Its **Bitmap Index Scan** builds a TID bitmap *in memory at query time* from ordinary B-tree, GIN or BRIN indexes. **BitmapAnd / BitmapOr** combine several indexes, and the **Bitmap Heap Scan** then reads heap pages in physical order and rechecks the condition.
+- If the bitmap outgrows \`work_mem\`, it degrades to one bit per *page* (lossy). EXPLAIN then shows \`Heap Blocks: lossy=...\` and \`Rows Removed by Index Recheck\`. BRIN bitmaps are always lossy.
+- **Interview line:** "Postgres bitmap scans give you bitmap-style index combining without bitmap-index write locking."
+
+**Inverted indexes: term → posting list**
+- Map each term (word, array element, JSON key/value, trigram) to a **sorted list of row ids**. \`a AND b\` intersects two posting lists, skipping ahead with galloping search. Postgres builds this as **GIN**, a B-tree of keys whose entries hold posting lists, or posting trees when the lists are large.
+- **Writes are the cost:** inserting one 2,000-word document touches hundreds of keys. GIN's **fastupdate** appends new entries to a *pending list* (up to \`gin_pending_list_limit\`, 4 MB by default) and merges it during VACUUM or when the list fills. You get fast inserts, an occasional slow insert that pays for the merge, and searches that also scan the pending list.
+- A GIN index on a \`tsvector\` stores lexemes but not weights, so weighted queries and \`ts_rank\` read the tsvector from the heap. Ranking a 500K-row match set is therefore slow: filter narrowly first, or move relevance-heavy search to Elasticsearch/OpenSearch, which keep frequencies and positions in their postings.
+- Lucene writes immutable **segments** (term dictionary + postings) and merges them in the background, the same idea as LSM compaction.`,
+      diagram: `  BITMAP INDEX (one bitmap per value)      rows:  1 2 3 4 5 6 7 8
+    status = 'shipped'                            1 0 1 1 0 0 1 0
+    region = 'EU'                                 1 1 0 1 0 0 1 1
+    AND  ------------------------------------>    1 0 0 1 0 0 1 0  -> rows 1,4,7
+                                                   popcount = 3 = COUNT(*)
+
+  POSTGRES (no stored bitmap): built per query from normal indexes
+    Bitmap Index Scan idx_status --+
+                                   +--> BitmapAnd --> Bitmap Heap Scan
+    Bitmap Index Scan idx_region --+     (TIDs)       (heap pages in order,
+                                                       recheck if lossy)
+
+  INVERTED INDEX (GIN / Lucene): term -> sorted posting list
+    "refund"  -> [3, 9, 14, 27, 40, 41]
+    "delayed" -> [9, 12, 27, 33]
+    refund AND delayed = intersect -> [9, 27]`,
+      code: [
+        {
+          language: 'sql',
+          title: 'Hash vs B-tree, a Postgres bitmap scan going lossy, and GIN write tuning',
+          code: `-- Hash: equality only; good for long keys, useless for ranges or uniqueness
+CREATE INDEX idx_links_url_hash ON short_links USING hash (long_url);
+-- SELECT ... WHERE long_url = $1   -> uses it
+-- SELECT ... WHERE long_url LIKE 'https://a.com/%' -> cannot
+
+-- Two single-column B-trees combined at query time (no bitmap index exists)
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT count(*) FROM orders WHERE status = 'shipped' AND region = 'EU';
+--  Bitmap Heap Scan on orders
+--    Recheck Cond: ((status = 'shipped') AND (region = 'EU'))
+--    Rows Removed by Index Recheck: 1840211      <- lossy pages rechecked
+--    Heap Blocks: exact=10432 lossy=176004       <- bitmap outgrew work_mem
+--    -> BitmapAnd
+--       -> Bitmap Index Scan on idx_orders_status
+--       -> Bitmap Index Scan on idx_orders_region
+SET LOCAL work_mem = '64MB';   -- keeps the bitmap exact for this query only
+-- Better for a hot path: one composite index, often an index-only scan
+CREATE INDEX CONCURRENTLY idx_orders_status_region ON orders (status, region);
+
+-- Inverted index for search; bound the pending-list merge pauses
+CREATE INDEX idx_tickets_fts ON tickets
+  USING gin (to_tsvector('english', body)) WITH (fastupdate = on, gin_pending_list_limit = 2048);
+-- gin_pending_list_limit is in kB: smaller list = shorter merge pauses, slower inserts`,
+        },
+      ],
+      keyPoints: [
+        'Hash indexes do equality only: no ranges, no sorting, no UNIQUE in Postgres. They fit long keys looked up by equality, and InnoDB ignores USING HASH.',
+        'Bitmap indexes: one bit per row per value. AND/OR/COUNT are very fast for low-cardinality analytics, but row-range locking and compressed rewrites make them a poor fit for concurrent OLTP.',
+        'Postgres bitmap scans are built per query from regular indexes. When they outgrow work_mem they go lossy, which shows up as Heap Blocks: lossy and Index Recheck.',
+        'Inverted/GIN: term → posting list, and AND means list intersection. Writes fan out to many keys, so fastupdate pending lists trade insert speed for merge pauses.',
+      ],
+      source: 'PostgreSQL 16 docs — Hash Indexes, GIN Indexes (fastupdate, gin_pending_list_limit), Text Search indexes, Using EXPLAIN (bitmap scans); Oracle Database Concepts — Bitmap Indexes; MySQL 8 docs — Comparison of B-Tree and Hash Indexes, Adaptive Hash Index; ByteByteGo — 5 Data Structures That Make DB Queries Super Fast (2025)',
+    },
   ],
   codeChallenges: [
     {
@@ -1074,6 +1266,59 @@ LSM, with the data model built for the read:
         'Modeling without bounding partition size',
       ],
     },
+    {
+      id: 'db-indexing-iq-08',
+      difficulty: 'hard',
+      question:
+        'A candidate on your team says: "A hash index is O(1) and a B-tree is O(log n), so for our 125M-row users table we should hash-index everything we look up by equality, and add bitmap indexes on plan_type and country for the admin filters." The table takes 3K writes/s. Walk me through why the default index is a B+ tree, and where you would and would not use hash, bitmap and inverted indexes here.',
+      whatInterviewerLooksFor: [
+        'Reasons about page reads and fan-out, not Big-O alone, with height numbers',
+        'Knows what hash indexes cannot do (ranges, sort, uniqueness in Postgres, composite) and their real niche',
+        'Explains why bitmap indexes fail under concurrent OLTP writes and what Postgres does instead',
+        'Places inverted (GIN) indexes correctly and mentions their write cost',
+      ],
+      modelAnswer: `**Big-O hides the constant that matters: page reads.**
+- A B+ tree with ~16-byte entries in 8 KB pages has a fan-out of about 400–500. 125M rows fit in **3–4 levels**, and the internal levels are only 4–7 MiB, so they stay cached.
+- A cold equality lookup is therefore about **1 leaf read + 1 heap read**. A hash index is also about 1 bucket page + 1 heap read, so "O(1) vs O(log n)" is a wash in practice.
+- The B+ tree also gives ranges, \`ORDER BY\`, prefix \`LIKE\`, composite leftmost-prefix use, \`UNIQUE\` and index-only scans. Its linked leaves turn \`created_at BETWEEN …\` into one descent plus sequential reads.
+
+**Hash indexes: a narrow niche.**
+- Postgres hash indexes are single-column, cannot be UNIQUE, store only the 32-bit hash (so no index-only scans and always a heap recheck), and answer no range or sort.
+- Use one only where a long key is looked up purely by equality, such as \`api_token\` or \`long_url\`, and the size saving matters.
+- \`email\` needs UNIQUE, so it stays a B-tree, perhaps on \`lower(email)\`.
+- On MySQL InnoDB the question is moot: \`USING HASH\` silently becomes a B-tree.
+
+**Bitmap indexes: not on a table taking 3K writes/s.**
+- A bitmap entry covers a range of rows. In engines that have bitmap indexes (Oracle), concurrent updates to different users with the same \`plan_type\` lock the same bitmap piece, causing serialisation and deadlocks. Each update also rewrites compressed bit runs.
+- Postgres doesn't have them anyway. It builds **bitmap scans** at query time from B-trees and combines them with BitmapAnd.
+- For admin filters: rely on that, or add a composite \`(country, plan_type)\` index, a partial index for a rare value, or ship the table to a columnar store (ClickHouse, Druid) where real bitmap and columnar filters belong.
+
+**Inverted (GIN) where the question is "contains".**
+- Use GIN for \`tags\` arrays, JSONB containment (\`@>\`), \`pg_trgm\` for \`ILIKE '%foo%'\` on names, and \`tsvector\` for bio search.
+- Budget for the write cost: one row inserts many keys. Use \`fastupdate\` with a sized pending list, and monitor insert latency spikes.
+
+**Plan:** B+ tree by default, hash for one long-token lookup if the size win is measurable, no bitmap indexes on OLTP, GIN for contains-queries, and verify each choice with EXPLAIN (ANALYZE, BUFFERS).`,
+      followUps: [
+        {
+          q: 'The users PK is a random UUIDv4 and the PK index is 40% bigger than expected. Why, and what changes if you switch to UUIDv7?',
+          a: 'Random keys insert into random leaves, and each full leaf splits 50/50, so pages settle around 70% full, with more pages, more cache misses, and WAL full-page writes spread across the whole index. UUIDv7 is time-ordered, so inserts hit the rightmost leaf. Postgres then splits it to keep the left page at the fillfactor (~90%), the index stays compact, and the hot set is just the right edge of the tree. The PK keeps global uniqueness while losing the random-I/O penalty.',
+        },
+        {
+          q: 'The admin filter query shows "Heap Blocks: lossy=150000" and slows down at month end. What is happening?',
+          a: 'Postgres built a bitmap from the country and plan_type indexes. The matching TIDs outgrew work_mem, so it fell back to one bit per heap page, and every row on those pages must be rechecked. That shows as a large "Rows Removed by Index Recheck". Month end widens the match set. Options: raise work_mem for that admin role, add a composite (country, plan_type) index so one index returns precise TIDs (maybe index-only), or move these analytics to a replica or columnar store.',
+        },
+        {
+          q: 'Could the B+ tree ever need 5 levels for this table?',
+          a: 'Only if fan-out collapsed, for example with very wide keys. A composite index over two 200-byte text columns gives a fan-out of about 20 per 8 KB page, and 125M rows then need 7 levels: 20^6 = 64M is not enough, 20^7 = 1.28B is. Postgres suffix truncation (v12+) shortens separator keys in internal pages, which restores much of the fan-out. Still, wide keys are a design smell: index a hash or a prefix, or an expression on a shorter value.',
+        },
+      ],
+      pitfalls: [
+        'Comparing O(1) and O(log n) without counting page reads or noting the internal levels are cached',
+        'Recommending hash indexes for columns that need UNIQUE, ranges or ORDER BY',
+        'Proposing bitmap indexes on a write-heavy OLTP table, or assuming Postgres supports a CREATE BITMAP INDEX',
+        'Ignoring GIN write amplification and pending-list merge pauses',
+      ],
+    },
   ],
   envelopeQuestions: [
     {
@@ -1549,6 +1794,80 @@ for (const o of orders) {
           "q": "A late-arriving data backfill inserts 50M rows with occurred_at from last year into today's physical pages. What happens to the BRIN index?",
           "a": "BRIN only stores min/max per block range (default 128 pages). Backfilled rows written into recent blocks widen those ranges to span a year, so queries for the last hour now match those block ranges too and scan them — the index loses selectivity for the affected region. With daily partitioning, routing rows to the correct historical partition avoids this entirely, which is a strong argument for partitioning. Otherwise run `brin_summarize_new_values`/re-summarize and consider `CLUSTER` or a rewrite of affected partitions; monitor via `EXPLAIN (ANALYZE, BUFFERS)` 'Rows Removed by Index Recheck'."
         }
+      ],
+    },
+    {
+      id: 'db-indexing-mcq-16',
+      difficulty: 'hard',
+      question:
+        'A month-end report slows from 0.8 s to 14 s. Both filter columns have single-column B-tree indexes, and nobody changed the schema. Given this plan, what is the most accurate diagnosis?',
+      code: {
+        language: 'sql',
+        code: `Bitmap Heap Scan on invoices  (actual time=212.4..13871.2 rows=96120 loops=1)
+  Recheck Cond: ((status = 'unpaid') AND (tenant_id = 42))
+  Rows Removed by Index Recheck: 2311904
+  Heap Blocks: exact=8211 lossy=241377
+  ->  BitmapAnd  (actual time=208.9..208.9 rows=0 loops=1)
+        ->  Bitmap Index Scan on idx_invoices_status
+        ->  Bitmap Index Scan on idx_invoices_tenant`,
+      },
+      options: [
+        'The query bitmap outgrew work_mem and went page-level, so every row on 241K pages is rechecked. Raise work_mem for this query or add a (tenant_id, status) index',
+        'Postgres created an on-disk bitmap index that is now bloated, so a REINDEX of the bitmap would restore the original speed',
+        'The visibility map is stale, so the scan has to recheck every row. Running VACUUM on invoices will remove the recheck',
+        'BitmapAnd returned rows=0, which means the two indexes disagree. One of them is corrupt and needs amcheck',
+      ],
+      correct: [0],
+      explanation:
+        'Postgres has no stored bitmap index. Bitmap Index Scans build TID bitmaps per query, and when they exceed work_mem the bitmap keeps one bit per page (lossy=241377). Every tuple on those pages is rechecked, hence 2.3M rows removed. More month-end matches pushed it over the limit. More work_mem keeps it exact, and a composite index returns precise TIDs with no AND step. VACUUM affects index-only scans, not lossy rechecks. BitmapAnd always reports rows=0 in EXPLAIN because bitmap nodes do not count rows.',
+      followUps: [
+        {
+          q: 'You add the composite (tenant_id, status) index. Could the plan become an index-only scan, and what would decide it?',
+          a: 'For SELECT count(*) with only those two columns referenced, yes: an Index Only Scan can answer from the index alone, but only for heap pages marked all-visible in the visibility map. Month-end invoices are recently updated, so many pages may not be all-visible, and "Heap Fetches" will show the fallback. Running VACUUM (or tuning autovacuum on this table) keeps the visibility map current. If the report selects other columns, add them with INCLUDE or accept heap fetches.',
+        },
+      ],
+    },
+    {
+      id: 'db-indexing-mcq-17',
+      difficulty: 'expert',
+      question:
+        'You are writing a storage engine with 8 KB pages and must choose between a classic B-tree (payloads in every node) and a B+ tree (payloads only in linked leaves). Select ALL statements that are correct for the B+ tree.',
+      options: [
+        'Internal pages hold only separator keys and child pointers, so fan-out is higher and the tree is often a level shorter',
+        'After one descent to the first key, a range scan reads the remaining keys by following sibling links between leaves',
+        'Every successful lookup ends at the leaf level, so the page reads per lookup are the same for every key',
+        'It always needs fewer page reads than a B-tree for a point lookup, because the B-tree must also reach a leaf',
+        'Storing data only in leaves means leaf pages never split; only internal pages split as the tree grows',
+      ],
+      correct: [0, 1, 2],
+      explanation:
+        'Keeping payloads out of internal nodes raises fan-out (about 500 vs about 70 with 100-byte payloads), so heights are lower and the inner levels fit in cache. Linked leaves make ranges one descent plus sequential hops, and all lookups have the same depth. A classic B-tree can find a key in an internal node and stop early, so it is not always worse for a single lookup. It loses on average and on ranges. Leaves split all the time, with the separator copied up, and internal splits move a key up.',
+      followUps: [
+        {
+          q: 'InnoDB stores whole rows in the clustered primary-key B+ tree leaves. What does that do to secondary index lookups?',
+          a: 'A secondary index leaf stores the primary-key value, not a physical pointer. A lookup by a secondary key therefore descends the secondary tree and then descends the clustered tree by PK, two traversals of about 3–4 levels each, mostly cached. That is why a wide PK, such as a 36-char UUID string, bloats every secondary index, and why covering secondary indexes (all selected columns in the index) avoid the second descent. Postgres instead stores a TID pointing into the heap, so it does one descent plus a heap page read.',
+        },
+      ],
+    },
+    {
+      id: 'db-indexing-mcq-18',
+      difficulty: 'medium',
+      question:
+        'A bigint primary-key index covers 125M rows. Entries are ~16 bytes in 8 KB pages, and after years of random inserts the pages average 75% full. How many levels does the tree have, and how much RAM keeps every non-leaf page cached?',
+      options: [
+        '4 levels: a fan-out of about 384 holds only 56.6M rows in 3 levels. The non-leaf pages take about 7 MiB',
+        '3 levels: 512³ is about 134M, which is over 125M. The non-leaf pages take about 4 MiB',
+        '27 levels: log2(125M) ≈ 27, so the non-leaf pages need about 2 GB of RAM to cache',
+        '2 levels: 8 KB ÷ 16 B = 512 per page, and 512² covers it. The root page alone needs caching',
+      ],
+      correct: [0],
+      explanation:
+        'At 75% fill, a page holds about 0.75 × 512 = 384 entries, and 384³ = 56.6M < 125M, so a fourth level is needed. Leaves: 125M ÷ 384 ≈ 325.5K pages. Parents: about 848 + 3 + 1 ≈ 852 pages × 8 KB ≈ 6.7 MiB, trivially cached, so a lookup is still about one uncached read. The 3-level answer assumes 100% full pages. The 27-level answer describes a binary tree. 512² is only 262K, nowhere near 125M.',
+      followUps: [
+        {
+          q: 'You REINDEX and pages pack to about 90% (fan-out ~460). Does the height change, and was the REINDEX worth it?',
+          a: '460³ ≈ 97M, still below 125M, so the tree stays at 4 levels and point-lookup cost barely moves. The real gain is about 17% fewer leaf pages (125M ÷ 460 ≈ 272K vs 325K), which means a smaller index, more of it cached, and faster range scans and index-only scans. Random inserts will loosen the pages again over time, so REINDEX CONCURRENTLY is worth scheduling only for bloat well beyond normal split slack. Measure with pgstatindex avg_leaf_density.',
+        },
       ],
     },
   ],
