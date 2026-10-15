@@ -4297,3 +4297,31 @@ a.dv-bar-main:hover {
     transform: none;
   }
 }
+
+/* ---------- code: show operators exactly as typed ----------
+   JetBrains Mono draws ===, !==, != and => as joined ligatures by default, and code would otherwise inherit
+   the body font's stylistic sets. Learners must see the real characters, so both are switched off for code. */
+code,
+pre,
+kbd,
+samp,
+textarea,
+.editor,
+.editor *,
+.inline-code,
+.console-out,
+.diagram,
+.step-calc,
+.test-msg,
+.answer-box.mono,
+.viz-svg text {
+  font-variant-ligatures: none;
+  font-feature-settings: normal;
+}
+/* the browser's default `code { font-family: monospace }` stops code from inheriting the app's code font */
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--mono);
+}
