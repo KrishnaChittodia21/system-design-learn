@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useBlocker, useParams } from 'react-router-dom';
-import { MCQ_TOPIC, TOPIC_BY_ID } from '../content';
+import { MCQ_TOPIC, TOPICS, TOPIC_BY_ID } from '../content';
+import { CircleCheck, CircleX, SkipForward } from 'lucide-react';
+import { NextUp } from '../components/NextUp';
 import type { Difficulty, MCQ } from '../types';
 import { recordAnswers, recordTest, useProgress } from '../lib/progress';
 import { weakSections } from '../lib/weak';
@@ -382,7 +384,7 @@ export function Exam({ title, questions, recordTopicId, backHref }: ExamProps) {
       <div className={`card result ${passed ? 'pass' : 'fail'}`}>
         <div className="result-score">{score}%</div>
         <div>
-          <h2>{passed ? (full ? 'Passed 🎉' : 'Great practice run') : 'Not yet. Review and retake.'}</h2>
+          <h2>{passed ? (full ? 'Passed!' : 'Great practice run') : 'Not yet. Review and retake.'}</h2>
           <p>
             {correctCount}/{items.length} correct · time used {formatClock(elapsed)} · pass mark {p.settings.passMark}%
             {!full && ' · practice (not counted towards passing)'}
@@ -402,6 +404,7 @@ export function Exam({ title, questions, recordTopicId, backHref }: ExamProps) {
           </div>
         </div>
       </div>
+      {passed && full && recordTopicId && <NextTopic topicId={recordTopicId} />}
       <AttemptAnalysis items={items.map((it) => it.q)} missed={missed} />
       <div className="row between">
         <h2>Review</h2>
@@ -420,7 +423,10 @@ export function Exam({ title, questions, recordTopicId, backHref }: ExamProps) {
         return (
           <article key={it.q.id} className={`card review ${ok ? 'ok' : 'bad'}`}>
             <div className="row between">
-              <span>{ok ? '✅ Correct' : sel.length ? '❌ Incorrect' : '⏭ Unanswered'}</span>
+              <span className={`review-verdict ${ok ? 'ok' : 'bad'}`}>
+                {ok ? <CircleCheck size={16} aria-hidden /> : sel.length ? <CircleX size={16} aria-hidden /> : <SkipForward size={16} aria-hidden />}{' '}
+                {ok ? 'Correct' : sel.length ? 'Incorrect' : 'Unanswered'}
+              </span>
               <DifficultyBadge d={it.q.difficulty} />
             </div>
             <Markdown>{it.q.question}</Markdown>
@@ -446,6 +452,17 @@ export function Exam({ title, questions, recordTopicId, backHref }: ExamProps) {
         );
       })}
     </div>
+  );
+}
+
+/** After a passed exam: point straight at the next topic (or the company track after the last one). */
+function NextTopic({ topicId }: { topicId: string }) {
+  const i = TOPICS.findIndex((t) => t.id === topicId);
+  const next = TOPICS[i + 1];
+  return next ? (
+    <NextUp lead={<strong>Topic passed. Keep the momentum going.</strong>} label={`Next topic: ${next.title}`} to={`/topic/${next.id}`} />
+  ) : (
+    <NextUp lead={<strong>That was the last topic.</strong>} label="Company track" to="/companies" />
   );
 }
 

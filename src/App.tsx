@@ -1,10 +1,12 @@
 import { RouterProvider, createHashRouter } from 'react-router-dom';
+import { MotionConfig } from 'motion/react';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import TopicPage from './pages/Topic';
 import ExamPage from './pages/Exam';
 import { CompaniesPage, CompanyQuestionPage } from './pages/Companies';
 import SettingsPage from './pages/Settings';
+import ContentsPage from './pages/Contents';
 import { PracticePage, WeakAreasPage } from './pages/WeakAreas';
 import { resumeLocation } from './lib/uiPrefs';
 
@@ -29,6 +31,7 @@ const router = createHashRouter([
     ),
     children: [
       { index: true, element: <Home /> },
+      { path: 'contents', element: <ContentsPage /> },
       { path: 'topic/:id', element: <TopicPage /> },
       { path: 'topic/:id/exam', element: <ExamPage /> },
       { path: 'companies', element: <CompaniesPage /> },
@@ -42,5 +45,10 @@ const router = createHashRouter([
 ]);
 
 export default function App() {
-  return <RouterProvider router={router} />;
+  // reducedMotion="user": the OS "reduce motion" setting turns off transform animations app-wide
+  return (
+    <MotionConfig reducedMotion="user">
+      <RouterProvider router={router} />
+    </MotionConfig>
+  );
 }

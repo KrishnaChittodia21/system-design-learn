@@ -4,6 +4,7 @@ import { COMPANIES, COMPANY_QUESTIONS, TOPICS, TOPIC_BY_ID } from '../content';
 import { setDraft, setFlag, setSettings, useProgress } from '../lib/progress';
 import { companyUnlocked } from '../lib/stats';
 import { Badge, Diagram, Markdown, ProgressBar, Reveal, formatClock } from '../components/ui';
+import { Lock } from 'lucide-react';
 
 function Locked() {
   const p = useProgress();
@@ -11,7 +12,9 @@ function Locked() {
   const done = TOPICS.length - remaining.length;
   return (
     <div className="page narrow">
-      <h1>🔒 Company track locked</h1>
+      <h1>
+        <Lock size={26} aria-hidden className="inline-icon" /> Company track locked
+      </h1>
       <p className="lead">
         This track holds {COMPANY_QUESTIONS.length} reported system design questions from {COMPANIES.length} companies, each with a
         timed mock-interview mode. It unlocks after you pass <strong>every</strong> topic exam (full length, ≥{' '}
@@ -98,7 +101,7 @@ export function CompaniesPage() {
               <p className="muted small">{q.prompt}</p>
               <div className="topic-card-foot">
                 <span className="small muted">{q.level}</span>
-                {p.company[q.id] && <span className="small">✓ Done</span>}
+                {p.company[q.id] && <span className="small status-pill st-passed">Done</span>}
               </div>
             </Link>
           );

@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { AnimatePresence, motion } from 'motion/react';
+import { Check, ChevronRight, Copy, Mic } from 'lucide-react';
 import remarkGfm from 'remark-gfm';
 import EditorModule from 'react-simple-code-editor';
 
@@ -59,7 +61,7 @@ export function CodeBlock({ snippet, compact }: { snippet: CodeSnippet; compact?
         <span className="code-title">{snippet.title ?? ''}</span>
         <span className="code-lang">{lang}</span>
         <button className="btn-ghost btn-xs" onClick={copy} type="button">
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? <Check size={12} aria-hidden /> : <Copy size={12} aria-hidden />} {copied ? 'Copied' : 'Copy'}
         </button>
       </figcaption>
       <pre className={`language-${lang}`}>
@@ -110,7 +112,12 @@ export function Badge({ children, tone = 'neutral' }: { children: ReactNode; ton
 export function ProgressBar({ value, tone }: { value: number; tone?: 'good' | 'warn' }) {
   return (
     <div className="pbar">
-      <div className={`pbar-fill ${tone ? `pbar-${tone}` : ''}`} style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
+      <motion.div
+        className={`pbar-fill ${tone ? `pbar-${tone}` : ''}`}
+        initial={{ width: 0 }}
+        animate={{ width: `${Math.min(100, Math.max(0, value))}%` }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
+      />
     </div>
   );
 }
@@ -120,9 +127,22 @@ export function Reveal({ label, children, defaultOpen = false }: { label: string
   return (
     <div className={`reveal ${open ? 'open' : ''}`}>
       <button type="button" className="reveal-btn" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-        <span className="chev">{open ? '▾' : '▸'}</span> {label}
+        <ChevronRight size={14} aria-hidden className={`chev-icon ${open ? 'open' : ''}`} /> {label}
       </button>
-      {open && <div className="reveal-body">{children}</div>}
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="body"
+            className="collapse-anim"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+          >
+            <div className="reveal-body">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -133,7 +153,9 @@ export function FollowUps({ items, startOpen = 1 }: { items?: FollowUp[]; startO
   if (!items?.length) return null;
   return (
     <div className="followups">
-      <div className="label">🎙 Interviewer follows up</div>
+      <div className="label">
+        <Mic size={13} aria-hidden /> Interviewer follows up
+      </div>
       {items.slice(0, shown).map((f, i) => (
         <div key={i} className="followup">
           <div className="fq">↳ {f.q}</div>

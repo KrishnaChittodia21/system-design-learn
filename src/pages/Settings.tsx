@@ -1,8 +1,21 @@
-import { resetProgress, setSettings, useProgress } from '../lib/progress';
+import { Check, Compass, Lightbulb } from 'lucide-react';
+import { resetProgress, setSettings, useProgress, type Accent } from '../lib/progress';
+import { saveUiPrefs, useUiPrefs } from '../lib/uiPrefs';
+import { openTour } from '../lib/guide';
+
+const ACCENTS: { id: Accent; label: string }[] = [
+  { id: 'indigo', label: 'Indigo' },
+  { id: 'teal', label: 'Teal' },
+  { id: 'rose', label: 'Rose' },
+  { id: 'amber', label: 'Amber' },
+];
 
 export default function SettingsPage() {
   const p = useProgress();
   const s = p.settings;
+  const prefs = useUiPrefs();
+  const tipsOn = prefs.coachTips !== false;
+  const dismissed = Object.keys(prefs.dismissedTips ?? {}).length;
   return (
     <div className="page narrow">
       <h1>Settings</h1>
@@ -59,14 +72,51 @@ export default function SettingsPage() {
         </label>
         <div className="field">
           <span>Theme</span>
-          <div className="row gap-s">
+          <div className="row gap-s wrap">
             {(['system', 'light', 'dark'] as const).map((t) => (
-              <button key={t} type="button" className={`chip ${s.theme === t ? 'on' : ''}`} onClick={() => setSettings({ theme: t })}>
+              <button key={t} type="button" className={`chip ${s.theme === t ? 'on' : ''}`} aria-pressed={s.theme === t} onClick={() => setSettings({ theme: t })}>
                 {t}
               </button>
             ))}
           </div>
         </div>
+        <div className="field">
+          <span id="accent-label">Accent colour</span>
+          <div className="accent-picker" role="group" aria-labelledby="accent-label">
+            {ACCENTS.map((a) => {
+              const on = (s.accent ?? 'indigo') === a.id;
+              return (
+                <button key={a.id} type="button" className={`accent-swatch ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => setSettings({ accent: a.id })}>
+                  <span className={`accent-dot accent-dot-${a.id}`} aria-hidden>
+                    {on && <Check size={14} strokeWidth={3} />}
+                  </span>
+                  {a.label}
+                </button>
+              );
+            })}
+          </div>
+          <span className="muted small">Changes buttons, links and highlights. Chart colours stay fixed so they read the same in every theme.</span>
+        </div>
+      </div>
+      <div className="card form">
+        <h3>Guide</h3>
+        <label className="check">
+          <input type="checkbox" checked={tipsOn} onChange={(e) => saveUiPrefs({ coachTips: e.target.checked })} />
+          <Lightbulb size={15} aria-hidden /> Show coach tips (a short tip the first time you open each kind of tab)
+        </label>
+        <div className="row gap-s wrap">
+          <button type="button" className="btn" onClick={openTour}>
+            <Compass size={16} aria-hidden /> Replay the welcome tour
+          </button>
+          {dismissed > 0 && (
+            <button type="button" className="btn-ghost" onClick={() => saveUiPrefs({ dismissedTips: {}, coachTips: true })}>
+              Show the {dismissed} dismissed tip{dismissed === 1 ? '' : 's'} again
+            </button>
+          )}
+        </div>
+        <span className="muted small">
+          Tip: press <kbd>?</kbd> anywhere to open the guide, and <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd> to search everything.
+        </span>
       </div>
       <div className="card danger">
         <h3>Reset progress</h3>

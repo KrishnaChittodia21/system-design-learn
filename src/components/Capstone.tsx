@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { CapstoneProject } from '../types';
+import { CircleCheck, Hammer, RefreshCw } from 'lucide-react';
 import { Badge, CodeBlock, DifficultyBadge, Markdown, ProgressBar } from './ui';
+import { celebrate } from '../lib/celebrate';
+import { claimCelebration } from '../lib/uiPrefs';
 
 interface TestResult {
   name: string;
@@ -58,10 +61,16 @@ export function CapstoneTab({ projects }: { projects: CapstoneProject[] }) {
 function ProjectCard({ p, result, onRefresh }: { p: CapstoneProject; result?: ProjectResult; onRefresh: () => void }) {
   const pct = result && result.total ? Math.round((result.passed / result.total) * 100) : 0;
   const done = !!result && result.total > 0 && result.passed === result.total;
+  // celebrate the first time this project's judge reports every test passing
+  useEffect(() => {
+    if (done && claimCelebration(`capstone:${p.id}`)) celebrate(`Capstone complete: ${p.title}`, 'Every judge test passes.');
+  }, [done, p.id, p.title]);
   return (
     <article className={`card capstone ${done ? 'capstone-done' : ''}`}>
       <div className="section-head">
-        <h2>🔨 {p.title}</h2>
+        <h2>
+          <Hammer size={20} aria-hidden className="inline-icon" /> {p.title}
+        </h2>
         <span className="row gap-s">
           <DifficultyBadge d={p.difficulty} />
           <Badge>~{p.estimatedHours} h</Badge>
@@ -92,7 +101,7 @@ function ProjectCard({ p, result, onRefresh }: { p: CapstoneProject; result?: Pr
         <div className="row between wrap">
           <div className="label">Judge result</div>
           <button type="button" className="btn-ghost btn-xs" onClick={onRefresh}>
-            Refresh
+            <RefreshCw size={12} aria-hidden /> Refresh
           </button>
         </div>
         {!result ? (
@@ -111,7 +120,11 @@ function ProjectCard({ p, result, onRefresh }: { p: CapstoneProject; result?: Pr
                 tests passing · last run {new Date(result.ranAt).toLocaleString()}
               </span>
             </div>
-            {done && <p className="capstone-pass">✅ All tests pass. Capstone complete.</p>}
+            {done && (
+              <p className="capstone-pass">
+                <CircleCheck size={18} aria-hidden className="inline-icon" /> All tests pass. Capstone complete.
+              </p>
+            )}
             <ul className="test-list">
               {result.tests.map((t, i) => (
                 <li key={i} className={t.ok ? 'ok' : 'bad'}>

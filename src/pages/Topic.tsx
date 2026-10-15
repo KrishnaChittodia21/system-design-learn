@@ -12,23 +12,49 @@ import {
   type Rating,
 } from '../lib/progress';
 import { Badge, CodeBlock, CodeEditor, Diagram, DifficultyBadge, FollowUps, Markdown, ProgressBar, Reveal } from '../components/ui';
-import { practiceLocked, topicCompletion } from '../lib/stats';
+import { practiceLocked, topicCompletion, topicStatus } from '../lib/stats';
+import { topicSteps } from '../lib/nextStep';
+import { StudyPath, type TabId } from '../components/StudyPath';
+import { CoachTip } from '../components/CoachTip';
+import { NextUp } from '../components/NextUp';
+import { ProgressRing } from '../components/ProgressRing';
+import { BookOpen, CirclePlay, Crosshair, Library, Lightbulb, Lock } from 'lucide-react';
 import { PREREQS } from '../content/prereqs';
 import { projectsForTopic } from '../content/projects';
 import { CapstoneTab } from '../components/Capstone';
 import { vizForSection } from '../viz/registry';
 import { currentlyWrong, weakSections } from '../lib/weak';
 
-const TABS = [
-  { id: 'learn', label: 'Learn' },
-  { id: 'code', label: 'Code Lab' },
-  { id: 'interview', label: 'Interview Qs' },
-  { id: 'envelope', label: 'Back-of-Envelope' },
-  { id: 'cheat', label: 'Cheat Sheet' },
-  { id: 'capstone', label: 'Capstone' },
-  { id: 'exam', label: 'Exam' },
-] as const;
-type TabId = (typeof TABS)[number]['id'];
+const TAB_IDS: TabId[] = ['learn', 'code', 'interview', 'envelope', 'cheat', 'capstone', 'exam'];
+
+/** First-time tips, one per tab type (Settings → "Show coach tips"). */
+const TIPS: Record<TabId, { title: string; text: string }> = {
+  learn: {
+    title: 'How to use Learn:',
+    text: 'read a section, then tick "Read" at its top right. Sections with an interactive animation let you play with the idea. The study path above fills in as you go.',
+  },
+  code: {
+    title: 'How to use the lab:',
+    text: 'edit the starter in place (it saves automatically), open hints one at a time, then compare with the reference solution and mark it done.',
+  },
+  interview: {
+    title: 'How to practise:',
+    text: 'answer out loud or type a draft before revealing anything, then rate yourself honestly. "Partially" and "Missed" ratings feed Weak Areas.',
+  },
+  envelope: {
+    title: 'How to drill estimates:',
+    text: 'write your own numbers first, then reveal the assumptions and each step to check your maths and the design insight.',
+  },
+  cheat: { title: 'Cheat sheet:', text: 'a last-minute revision list for the day before an interview, not a replacement for the lessons.' },
+  capstone: {
+    title: 'Capstones:',
+    text: 'build the project in your editor, run its judge command, and the test results appear here automatically.',
+  },
+  exam: {
+    title: 'About the exam:',
+    text: 'timed and shuffled. Only full-length attempts at or above the pass mark count. Questions you miss show up in Weak Areas.',
+  },
+};
 
 export default function TopicPage() {
   const { id = '' } = useParams();
@@ -43,25 +69,50 @@ export default function TopicPage() {
       </div>
     );
   }
-  const tab = (TABS.find((t) => t.id === params.get('tab'))?.id ?? 'learn') as TabId;
+  const tab = (TAB_IDS.find((t) => t === params.get('tab')) ?? 'learn') as TabId;
   const phase = PHASES.find((ph) => ph.id === topic.phase);
   const idx = TOPICS.findIndex((t) => t.id === topic.id);
   const prev = TOPICS[idx - 1];
   const next = TOPICS[idx + 1];
   const capstones = projectsForTopic(topic.id);
-  const counts: Record<TabId, number | undefined> = {
-    learn: topic.sections.length,
-    code: topic.codeChallenges.length,
-    interview: topic.interviewQuestions.length,
-    envelope: topic.envelopeQuestions.length,
-    cheat: undefined,
-    capstone: capstones.length,
-    exam: topic.test.length,
-  };
+  const steps = topicSteps(p, topic, capstones.length);
   const locks: Partial<Record<TabId, boolean>> = {
     interview: practiceLocked(p, topic, 'interview'),
     exam: practiceLocked(p, topic, 'exam'),
   };
+  const pct = topicCompletion(p, topic);
+  const selectTab = (t: TabId) => setParams({ tab: t }, { replace: true });
+  // "Next up" target after the current tab: the following study-path step, else the next topic
+  const stepIds = steps.map((s) => s.id as TabId);
+  const after = tab === 'cheat' ? (stepIds.includes('exam') ? 'exam' : undefined) : stepIds[stepIds.indexOf(tab) + 1];
+  const afterLabel = steps.find((s) => s.id === after)?.label;
+  const nextUp = after ? (
+    <NextUp
+      lead={
+        <>
+          <strong>{tab === 'learn' ? 'Finished reading?' : 'Done here?'}</strong> Next: {afterLabel}
+          {after === 'exam' && <span className="muted small"> · pass mark {p.settings.passMark}%</span>}
+        </>
+      }
+      label={`Go to ${afterLabel}`}
+      onClick={() => {
+        selectTab(after);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }}
+    />
+  ) : next ? (
+    <NextUp
+      lead={
+        <>
+          <strong>{topicStatus(p, topic) === 'passed' ? 'Topic done.' : 'Finished this topic?'}</strong> Next topic: {next.title}
+        </>
+      }
+      label={`Next topic: ${next.title}`}
+      to={`/topic/${next.id}`}
+    />
+  ) : (
+    <NextUp lead={<strong>That was the last topic.</strong>} label="Company track" to="/companies" />
+  );
 
   return (
     <div className="page">
@@ -81,8 +132,9 @@ export default function TopicPage() {
         </div>
         {topic.sources.length > 0 && <p className="muted small">Sources: {topic.sources.join(' · ')}</p>}
         <div className="topic-progress">
-          <ProgressBar value={topicCompletion(p, topic)} />
-          <span className="small muted">{topicCompletion(p, topic)}% complete</span>
+          <ProgressRing value={pct} size={34} tone={pct === 100 ? 'good' : undefined} />
+          <ProgressBar value={pct} tone={pct === 100 ? 'good' : undefined} />
+          <span className="small muted">{pct}% complete</span>
         </div>
         {topic.phase === 'miscellaneous' && (
           <div className="card info small misc-note">
@@ -92,22 +144,11 @@ export default function TopicPage() {
         )}
       </div>
 
-      <div className="tabs" role="tablist">
-        {TABS.filter((t) => counts[t.id] !== 0).map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={tab === t.id}
-            className={`tab ${tab === t.id ? 'active' : ''}`}
-            onClick={() => setParams({ tab: t.id }, { replace: true })}
-            type="button"
-          >
-            {locks[t.id] && <span title="Read every Learn section first">🔒</span>}
-            {t.id === 'code' && topic.phase === 'behavioral' ? 'Answer Lab' : t.label}
-            {counts[t.id] !== undefined && <span className="tab-count">{counts[t.id]}</span>}
-          </button>
-        ))}
-      </div>
+      <StudyPath steps={steps} active={tab} locks={locks} onSelect={selectTab} />
+
+      <CoachTip id={`tab-${tab}`} title={TIPS[tab].title}>
+        {TIPS[tab].text}
+      </CoachTip>
 
       {tab === 'learn' && <LearnTab topic={topic} />}
       {tab === 'code' && topic.codeChallenges.map((c, i) => <ChallengeCard key={c.id} c={c} n={i + 1} />)}
@@ -116,6 +157,7 @@ export default function TopicPage() {
       {tab === 'cheat' && <CheatSheet topic={topic} />}
       {tab === 'capstone' && <CapstoneTab projects={capstones} />}
       {tab === 'exam' && (locks.exam ? <StudyLock topic={topic} what="exam" /> : <ExamIntro topic={topic} />)}
+      {!(tab === 'interview' && locks.interview) && !(tab === 'exam' && locks.exam) && nextUp}
 
       <div className="pager">
         {prev ? <Link to={`/topic/${prev.id}`}>← {prev.title}</Link> : <span />}
@@ -128,7 +170,7 @@ export default function TopicPage() {
 function LearnTab({ topic }: { topic: Topic }) {
   const p = useProgress();
   const read = new Set(p.sections[topic.id] ?? []);
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const target = params.get('s');
 
   // deep link from weak-area reports: /topic/:id?tab=learn&s=<section index>
@@ -173,7 +215,11 @@ function LearnTab({ topic }: { topic: Topic }) {
               <input type="checkbox" checked={read.has(i)} onChange={() => toggleSectionRead(topic.id, i)} /> Read
             </label>
           </div>
-          {s.source && <div className="source">📖 {s.source}</div>}
+          {s.source && (
+            <div className="source">
+              <BookOpen size={13} aria-hidden /> {s.source}
+            </div>
+          )}
           <PrereqLinks topicId={topic.id} heading={s.heading} />
           <Markdown>{s.body}</Markdown>
           {s.diagram && <Diagram text={s.diagram} />}
@@ -191,15 +237,19 @@ function LearnTab({ topic }: { topic: Topic }) {
           )}
         </article>
       ))}
-      <div className="card cta">
-        <div>
-          <strong>Done reading?</strong> Practise with the code lab, the interview questions and the estimation drills, then take
-          the timed exam.
+      {read.size < topic.sections.length && (
+        <div className="card cta">
+          <div>
+            <strong>
+              {read.size}/{topic.sections.length} sections ticked as read.
+            </strong>{' '}
+            Tick each one when you finish it, or mark them all if you already know this topic.
+          </div>
+          <button className="btn" type="button" onClick={() => markAllSectionsRead(topic.id, topic.sections.length)}>
+            Mark all as read
+          </button>
         </div>
-        <button className="btn btn-primary" type="button" onClick={() => setParams({ tab: 'code' })}>
-          Go to {topic.phase === 'behavioral' ? 'Answer Lab' : 'Code Lab'} →
-        </button>
-      </div>
+      )}
     </div>
   );
 }
@@ -236,7 +286,7 @@ function ChallengeCard({ c, n }: { c: CodeChallenge; n: number }) {
       <div className="hints">
         {c.hints.slice(0, hints).map((h, i) => (
           <div key={i} className="hint">
-            💡 <strong>Hint {i + 1}:</strong> {h}
+            <Lightbulb size={15} aria-hidden className="inline-icon" /> <strong>Hint {i + 1}:</strong> {h}
           </div>
         ))}
         <div className="row gap-s wrap">
@@ -405,7 +455,7 @@ function EnvelopeCard({ q, n }: { q: EnvelopeQuestion; n: number }) {
           <div className="label">Answer</div>
           <Markdown>{q.answer}</Markdown>
           <div className="insight">
-            🎯 <strong>Design insight:</strong> {q.insight}
+            <Crosshair size={15} aria-hidden className="inline-icon" /> <strong>Design insight:</strong> {q.insight}
           </div>
           <FollowUps items={q.followUps} />
         </div>
@@ -515,7 +565,9 @@ function PrereqLinks({ topicId, heading }: { topicId: string; heading: string })
   if (!links?.length) return null;
   return (
     <div className="prereq">
-      <span className="prereq-label">📚 Learn this first:</span>
+      <span className="prereq-label">
+        <Library size={14} aria-hidden className="inline-icon" /> Learn this first:
+      </span>
       {links.map((l) => {
         const t = TOPIC_BY_ID.get(l.topic);
         const sec = t?.sections[l.section];
@@ -539,7 +591,9 @@ export function StudyLock({ topic, what }: { topic: Topic; what: string }) {
   const goRead = (i: number) => nav(`/topic/${topic.id}?tab=learn&s=${i}`);
   return (
     <div className="card study-lock">
-      <h2>🔒 Study first</h2>
+      <h2>
+        <Lock size={20} aria-hidden className="inline-icon" /> Study first
+      </h2>
       <p>
         The {what} for this topic unlock once you&apos;ve read every Learn section, so the questions always come after the explanation.
       </p>
@@ -605,7 +659,8 @@ function SectionViz({ topic, sectionIndex }: { topic: Topic; sectionIndex: numbe
               className="viz-backlink"
               onClick={() => document.getElementById(`s-${first}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
             >
-              ▶ Interactive: {meta.title} (in §{first + 1} above), revisit it with this section in mind
+              <CirclePlay size={15} aria-hidden className="inline-icon" /> Interactive: {meta.title} (in §{first + 1} above), revisit it
+              with this section in mind
             </button>
           );
         }

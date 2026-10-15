@@ -27,7 +27,11 @@ export interface Settings {
   mockMinutes: number;
   /** study-first lock: which practice unlocks only after every Learn section is marked read */
   studyLock: 'off' | 'exam' | 'exam-interview';
+  /** UI accent theme (optional; older saves default to indigo) */
+  accent?: Accent;
 }
+
+export type Accent = 'indigo' | 'teal' | 'rose' | 'amber';
 
 export interface Progress {
   tests: Record<string, TestRecord>;
@@ -40,6 +44,8 @@ export interface Progress {
   mcq: Record<string, McqRecord>;
   /** applied one-off data migrations */
   migrations?: string[];
+  /** local dates (YYYY-MM-DD) with any study activity, oldest first (max 120), for the study streak */
+  activityDays?: string[];
   settings: Settings;
 }
 
@@ -99,8 +105,22 @@ export function getProgress(): Progress {
   return state;
 }
 
-export function update(fn: (p: Progress) => Progress) {
+/** today's local date as YYYY-MM-DD */
+export function localDay(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function withActivity(p: Progress): Progress {
+  const today = localDay();
+  const days = p.activityDays ?? [];
+  if (days[days.length - 1] === today) return p;
+  return { ...p, activityDays: [...days.filter((d) => d !== today), today].slice(-120) };
+}
+
+/** Apply a change. Study actions (activity = true) also record today for the study streak. */
+export function update(fn: (p: Progress) => Progress, activity = true) {
   state = fn(state);
+  if (activity) state = withActivity(state);
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
   } catch {
@@ -177,11 +197,11 @@ export function setDraft(id: string, text: string) {
 }
 
 export function setSettings(s: Partial<Settings>) {
-  update((p) => ({ ...p, settings: { ...p.settings, ...s } }));
+  update((p) => ({ ...p, settings: { ...p.settings, ...s } }), false);
 }
 
 export function resetProgress() {
-  update((p) => ({ ...DEFAULT, settings: p.settings }));
+  update((p) => ({ ...DEFAULT, settings: p.settings }), false);
 }
 
 export function isPassed(p: Progress, topicId: string) {

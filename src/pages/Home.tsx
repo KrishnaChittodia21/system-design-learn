@@ -1,149 +1,165 @@
-import { Link } from 'react-router-dom';
-import { COMPANY_QUESTIONS, PHASES, TOPICS } from '../content';
+import { useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowRight, Building2, Dumbbell, ListTree, Lock, LockOpen, Map as MapIcon, Target } from 'lucide-react';
+import { COMPANY_QUESTIONS, PHASES, TOPICS, TOPIC_BY_ID } from '../content';
 import { useProgress } from '../lib/progress';
 import { companyUnlocked, topicCompletion, topicStatus } from '../lib/stats';
-import { ProgressBar } from '../components/ui';
 import { weakTopics } from '../lib/weak';
+import { nextStep } from '../lib/nextStep';
+import { phaseProgress } from '../lib/metrics';
+import { getUiPrefs } from '../lib/uiPrefs';
+import { ProgressRing } from '../components/ProgressRing';
+import { CountUp } from '../components/CountUp';
+import { NextStepCard } from '../components/NextStepCard';
+import { JourneyMap } from '../components/JourneyMap';
+import { ChartCard } from '../components/charts/ChartCard';
+import { BarList } from '../components/charts/BarList';
+import { DashboardMetrics } from '../components/DashboardMetrics';
+import { WeakReattempt } from '../components/WeakReattempt';
+import { shortTitle } from '../lib/labels';
+
+const TAB_LABELS: Record<string, string> = {
+  learn: 'Learn',
+  code: 'Code Lab',
+  interview: 'Interview Qs',
+  envelope: 'Back-of-Envelope',
+  cheat: 'Cheat Sheet',
+  capstone: 'Capstone',
+  exam: 'Exam',
+};
+const PAGE_LABELS: Record<string, string> = {
+  '/contents': 'Contents',
+  '/weak-areas': 'Weak Areas',
+  '/companies': 'Company track',
+  '/settings': 'Settings',
+};
+
+/** Human label for a saved location, e.g. "Caching patterns · Learn · §3 Write-through". */
+function describeLocation(loc: string): string | null {
+  const [path, search = ''] = loc.split('?');
+  const params = new URLSearchParams(search);
+  const topic = /^\/topic\/([^/]+)/.exec(path);
+  if (topic) {
+    const t = TOPIC_BY_ID.get(topic[1]);
+    if (!t) return null;
+    const tab = params.get('tab') ?? 'learn';
+    const s = Number(params.get('s'));
+    const sec = tab === 'learn' && params.has('s') && t.sections[s] ? ` · §${s + 1} ${t.sections[s].heading}` : '';
+    return `${t.title} · ${TAB_LABELS[tab] ?? 'Learn'}${sec}`;
+  }
+  const cq = /^\/companies\/(.+)$/.exec(path);
+  if (cq) return COMPANY_QUESTIONS.find((q) => q.id === cq[1])?.title ?? null;
+  return PAGE_LABELS[path] ?? null;
+}
 
 export default function Home() {
   const p = useProgress();
-  const passed = TOPICS.filter((t) => topicStatus(p, t) === 'passed').length;
-  const totalMcq = TOPICS.reduce((a, t) => a + t.test.length, 0);
-  const totalIq = TOPICS.reduce((a, t) => a + t.interviewQuestions.length, 0);
-  const totalBoe = TOPICS.reduce((a, t) => a + t.envelopeQuestions.length, 0);
-  const totalCc = TOPICS.reduce((a, t) => a + t.codeChallenges.length, 0);
-  const practicedIq = Object.keys(p.iq).length;
-  const next = TOPICS.find((t) => topicStatus(p, t) !== 'passed');
+  const navigate = useNavigate();
   const { unlocked, remaining } = companyUnlocked(p, TOPICS);
-  const weak = weakTopics(p, TOPICS);
-  const readiness = TOPICS.length
-    ? Math.round(TOPICS.reduce((a, t) => a + topicCompletion(p, t), 0) / TOPICS.length)
-    : 0;
+  const weak = useMemo(() => weakTopics(p, TOPICS), [p]);
+  const readiness = TOPICS.length ? Math.round(TOPICS.reduce((a, t) => a + topicCompletion(p, t), 0) / TOPICS.length) : 0;
+  const weakest = weak.find((w) => w.sections.length > 0);
+  const step = nextStep(p, TOPICS, {
+    companyTotal: COMPANY_QUESTIONS.length,
+    weak: weakest ? { topic: weakest.topic, index: weakest.sections[0].index, heading: weakest.sections[0].heading } : null,
+  });
+  const last = getUiPrefs().lastStudyLocation;
+  const lastLabel = last ? describeLocation(last) : null;
+  const resume = last && lastLabel && last !== step.href ? { href: last, label: lastLabel } : null;
+  const journey = PHASES.map((phase) => {
+    const topics = TOPICS.filter((t) => t.phase === phase.id);
+    return { phase, total: topics.length, passed: topics.filter((t) => topicStatus(p, t) === 'passed').length };
+  }).filter((x) => x.total > 0);
+  const phases = phaseProgress(p, TOPICS, PHASES);
+  const openPhase = (id: string) => navigate(`/contents#phase-${id}`);
+  const firstUntested = TOPICS.find((t) => !p.tests[t.id]) ?? TOPICS[0];
+  const firstExamHref = firstUntested ? `/topic/${firstUntested.id}?tab=exam` : '/contents';
+  const answered = Object.keys(p.mcq).length;
+  const wrongCount = Object.values(p.mcq).filter((r) => !r.lastCorrect).length;
 
   return (
-    <div className="page">
-      <section className="hero">
-        <div>
-          <h1>Your system design roadmap</h1>
+    <div className="page dashboard">
+      <section className="hero hero-grad">
+        <div className="aurora" aria-hidden>
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="hero-copy">
+          <div className="eyebrow">Dashboard</div>
+          <h1 className="hero-title">Your system design roadmap</h1>
           <p className="lead">
-            {TOPICS.length} topics across {PHASES.length} phases. Built from <em>System Design Interview Vol 2</em> (Alex Xu),{' '}
-            <em>Mastering API Architecture</em> and a senior backend interview syllabus. Learn each topic, practise interview
-            questions and estimation drills, fix code, then pass the timed exam. Pass every exam to unlock the company track.
+            {TOPICS.length} topics across {PHASES.length} phases, built from <em>System Design Interview Vol 2</em> (Alex Xu),{' '}
+            <em>Mastering API Architecture</em> and a senior backend interview syllabus. Learn each topic, practise it the way
+            interviews test it, then pass the timed exam. Pass every exam to unlock the company track.
           </p>
-          {next && (
-            <Link to={`/topic/${next.id}`} className="btn btn-primary">
-              {topicStatus(p, next) === 'new' ? 'Start' : 'Continue'}: {next.title} →
-            </Link>
-          )}
+          <Link to="/contents" className="btn">
+            Browse all contents <ArrowRight size={16} aria-hidden />
+          </Link>
         </div>
-        <div className="stat-grid">
-          <Stat label="Exams passed" value={`${passed}/${TOPICS.length}`} />
-          <Stat label="Readiness" value={`${readiness}%`} />
-          <Stat label="Interview Qs practised" value={`${practicedIq}/${totalIq}`} />
-          <Stat label="Question bank" value={`${totalMcq + totalIq + totalBoe}`} hint={`${totalMcq} MCQ · ${totalBoe} estimation · ${totalCc} code labs`} />
+        <div className="hero-ring">
+          <ProgressRing gradient value={readiness} size={148} stroke={12} tone={readiness === 100 ? 'good' : undefined} label={`Readiness ${readiness}%`}>
+            <span className="hero-ring-value">
+              <CountUp value={readiness} suffix="%" />
+            </span>
+            <span className="hero-ring-label">readiness</span>
+          </ProgressRing>
         </div>
       </section>
 
-      {weak.length > 0 && (
-        <section className="card weak-card">
-          <div className="row between wrap">
-            <h2>Focus next: your weakest areas</h2>
-            <Link to="/weak-areas">Full analysis →</Link>
-          </div>
-          <ul className="weak-sections">
-            {weak.slice(0, 4).map((w) => (
-              <li key={w.topic.id}>
-                <span className="weak-count">{w.attempts ? `${w.last}%` : `${w.wrong.length} wrong`}</span>
-                <span className="weak-heading">
-                  {w.topic.title}
-                  {w.sections[0] && <span className="muted small"> · weakest: {w.sections[0].heading}</span>}
-                </span>
-                <Link
-                  to={w.sections[0] ? `/topic/${w.topic.id}?tab=learn&s=${w.sections[0].index}` : `/topic/${w.topic.id}`}
-                  className="small"
-                >
-                  Revise →
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <NextStepCard step={step} resume={resume} />
 
-      {PHASES.map((ph) => {
-        const topics = TOPICS.filter((t) => t.phase === ph.id);
-        if (!topics.length) return null;
-        const phPassed = topics.filter((t) => topicStatus(p, t) === 'passed').length;
-        return (
-          <section key={ph.id} className="phase">
-            <div className="phase-head">
-              <div>
-                <div className="eyebrow">Phase {ph.number}</div>
-                <h2>{ph.title}</h2>
-                <p className="muted">{ph.blurb}</p>
-              </div>
-              <div className="phase-meter">
-                <span className="muted">
-                  {phPassed}/{topics.length} passed
-                </span>
-                <ProgressBar value={(phPassed / topics.length) * 100} tone="good" />
-              </div>
-            </div>
-            <div className="card-grid">
-              {topics.map((t) => {
-                const st = topicStatus(p, t);
-                const rec = p.tests[t.id];
-                return (
-                  <Link key={t.id} to={`/topic/${t.id}`} className={`topic-card st-${st}`}>
-                    <div className="topic-card-top">
-                      <span className={`dot dot-${st}`} />
-                      <span className="muted small">{t.estimatedMinutes} min</span>
-                    </div>
-                    <h3>{t.title}</h3>
-                    <p className="muted small">{t.subtitle}</p>
-                    <div className="topic-card-foot">
-                      <ProgressBar value={topicCompletion(p, t)} />
-                      <span className="small">
-                        {st === 'passed' ? `✓ Passed · best ${rec?.best}%` : rec ? `Best ${rec.best}%` : `${t.test.length}-question exam`}
-                      </span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
-
-      <section className="phase">
-        <div className="phase-head">
+      <section className="dash-section" aria-labelledby="roadmap-title">
+        <div className="dash-section-head">
           <div>
-            <div className="eyebrow">Final track</div>
-            <h2>Company-specific system design questions</h2>
-            <p className="muted">
-              {COMPANY_QUESTIONS.length} reported questions from product companies and Indian unicorns, each with a timed mock interview mode.
-            </p>
+            <div className="eyebrow">
+              <MapIcon size={14} aria-hidden /> Your roadmap
+            </div>
+            <h2 id="roadmap-title">Phase by phase to the company track</h2>
           </div>
+          <Link to="/contents" className="small">
+            All topics in Contents →
+          </Link>
         </div>
-        <Link to="/companies" className={`topic-card company-card ${unlocked ? 'st-passed' : 'locked'}`}>
-          <h3>{unlocked ? '🔓 Unlocked. Start the company mock interviews' : '🔒 Locked'}</h3>
-          <p className="muted small">
-            {unlocked
-              ? 'You passed every topic exam. Time to practise the real thing.'
-              : `Pass ${remaining.length} more topic exam${remaining.length === 1 ? '' : 's'} (pass mark ${p.settings.passMark}%) to unlock.`}
-          </p>
-        </Link>
+        <JourneyMap phases={journey} unlocked={unlocked} onSelect={openPhase} />
+        <ChartCard
+          title="Progress by phase"
+          subtitle="Share of each phase's exams passed, in course order. Select a phase to open it in Contents."
+          table={{ columns: ['Phase', 'Exams passed', 'Topics', 'Share'], rows: phases.map((ph) => [`${ph.number}. ${ph.title}`, ph.passed, ph.total, `${ph.pct}%`]) }}
+        >
+          <BarList
+            seriesLabel="Exams passed per phase"
+            rows={phases.map((ph) => ({
+              id: ph.id,
+              label: `${ph.number}. ${shortTitle(ph.title)}`,
+              value: ph.pct,
+              display: `${ph.passed}/${ph.total}`,
+              detail: `${ph.pct}% of ${ph.title} passed`,
+              href: `/contents#phase-${ph.id}`,
+            }))}
+          />
+        </ChartCard>
       </section>
-    </div>
-  );
-}
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="stat">
-      <div className="stat-value">{value}</div>
-      <div className="stat-label">{label}</div>
-      {hint && <div className="stat-hint">{hint}</div>}
+      <DashboardMetrics p={p} topics={TOPICS} readiness={readiness} companyTotal={COMPANY_QUESTIONS.length} companyUnlocked={unlocked} firstExamHref={firstExamHref} />
+
+      <WeakReattempt weak={weak} answered={answered} passMark={p.settings.passMark} firstExamHref={firstExamHref} />
+
+      <nav className="dash-practice" aria-label="Practice">
+        <span className="label">Practice</span>
+        <Link to="/practice" className="chip-link">
+          <Dumbbell size={15} aria-hidden /> Mistakes drill{wrongCount > 0 && <span className="side-badge">{wrongCount}</span>}
+        </Link>
+        <Link to="/weak-areas" className="chip-link">
+          <Target size={15} aria-hidden /> Weak Areas
+        </Link>
+        <Link to="/companies" className="chip-link" title={unlocked ? 'Company track unlocked' : `Pass ${remaining.length} more exam${remaining.length === 1 ? '' : 's'} to unlock`}>
+          {unlocked ? <LockOpen size={15} aria-hidden /> : <Lock size={15} aria-hidden />} <Building2 size={15} aria-hidden /> Company questions ({COMPANY_QUESTIONS.length})
+        </Link>
+        <Link to="/contents" className="chip-link">
+          <ListTree size={15} aria-hidden /> Contents
+        </Link>
+      </nav>
     </div>
   );
 }

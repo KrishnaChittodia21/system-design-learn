@@ -13,6 +13,13 @@
     "project": "node --no-warnings scripts/run-project.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "5.3.0",
+    "@fontsource-variable/jetbrains-mono": "5.3.0",
+    "@fontsource-variable/plus-jakarta-sans": "5.3.0",
+    "canvas-confetti": "1.9.4",
+    "cmdk": "1.1.1",
+    "lucide-react": "1.49.0",
+    "motion": "13.4.6",
     "prismjs": "^1.30.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -22,6 +29,7 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
+    "@types/canvas-confetti": "1.9.0",
     "@types/node": "^24.13.3",
     "@types/prismjs": "^1.26.6",
     "@types/react": "^19.2.18",
