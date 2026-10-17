@@ -2,10 +2,13 @@ import { Link } from 'react-router-dom';
 import { Lock, LockOpen } from 'lucide-react';
 import { COMPANY_QUESTIONS, PHASES, TOPICS } from '../content';
 import type { Progress } from '../lib/progress';
+import { localDay } from '../lib/progress';
+import { studyStreak } from '../lib/streak';
 import { companyUnlocked } from '../lib/stats';
-import { phaseProgress, practiceVolume, statusCounts, type PhaseProgress, type StatusCounts } from '../lib/metrics';
+import { activityGrid, phaseProgress, practiceVolume, statusCounts, type PhaseProgress, type StatusCounts } from '../lib/metrics';
 import { phaseCode } from '../lib/labels';
 import { ChartCard } from './charts/ChartCard';
+import { Heatmap } from './charts/Heatmap';
 import { useTip } from './charts/hooks';
 import { ChartTip, TipRow } from './charts/tooltip';
 
@@ -20,16 +23,23 @@ const STATES: { id: StatusKey; label: string; color: string }[] = [
   { id: 'notStarted', label: 'Not started', color: 'var(--dv-st-new)' },
 ];
 const LEGEND = STATES.map((s) => ({ label: s.label, color: s.color }));
+function shortDate(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
 const pctOf = (n: number, total: number) => (total ? Math.round((n / total) * 100) : 0);
 const mix = (c: Record<StatusKey, number>) => STATES.map((s) => `${c[s.id]} ${s.label.toLowerCase()}`).join(', ');
 
-/** Dashboard "Progress at a glance": topics by status (donut), status mix per phase (stacked bars) and practice figures. */
+/** Dashboard "Progress at a glance": topics by status (donut), status mix per phase (stacked bars), practice figures and study activity. */
 export function ProgressPanel({ p }: { p: Progress }) {
   const all = statusCounts(p, TOPICS);
   const phases = phaseProgress(p, TOPICS, PHASES);
   const { unlocked, remaining } = companyUnlocked(p, TOPICS);
   const vol = new Map(practiceVolume(p, TOPICS, COMPANY_QUESTIONS.length).map((v) => [v.id, v]));
   const left = remaining.length;
+  const today = localDay();
+  const streak = studyStreak(p.activityDays, today);
+  const grid = activityGrid(p.activityDays, today, 12);
+  const studied12 = grid.flat().filter((c) => c.active).length;
   const figures = [
     { id: 'learn', label: 'Sections read', hint: 'Tick “Read” at the end of each Learn section.' },
     { id: 'code', label: 'Code labs done', hint: 'Code Lab (Answer Lab in the behavioural topics): fix it, then compare with the reference.' },
@@ -98,6 +108,32 @@ export function ProgressPanel({ p }: { p: Progress }) {
             </div>
           ))}
         </div>
+        <ChartCard
+          className="progress-activity"
+          title="Study activity"
+          subtitle={
+            <>
+              Last 12 weeks · {studied12} day{studied12 === 1 ? '' : 's'} studied ·{' '}
+              <strong>
+                {streak ? `${streak}-day streak` : 'no current streak'}
+              </strong>
+            </>
+          }
+          table={{
+            columns: ['Week starting', 'Days studied', 'Days'],
+            rows: grid.map((w) => [shortDate(`${w[0].day}T12:00:00`), w.filter((c) => c.active).length, w.filter((c) => c.active).map((c) => shortDate(`${c.day}T12:00:00`)).join(', ') || '—']),
+          }}
+        >
+          <Heatmap weeks={grid} />
+          <p className="small muted dv-heat-note">
+            <span className="dv-key dv-key-rect" style={{ background: 'var(--dv-1)' }} aria-hidden />
+            <span>studied</span>
+            <span className="dv-key dv-key-rect dv-key-empty" aria-hidden />
+            <span>no study</span>
+            <span className="dv-key dv-key-rect dv-key-today" aria-hidden />
+            <span>today</span>
+          </p>
+        </ChartCard>
       </div>
     </section>
   );

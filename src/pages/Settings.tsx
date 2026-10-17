@@ -1,4 +1,5 @@
 import { Check, Compass, Lightbulb, Monitor, Moon, Sun } from 'lucide-react';
+import { motion } from 'motion/react';
 import { resetProgress, setSettings, useProgress } from '../lib/progress';
 import { saveUiPrefs, useUiPrefs } from '../lib/uiPrefs';
 import { openTour } from '../lib/guide';
@@ -84,6 +85,7 @@ export default function SettingsPage() {
           <div className="segmented" role="group" aria-labelledby="theme-label">
             {THEMES.map(({ id, label, Icon }) => (
               <button key={id} type="button" className={s.theme === id ? 'on' : ''} aria-pressed={s.theme === id} onClick={() => setSettings({ theme: id })}>
+                {s.theme === id && <motion.span layoutId="theme-seg-pill" className="seg-pill" transition={{ type: 'spring', stiffness: 520, damping: 40 }} />}
                 <Icon size={15} aria-hidden /> {label}
               </button>
             ))}
@@ -91,7 +93,7 @@ export default function SettingsPage() {
           <span className="muted small">System follows your device. The top bar's sun/moon button switches between light and dark.</span>
         </div>
         <div className="field">
-          <span id="accent-label">Ink</span>
+          <span id="accent-label">Accent</span>
           <div className="ink-picker" role="group" aria-labelledby="accent-label">
             {ACCENTS.map((a) => {
               const on = (s.accent ?? 'indigo') === a.id;
@@ -115,7 +117,7 @@ export default function SettingsPage() {
               );
             })}
           </div>
-          <span className="muted small">The pen colour for links, buttons and highlights. Passed, in progress and wrong keep their own colours.</span>
+          <span className="muted small">The colour for links, buttons, highlights and gradients. Passed, in progress and wrong keep their own colours.</span>
         </div>
       </div>
       <h2 className="settings-group">Guide</h2>
@@ -158,7 +160,7 @@ export default function SettingsPage() {
       <h2 className="settings-group">Data</h2>
       <div className="card danger">
         <h3>Reset progress</h3>
-        <p className="muted small">Clears exam results, read markers, ratings and drafts. Settings are kept.</p>
+        <p className="muted small">Clears exam results, read markers, ratings, drafts and earned achievements. Settings are kept.</p>
         <button
           className="btn btn-danger"
           type="button"

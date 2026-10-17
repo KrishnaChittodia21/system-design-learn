@@ -4,6 +4,7 @@ import { Command, defaultFilter } from 'cmdk';
 import { motion } from 'motion/react';
 import {
   ArrowRight,
+  Award,
   BookOpen,
   Building,
   Clock,
@@ -48,6 +49,7 @@ const PAGES: Item[] = [
   { id: 'page:weak', label: 'Weak Areas', href: '/weak-areas', icon: Target, keywords: ['mistakes', 'revise'] },
   { id: 'page:practice', label: 'Practice', hint: 'drill missed exam questions', href: '/practice', icon: Dumbbell, keywords: ['drill', 'mistakes'] },
   { id: 'page:companies', label: 'Company track', href: '/companies', icon: Building, keywords: ['mock', 'interview'] },
+  { id: 'page:achievements', label: 'Achievements', hint: 'badges earned and what unlocks next', href: '/achievements', icon: Award, keywords: ['badges', 'milestones', 'rewards', 'trophies', 'medals'] },
   { id: 'page:settings', label: 'Settings', href: '/settings', icon: Settings, keywords: ['theme', 'pass mark', 'reset'] },
 ];
 

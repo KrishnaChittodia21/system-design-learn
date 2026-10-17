@@ -7,7 +7,7 @@ export function Footer() {
     <footer className="site-footer">
       <div className="footer-row">
         <Link to="/" className="brand footer-brand">
-          <BrandMark size={20} />
+          <BrandMark size={24} />
           <span className="brand-name">System Design</span>
         </Link>
         <span className="footer-copy">© 2026 System Design Interview Prep</span>

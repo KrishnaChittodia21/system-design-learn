@@ -8,8 +8,8 @@ export function celebrate(title: string, detail?: string) {
   if (reducedMotion()) return;
   import('canvas-confetti')
     .then(({ default: confetti }) => {
-      // the Schematic palette: redline, blueprint blue, pass green, ink and paper
-      const colors = ['#e2551b', '#2a78d6', '#1f9a5c', '#14171c', '#c9ced5'];
+      // the blueprint palette: cobalt, amber, harbour teal, pass green and drafting steel
+      const colors = ['#1f4fc4', '#f2a65a', '#1590b0', '#1f9a5c', '#c4cfdf'];
       confetti({ particleCount: 90, spread: 70, startVelocity: 38, origin: { x: 0.5, y: 0.7 }, colors, disableForReducedMotion: true });
       setTimeout(() => confetti({ particleCount: 40, spread: 100, origin: { x: 0.25, y: 0.75 }, colors, disableForReducedMotion: true }), 180);
       setTimeout(() => confetti({ particleCount: 40, spread: 100, origin: { x: 0.75, y: 0.75 }, colors, disableForReducedMotion: true }), 300);

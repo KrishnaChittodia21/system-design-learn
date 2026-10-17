@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Target } from 'lucide-react';
 import { COMPANY_QUESTIONS, PHASES, TOPICS, TOPIC_BY_ID } from '../content';
@@ -14,6 +14,10 @@ import { phaseCode, shortTitle, topicCode } from '../lib/labels';
 import { ProgressPanel } from '../components/ProgressPanel';
 import { DashboardMetrics } from '../components/DashboardMetrics';
 import { WeakReattempt } from '../components/WeakReattempt';
+import { AchievementsSummary } from '../components/achievements/AchievementsSummary';
+import { CountUp } from '../components/CountUp';
+import { HeroDiagram } from '../components/HeroDiagram';
+import { gsap, MOTION_OK, revealOnScroll, useGSAP } from '../lib/gsap';
 
 const TAB_LABELS: Record<string, string> = {
   learn: 'Learn',
@@ -36,6 +40,49 @@ const LOOKUP: LocationLookup = {
 
 export default function Home() {
   const p = useProgress();
+  const root = useRef<HTMLDivElement>(null);
+  // GSAP: the hero sequence (kicker → title → detail → actions, the ledger sliding in with its bars filling),
+  // a magnetic primary button, and scroll reveals for the sections below. Reverted when the page unmounts.
+  useGSAP(
+    () => {
+      const el = root.current;
+      if (!el) return;
+      const q = gsap.utils.selector(el);
+      const mm = gsap.matchMedia();
+      mm.add(MOTION_OK, () => {
+        const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+        tl.from(q('.today-lead'), { autoAlpha: 0, y: 18, duration: 0.7, clearProps: 'transform,opacity,visibility' })
+          .from(q('.today-main > :not(.hero-diagram)'), { autoAlpha: 0, y: 16, duration: 0.6, stagger: 0.07, clearProps: 'transform,opacity,visibility' }, 0.12)
+          .from(q('.ledger'), { autoAlpha: 0, x: 22, duration: 0.75, clearProps: 'transform,opacity,visibility' }, 0.2)
+          .from(q('.ledger-bar > span'), { scaleX: 0, transformOrigin: '0% 50%', duration: 0.8, stagger: 0.035, ease: 'power2.out', clearProps: 'transform' }, 0.45);
+        revealOnScroll(q('.dash > :not(.today-lead)'));
+      });
+      // magnetic primary action: the button leans a few pixels toward a fine pointer
+      mm.add(`${MOTION_OK} and (pointer: fine)`, () => {
+        const btn = q('.today-actions .btn-primary')[0] as HTMLElement | undefined;
+        if (!btn) return;
+        const x = gsap.quickTo(btn, 'x', { duration: 0.4, ease: 'power3.out' });
+        const y = gsap.quickTo(btn, 'y', { duration: 0.4, ease: 'power3.out' });
+        const move = (e: PointerEvent) => {
+          const r = btn.getBoundingClientRect();
+          x(((e.clientX - (r.left + r.width / 2)) / r.width) * 8);
+          y(((e.clientY - (r.top + r.height / 2)) / r.height) * 6);
+        };
+        const leave = () => {
+          x(0);
+          y(0);
+        };
+        btn.addEventListener('pointermove', move);
+        btn.addEventListener('pointerleave', leave);
+        return () => {
+          btn.removeEventListener('pointermove', move);
+          btn.removeEventListener('pointerleave', leave);
+          gsap.set(btn, { clearProps: 'transform' });
+        };
+      });
+    },
+    { scope: root },
+  );
   const passMark = p.settings.passMark;
   const weak = useMemo(() => weakTopics(p, TOPICS), [p]);
   const readiness = TOPICS.length ? Math.round(TOPICS.reduce((a, t) => a + topicCompletion(p, t), 0) / TOPICS.length) : 0;
@@ -76,7 +123,7 @@ export default function Home() {
   const answered = Object.keys(p.mcq).length;
 
   return (
-    <div className="page dash">
+    <div className="page dash" ref={root} data-motion="own">
       <header className="today-lead">
         <section className="today-main" aria-labelledby="today-title">
           <p className="eyebrow today-date">{today}</p>
@@ -102,6 +149,7 @@ export default function Home() {
               <ArrowRight size={14} aria-hidden />
             </Link>
           )}
+          <HeroDiagram />
         </section>
 
         <aside className="ledger" aria-labelledby="ledger-title">
@@ -139,13 +187,15 @@ export default function Home() {
             <div>
               <dt>Topics passed</dt>
               <dd>
-                {passedTopics}
+                <CountUp value={passedTopics} />
                 <span>/{TOPICS.length}</span>
               </dd>
             </div>
             <div>
               <dt>Exam answers</dt>
-              <dd>{examAnswers}</dd>
+              <dd>
+                <CountUp value={examAnswers} />
+              </dd>
             </div>
             <div>
               <dt>
@@ -159,7 +209,7 @@ export default function Home() {
             <div>
               <dt>Study streak</dt>
               <dd>
-                {streak}
+                <CountUp value={streak} />
                 <span> day{streak === 1 ? '' : 's'}</span>
               </dd>
             </div>
@@ -210,6 +260,8 @@ export default function Home() {
       )}
 
       <ProgressPanel p={p} />
+
+      <AchievementsSummary p={p} />
 
       <WeakReattempt weak={weak} answered={answered} passMark={passMark} firstExamHref={firstExamHref} />
 

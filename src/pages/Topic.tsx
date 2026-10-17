@@ -1,4 +1,5 @@
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { usePageMotion } from '../lib/usePageMotion';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { PHASES, TOPICS, TOPIC_BY_ID } from '../content';
 import type { CodeChallenge, EnvelopeQuestion, InterviewQuestion, Topic } from '../types';
@@ -63,6 +64,11 @@ export default function TopicPage() {
   const [params, setParams] = useSearchParams();
   const topic = TOPIC_BY_ID.get(id);
   const p = useProgress();
+  const tabParam = params.get('tab');
+  // GSAP: the topic header staggers in once; each tab's cards reveal as they scroll into view
+  const root = useRef<HTMLDivElement>(null);
+  usePageMotion(root, { intro: '.topic-head > *, :scope > .study-path', deps: [id] });
+  usePageMotion(root, { reveal: '.learn > article, .learn > .cta, :scope > article, :scope > .card', deps: [id, tabParam] });
   if (!topic) {
     return (
       <div className="page">
@@ -117,7 +123,7 @@ export default function TopicPage() {
   );
 
   return (
-    <div className="page">
+    <div className="page" ref={root} data-motion="own">
       <div className="topic-head">
         <div className="eyebrow">
           Phase {phase?.number} · {phase?.title}

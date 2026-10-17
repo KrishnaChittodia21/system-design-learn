@@ -14,6 +14,7 @@ export const PAGE_LABELS: Record<string, string> = {
   '/weak-areas': 'Weak areas',
   '/practice': 'Practice',
   '/companies': 'Company track',
+  '/achievements': 'Achievements',
 };
 
 /** Human label, e.g. "Caching Patterns · Learn · §3 Write-through" or "Company track · Design a URL shortener". */

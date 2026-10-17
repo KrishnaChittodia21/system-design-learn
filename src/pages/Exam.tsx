@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useBlocker, useParams } from 'react-router-dom';
 import { MCQ_TOPIC, TOPICS, TOPIC_BY_ID } from '../content';
 import { CircleCheck, CircleX, SkipForward } from 'lucide-react';
+import { motion } from 'motion/react';
+import { CountUp } from '../components/CountUp';
 import { NextUp } from '../components/NextUp';
 import type { Difficulty, MCQ } from '../types';
 import { recordAnswers, recordTest, useProgress } from '../lib/progress';
@@ -279,30 +281,36 @@ export function Exam({ title, questions, recordTopicId, backHref }: ExamProps) {
                 <DifficultyBadge d={item.q.difficulty} />
               </span>
             </div>
-            <div className="q-text">
-              <Markdown>{item.q.question}</Markdown>
-            </div>
-            {item.q.code && <CodeBlock snippet={item.q.code} />}
-            <div className="options">
-              {item.order.map((orig, di) => {
-                const on = selected.includes(orig);
-                const verdict = isLocked ? (item.q.correct.includes(orig) ? 'is-correct' : on ? 'is-wrong' : '') : '';
-                return (
-                  <button
-                    key={orig}
-                    type="button"
-                    className={`option ${on ? 'selected' : ''} ${verdict}`}
-                    disabled={isLocked}
-                    onClick={() => toggle(item, orig)}
-                  >
-                    <span className={`opt-key ${multi ? 'square' : ''}`}>{on ? '✓' : di + 1}</span>
-                    <span className="opt-text">
-                      <Markdown>{item.q.options[orig]}</Markdown>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            {/* Framer Motion: each question slides in; options press in, and a locked answer pulses (right) or shakes (wrong) */}
+            <motion.div key={item.q.id} className="q-body" initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.24, ease: 'easeOut' }}>
+              <div className="q-text">
+                <Markdown>{item.q.question}</Markdown>
+              </div>
+              {item.q.code && <CodeBlock snippet={item.q.code} />}
+              <div className="options">
+                {item.order.map((orig, di) => {
+                  const on = selected.includes(orig);
+                  const verdict = isLocked ? (item.q.correct.includes(orig) ? 'is-correct' : on ? 'is-wrong' : '') : '';
+                  return (
+                    <motion.button
+                      key={orig}
+                      type="button"
+                      className={`option ${on ? 'selected' : ''} ${verdict}`}
+                      disabled={isLocked}
+                      onClick={() => toggle(item, orig)}
+                      whileTap={isLocked ? undefined : { scale: 0.985 }}
+                      animate={verdict === 'is-wrong' ? { x: [0, -7, 7, -4, 4, 0] } : verdict === 'is-correct' ? { scale: [1, 1.02, 1] } : { x: 0, scale: 1 }}
+                      transition={{ duration: verdict ? 0.42 : 0.15, ease: 'easeOut' }}
+                    >
+                      <span className={`opt-key ${multi ? 'square' : ''}`}>{on ? '✓' : di + 1}</span>
+                      <span className="opt-text">
+                        <Markdown>{item.q.options[orig]}</Markdown>
+                      </span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </motion.div>
             {interviewMode && !isLocked && (
               <button
                 className="btn btn-primary lock-btn"
@@ -381,8 +389,15 @@ export function Exam({ title, questions, recordTopicId, backHref }: ExamProps) {
       <Link to={backHref} className="muted small">
         ← Back
       </Link>
-      <div className={`card result ${passed ? 'pass' : 'fail'}`}>
-        <div className="result-score">{score}%</div>
+      <motion.div
+        className={`card result ${passed ? 'pass' : 'fail'}`}
+        initial={{ opacity: 0, y: 12, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+      >
+        <div className="result-score">
+          <CountUp value={score} suffix="%" delay={0.15} />
+        </div>
         <div>
           <h2>{passed ? (full ? 'Passed!' : 'Great practice run') : 'Not yet. Review and retake.'}</h2>
           <p>
@@ -403,7 +418,7 @@ export function Exam({ title, questions, recordTopicId, backHref }: ExamProps) {
             </Link>
           </div>
         </div>
-      </div>
+      </motion.div>
       {passed && full && recordTopicId && <NextTopic topicId={recordTopicId} />}
       <AttemptAnalysis items={items.map((it) => it.q)} missed={missed} />
       <div className="row between">

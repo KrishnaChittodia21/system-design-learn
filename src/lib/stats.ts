@@ -16,11 +16,14 @@ export function topicStatus(p: Progress, t: Topic): TopicStatus {
 }
 
 export function topicCompletion(p: Progress, t: Topic): number {
+  // a part the topic has none of (e.g. no estimation drills in behavioural topics) is left out,
+  // not scored as 0, so every topic can reach 100%
+  const part = (done: number, total: number) => (total > 0 ? [done / total] : []);
   const parts = [
-    (p.sections[t.id]?.length ?? 0) / Math.max(1, t.sections.length),
-    t.codeChallenges.filter((c) => p.cc[c.id]).length / Math.max(1, t.codeChallenges.length),
-    t.interviewQuestions.filter((q) => p.iq[q.id]).length / Math.max(1, t.interviewQuestions.length),
-    t.envelopeQuestions.filter((q) => p.boe[q.id]).length / Math.max(1, t.envelopeQuestions.length),
+    ...part(p.sections[t.id]?.length ?? 0, t.sections.length),
+    ...part(t.codeChallenges.filter((c) => p.cc[c.id]).length, t.codeChallenges.length),
+    ...part(t.interviewQuestions.filter((q) => p.iq[q.id]).length, t.interviewQuestions.length),
+    ...part(t.envelopeQuestions.filter((q) => p.boe[q.id]).length, t.envelopeQuestions.length),
     isPassed(p, t.id) ? 1 : 0,
   ];
   return Math.round((parts.reduce((a, b) => a + b, 0) / parts.length) * 100);

@@ -6,6 +6,7 @@ import TopicPage from './pages/Topic';
 import ExamPage from './pages/Exam';
 import { CompaniesPage, CompanyQuestionPage } from './pages/Companies';
 import SettingsPage from './pages/Settings';
+import AchievementsPage from './pages/Achievements';
 import ContentsPage from './pages/Contents';
 import { PracticePage, WeakAreasPage } from './pages/WeakAreas';
 import { resumeLocation } from './lib/uiPrefs';
@@ -38,6 +39,7 @@ const router = createHashRouter([
       { path: 'companies/:qid', element: <CompanyQuestionPage /> },
       { path: 'weak-areas', element: <WeakAreasPage /> },
       { path: 'practice', element: <PracticePage /> },
+      { path: 'achievements', element: <AchievementsPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: '*', element: <Home /> },
     ],

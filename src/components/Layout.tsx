@@ -1,7 +1,8 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, NavLink, useLocation, useOutlet } from 'react-router-dom';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Link, NavLink, useLocation, useNavigate, useOutlet } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import {
+  Award,
   Building2,
   ChevronDown,
   Dumbbell,
@@ -18,7 +19,7 @@ import {
 } from 'lucide-react';
 import { COMPANY_QUESTIONS, PHASES, TOPICS, TOPIC_BY_ID } from '../content';
 import { setSettings, useProgress } from '../lib/progress';
-import { companyUnlocked, topicStatus } from '../lib/stats';
+import { companyUnlocked, topicCompletion, topicStatus } from '../lib/stats';
 import { getUiPrefs, saveUiPrefs, stableLocation } from '../lib/uiPrefs';
 import { openPalette, openTour, closePalette, useGuide } from '../lib/guide';
 import { applyThemeAttrs } from '../lib/theme';
@@ -28,9 +29,15 @@ import { Toaster } from './Toaster';
 import { CelebrationWatcher } from './CelebrationWatcher';
 import { Footer } from './Footer';
 import { BrandMark } from './BrandMark';
+import { RouteMotion } from './RouteMotion';
+import { useAchievementDetection } from '../lib/useAchievements';
+import { achievementById, TIER_LABEL } from '../content/achievements';
+import { refreshSoon, ScrollTrigger } from '../lib/gsap';
 
 // cmdk is only needed once the palette is opened
 const CommandPalette = lazy(() => import('./CommandPalette'));
+// the unlock dialog (and its badge art) loads on the first unlock
+const AchievementCelebration = lazy(() => import('./achievements/AchievementCelebration'));
 /** below this width the main nav and the syllabus share one drawer */
 const isCompact = () => window.matchMedia('(max-width: 1099px)').matches;
 
@@ -50,6 +57,14 @@ export default function Layout() {
   const { unlocked } = companyUnlocked(p, TOPICS);
   const guide = useGuide();
   const outlet = useOutlet();
+  const navigate = useNavigate();
+  const { queue: newBadges, dismiss: dismissUnlocked } = useAchievementDetection(p);
+  const viewAllAchievements = useCallback(() => {
+    dismissUnlocked();
+    navigate('/achievements');
+  }, [dismissUnlocked, navigate]);
+  // unlocks wait while the guide is open (e.g. the first-visit tour)
+  const showUnlocked = newBadges.length > 0 && !guide.tour;
 
   useEffect(() => {
     locRef.current = loc;
@@ -126,6 +141,17 @@ export default function Layout() {
     }
     window.scrollTo({ top: 0 });
   }, [location.pathname]);
+
+  // Scroll-triggered reveals: re-measure once the new route has mounted and settled, and once the web fonts load.
+  useEffect(() => {
+    const call = refreshSoon(0.5);
+    return () => {
+      call.kill();
+    };
+  }, [location.pathname]);
+  useEffect(() => {
+    document.fonts?.ready.then(() => ScrollTrigger.refresh()).catch(() => {});
+  }, []);
 
   // Remember how far down the current page the user has read.
   useEffect(() => {
@@ -210,27 +236,21 @@ export default function Layout() {
           <span className="brand-name">System Design</span>
         </Link>
         <nav className="topnav" aria-label="Main">
-          <NavLink to="/" end className="topnav-link">
+          <TopNavLink to="/" end>
             Overview
-          </NavLink>
-          <NavLink to="/contents" className="topnav-link">
-            Contents
-          </NavLink>
-          <NavLink to="/weak-areas" className="topnav-link">
+          </TopNavLink>
+          <TopNavLink to="/contents">Contents</TopNavLink>
+          <TopNavLink to="/weak-areas">
             Weak areas
             {weakCount > 0 && (
               <span className="count-tag fail" aria-label={`, ${weakCount} questions to revisit`}>
                 {weakCount}
               </span>
             )}
-          </NavLink>
+          </TopNavLink>
           <span className="topnav-sep" aria-hidden />
-          <NavLink to="/practice" className="topnav-link">
-            Practice
-          </NavLink>
-          <NavLink to="/companies" className="topnav-link">
-            Company track {lockIcon}
-          </NavLink>
+          <TopNavLink to="/practice">Practice</TopNavLink>
+          <TopNavLink to="/companies">Company track {lockIcon}</TopNavLink>
         </nav>
         <div className="topbar-right">
           <span className="topbar-report" title="Topics whose timed exam you have passed">
@@ -248,6 +268,9 @@ export default function Layout() {
           >
             {isDark ? <Sun size={18} aria-hidden /> : <Moon size={18} aria-hidden />}
           </button>
+          <NavLink to="/achievements" className="btn-ghost icon-btn topbar-ach" aria-label="Achievements" title="Achievements">
+            <Award size={18} aria-hidden />
+          </NavLink>
           <NavLink to="/settings" className="btn-ghost icon-btn" aria-label="Settings" title="Settings">
             <SettingsIcon size={18} aria-hidden />
           </NavLink>
@@ -277,6 +300,9 @@ export default function Layout() {
           </NavLink>
           <NavLink to="/companies" className="drawer-link">
             <Building2 size={16} aria-hidden /> Company track ({COMPANY_QUESTIONS.length}) {lockIcon}
+          </NavLink>
+          <NavLink to="/achievements" className="drawer-link">
+            <Award size={16} aria-hidden /> Achievements
           </NavLink>
           <NavLink to="/settings" className="drawer-link">
             <SettingsIcon size={16} aria-hidden /> Settings
@@ -338,11 +364,22 @@ export default function Layout() {
                     >
                       {topics.map((t) => {
                         const st = topicStatus(p, t);
+                        const pct = topicCompletion(p, t);
                         return (
                           <NavLink key={t.id} to={`/topic/${t.id}`} className="side-link side-topic">
                             <span className={`st-mark st-mark-${st}`} aria-hidden />
-                            <span className="side-topic-title">{t.title}</span>
-                            <span className="sr-only">, {STATUS_LABEL[st]}</span>
+                            <span className="side-topic-body">
+                              <span className="side-topic-title">{t.title}</span>
+                              <span className={`side-topic-bar side-topic-bar-${st}`} aria-hidden>
+                                <span style={{ width: `${pct}%` }} />
+                              </span>
+                            </span>
+                            <span className="side-topic-pct" aria-hidden>
+                              {pct}%
+                            </span>
+                            <span className="sr-only">
+                              , {STATUS_LABEL[st]}, {pct}% complete
+                            </span>
                           </NavLink>
                         );
                       })}
@@ -375,7 +412,7 @@ export default function Layout() {
             exit={{ opacity: 0, transition: { duration: 0.06 } }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
           >
-            {outlet}
+            <RouteMotion>{outlet}</RouteMotion>
           </motion.div>
         </AnimatePresence>
         <Footer />
@@ -389,6 +426,32 @@ export default function Layout() {
           <CommandPalette />
         </Suspense>
       )}
+      {showUnlocked && (
+        <Suspense fallback={null}>
+          <AchievementCelebration items={newBadges} onClose={dismissUnlocked} onViewAll={viewAllAchievements} />
+        </Suspense>
+      )}
+      <div className="sr-only" aria-live="assertive" aria-atomic="true">
+        {!showUnlocked
+          ? ''
+          : newBadges.length === 1
+            ? `Achievement unlocked: ${achievementById[newBadges[0].id]?.name}${TIER_LABEL[newBadges[0].tier] ? `, ${TIER_LABEL[newBadges[0].tier]} tier` : ''}`
+            : `You've earned ${newBadges.length} achievements`}
+      </div>
     </div>
+  );
+}
+
+/** A main-nav link whose active state is a pill that slides between links (Framer Motion layoutId). */
+function TopNavLink({ to, end, children }: { to: string; end?: boolean; children: ReactNode }) {
+  return (
+    <NavLink to={to} end={end} className="topnav-link">
+      {({ isActive }) => (
+        <>
+          {isActive && <motion.span layoutId="topnav-pill" className="topnav-pill" transition={{ type: 'spring', stiffness: 520, damping: 40 }} />}
+          {children}
+        </>
+      )}
+    </NavLink>
   );
 }

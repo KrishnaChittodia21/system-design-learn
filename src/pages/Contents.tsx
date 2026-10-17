@@ -2,7 +2,9 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
+import { usePageMotion } from '../lib/usePageMotion';
 import {
+  Award,
   Building,
   Calculator,
   Check,
@@ -28,6 +30,7 @@ import { companyUnlocked, topicCompletion, topicStatus } from '../lib/stats';
 import { codeLabLabel } from '../lib/nextStep';
 import { currentlyWrong, weakTopics } from '../lib/weak';
 import { VIZ, vizForSection } from '../viz/registry';
+import { ACHIEVEMENT_TOTAL } from '../lib/achievements';
 import { ProgressRing } from '../components/ProgressRing';
 import { phaseCode, shortTitle, topicCode } from '../lib/labels';
 import type { Topic } from '../types';
@@ -118,8 +121,15 @@ export default function ContentsPage() {
   };
   const setAll = (value: boolean) => setCollapsed(Object.fromEntries(PHASES.map((ph) => [ph.id, value])));
 
+  // GSAP: heading + totals stagger in; phases reveal as they scroll into view (phase bodies use Framer Motion)
+  const root = useRef<HTMLDivElement>(null);
+  usePageMotion(root, {
+    intro: '.contents-head > :not(.contents-totals), .contents-totals > li, :scope > .contents-tools, :scope > .jump-bar',
+    reveal: ':scope > .contents-phase',
+  });
+
   return (
-    <div className="page contents-page">
+    <div className="page contents-page" ref={root} data-motion="own">
       <header className="contents-head">
         <div className="eyebrow">
           <ListTree size={14} aria-hidden /> Contents
@@ -374,6 +384,13 @@ function ToolsGroup() {
           <Dumbbell size={20} aria-hidden />
           <strong>Practice</strong>
           <span className="small muted">A timed drill of every exam question you currently get wrong ({mistakes}).</span>
+        </Link>
+        <Link to="/achievements" className="tool-card">
+          <Award size={20} aria-hidden />
+          <strong>Achievements</strong>
+          <span className="small muted">
+            Badges for milestones, bronze to diamond: {Object.keys(p.achievements ?? {}).length}/{ACHIEVEMENT_TOTAL} earned.
+          </span>
         </Link>
         <Link to="/settings" className="tool-card">
           <Settings size={20} aria-hidden />

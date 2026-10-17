@@ -1,10 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { Topic } from '../types';
 import type { Progress } from '../lib/progress';
-import { localDay } from '../lib/progress';
-import { studyStreak } from '../lib/streak';
 import {
-  activityGrid,
   attemptTimeline,
   averageBest,
   difficultyAccuracy,
@@ -19,7 +16,6 @@ import { BarList } from './charts/BarList';
 import { ColumnChart } from './charts/ColumnChart';
 import { LineChart } from './charts/LineChart';
 import { StackedBar } from './charts/StackedBar';
-import { Heatmap } from './charts/Heatmap';
 
 const LEVEL_LABEL: Record<string, string> = { medium: 'Medium', hard: 'Hard', expert: 'Expert' };
 
@@ -29,11 +25,10 @@ function shortDate(iso: string) {
 
 /**
  * The dashboard's "Study record": a KPI strip plus a responsive grid of chart cards. Topics passed, exam
- * answers, mistakes and the streak live in the Record ledger at the top, practice volume in "Progress at a
- * glance", so they are not repeated here.
+ * answers, mistakes and the streak live in the Record ledger at the top, practice volume and study activity in
+ * "Progress at a glance", so they are not repeated here.
  */
 export function DashboardMetrics({ p, topics, readiness, firstExamHref }: { p: Progress; topics: Topic[]; readiness: number; firstExamHref: string }) {
-  const today = localDay();
   const scores = examScores(p, topics);
   const avg = averageBest(p, topics);
   const acc = mcqAccuracy(p, topics);
@@ -41,9 +36,6 @@ export function DashboardMetrics({ p, topics, readiness, firstExamHref }: { p: P
   const levels = difficultyAccuracy(p, topics);
   const ratings = ratingCounts(p, topics);
   const timeline = attemptTimeline(p, topics);
-  const streak = studyStreak(p.activityDays, today);
-  const grid = activityGrid(p.activityDays, today, 12);
-  const studied12 = grid.flat().filter((c) => c.active).length;
   const passMark = p.settings.passMark;
   const takeExam = (
     <Link className="btn" to={firstExamHref}>
@@ -178,31 +170,6 @@ export function DashboardMetrics({ p, topics, readiness, firstExamHref }: { p: P
           <p className="small muted">Partial and missed questions count as weak areas until you re-rate them.</p>
         </ChartCard>
 
-        <ChartCard
-          title="Study activity"
-          subtitle={
-            <>
-              Last 12 weeks · {studied12} day{studied12 === 1 ? '' : 's'} studied ·{' '}
-              <strong>
-                {streak ? `${streak}-day streak` : 'no current streak'}
-              </strong>
-            </>
-          }
-          table={{
-            columns: ['Week starting', 'Days studied', 'Days'],
-            rows: grid.map((w) => [shortDate(`${w[0].day}T12:00:00`), w.filter((c) => c.active).length, w.filter((c) => c.active).map((c) => shortDate(`${c.day}T12:00:00`)).join(', ') || '—']),
-          }}
-        >
-          <Heatmap weeks={grid} />
-          <p className="small muted dv-heat-note">
-            <span className="dv-key dv-key-rect" style={{ background: 'var(--dv-1)' }} aria-hidden />
-            <span>studied</span>
-            <span className="dv-key dv-key-rect dv-key-empty" aria-hidden />
-            <span>no study</span>
-            <span className="dv-key dv-key-rect dv-key-today" aria-hidden />
-            <span>today</span>
-          </p>
-        </ChartCard>
       </div>
     </section>
   );
