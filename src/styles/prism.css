@@ -1,36 +1,4 @@
-/* Prism tokens (light + dark) */
-:root {
-  --tk-comment: #5f6d84;
-  --tk-keyword: #9b2c6b;
-  --tk-string: #17723c;
-  --tk-number: #a3520c;
-  --tk-function: #1f4fc4;
-  --tk-class: #0b6b72;
-  --tk-operator: #45536b;
-  --tk-property: #b03a2e;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --tk-comment: #8593ad;
-    --tk-keyword: #f08fc0;
-    --tk-string: #8fdba8;
-    --tk-number: #f5b97a;
-    --tk-function: #8db3ff;
-    --tk-class: #6fd8cf;
-    --tk-operator: #b3c0d6;
-    --tk-property: #f6a38f;
-  }
-}
-:root[data-theme='dark'] {
-  --tk-comment: #8593ad;
-  --tk-keyword: #f08fc0;
-  --tk-string: #8fdba8;
-  --tk-number: #f5b97a;
-  --tk-function: #8db3ff;
-  --tk-class: #6fd8cf;
-  --tk-operator: #b3c0d6;
-  --tk-property: #f6a38f;
-}
+/* Prism token colours. The --tk-* values live in tokens.css (code blocks are a dark island in both themes). */
 .token.comment,
 .token.prolog,
 .token.doctype,

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { CapstoneProject } from '../types';
-import { CircleCheck, Hammer, RefreshCw } from 'lucide-react';
-import { Badge, CodeBlock, DifficultyBadge, Markdown, ProgressBar } from './ui';
+import { Check, CircleCheck, Hammer, RefreshCw, X } from 'lucide-react';
+import { CodeBlock, Markdown, ProgressBar } from './ui';
 import { celebrate } from '../lib/celebrate';
 import { claimCelebration } from '../lib/uiPrefs';
 
@@ -44,21 +44,35 @@ function useProjectResults(active: boolean) {
 export function CapstoneTab({ projects }: { projects: CapstoneProject[] }) {
   const { results, reload } = useProjectResults(true);
   return (
-    <div>
-      <div className="card info">
+    <div className="tp-stack">
+      <div className="tp-intro info">
         <strong>Build it, then get it judged.</strong> Each capstone is a real project in this repo. Write your implementation in
         your editor and run its test suite. The tests are the judge, and the results appear here automatically. Read the tests
         if you are stuck, but don&apos;t change them. A reference solution is in <code className="inline-code">solution/</code>{' '}
         for after you&apos;ve tried.
       </div>
-      {projects.map((p) => (
-        <ProjectCard key={p.id} p={p} result={results[p.id]} onRefresh={reload} />
+      {projects.map((p, i) => (
+        <ProjectCard key={p.id} p={p} n={i + 1} of={projects.length} result={results[p.id]} onRefresh={reload} />
       ))}
     </div>
   );
 }
 
-function ProjectCard({ p, result, onRefresh }: { p: CapstoneProject; result?: ProjectResult; onRefresh: () => void }) {
+const DIFF_TONE = { medium: 'blue', hard: 'amber', expert: 'rose' } as const;
+
+function ProjectCard({
+  p,
+  n,
+  of,
+  result,
+  onRefresh,
+}: {
+  p: CapstoneProject;
+  n: number;
+  of: number;
+  result?: ProjectResult;
+  onRefresh: () => void;
+}) {
   const pct = result && result.total ? Math.round((result.passed / result.total) * 100) : 0;
   const done = !!result && result.total > 0 && result.passed === result.total;
   // celebrate the first time this project's judge reports every test passing
@@ -66,29 +80,35 @@ function ProjectCard({ p, result, onRefresh }: { p: CapstoneProject; result?: Pr
     if (done && claimCelebration(`capstone:${p.id}`)) celebrate(`Capstone complete: ${p.title}`, 'Every judge test passes.');
   }, [done, p.id, p.title]);
   return (
-    <article className={`card capstone ${done ? 'capstone-done' : ''}`}>
-      <div className="section-head">
-        <h2>
-          <Hammer size={20} aria-hidden className="inline-icon" /> {p.title}
-        </h2>
-        <span className="row gap-s">
-          <DifficultyBadge d={p.difficulty} />
-          <Badge>~{p.estimatedHours} h</Badge>
+    <article id={`capstone-${p.id}`} className={`tp-card capstone ${done ? 'capstone-done' : ''}`} aria-labelledby={`cap-${p.id}`}>
+      <div className="tp-card-top">
+        <span className="eyebrow tp-eb-amber">
+          <Hammer size={13} aria-hidden /> Capstone {n} of {of}
+        </span>
+        <span className="tp-chips">
+          <span className={`nb-chip ${DIFF_TONE[p.difficulty]}`}>{p.difficulty}</span>
+          <span className="nb-chip">~{p.estimatedHours} h</span>
+          {done && <span className="nb-chip cyan">Complete</span>}
         </span>
       </div>
+      <h2 id={`cap-${p.id}`} className="tp-card-title">
+        {p.title}
+      </h2>
       <Markdown>{p.summary}</Markdown>
 
-      <div className="label">Milestones the tests check</div>
-      <ol className="milestones">
+      <div className="tp-label">Milestones the tests check</div>
+      <ol className="tp-numlist milestones">
         {p.milestones.map((m) => (
           <li key={m.name}>
-            <strong>{m.name}</strong>
-            <Markdown>{m.description}</Markdown>
+            <div>
+              <strong>{m.name}</strong>
+              <Markdown>{m.description}</Markdown>
+            </div>
           </li>
         ))}
       </ol>
 
-      <div className="label">How to build and get judged</div>
+      <div className="tp-label">How to build and get judged</div>
       <CodeBlock
         snippet={{
           language: 'bash',
@@ -97,9 +117,9 @@ function ProjectCard({ p, result, onRefresh }: { p: CapstoneProject; result?: Pr
         }}
       />
 
-      <div className="judge">
-        <div className="row between wrap">
-          <div className="label">Judge result</div>
+      <div className={`judge ${done ? 'ok' : ''}`}>
+        <div className="judge-head">
+          <div className="tp-label">Judge result</div>
           <button type="button" className="btn-ghost btn-xs" onClick={onRefresh}>
             <RefreshCw size={12} aria-hidden /> Refresh
           </button>
@@ -111,15 +131,13 @@ function ProjectCard({ p, result, onRefresh }: { p: CapstoneProject; result?: Pr
           </p>
         ) : (
           <>
-            <div className="topic-progress">
-              <ProgressBar value={pct} tone={done ? 'good' : undefined} />
-              <span className="small">
-                <strong>
-                  {result.passed}/{result.total}
-                </strong>{' '}
-                tests passing · last run {new Date(result.ranAt).toLocaleString()}
+            <div className="judge-score">
+              <span className="num">
+                {result.passed}/{result.total}
               </span>
+              <span className="small muted">tests passing · last run {new Date(result.ranAt).toLocaleString()}</span>
             </div>
+            <ProgressBar value={pct} tone={done ? 'good' : undefined} />
             {done && (
               <p className="capstone-pass">
                 <CircleCheck size={18} aria-hidden className="inline-icon" /> All tests pass. Capstone complete.
@@ -128,8 +146,11 @@ function ProjectCard({ p, result, onRefresh }: { p: CapstoneProject; result?: Pr
             <ul className="test-list">
               {result.tests.map((t, i) => (
                 <li key={i} className={t.ok ? 'ok' : 'bad'}>
-                  <span className="mark">{t.ok ? '✓' : '✗'}</span>
+                  <span className="mark" aria-hidden>
+                    {t.ok ? <Check size={14} strokeWidth={3} /> : <X size={14} strokeWidth={3} />}
+                  </span>
                   <span>
+                    <span className="sr-only">{t.ok ? 'Passed: ' : 'Failed: '}</span>
                     {t.name}
                     {!t.ok && t.message && <pre className="test-msg">{t.message}</pre>}
                   </span>

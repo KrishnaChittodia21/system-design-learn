@@ -1,0 +1,798 @@
+/* =====================================================================
+   Overlays — modal shell, welcome tour (WelcomeTour.tsx), command palette (CommandPalette.tsx),
+   toasts (Toaster.tsx) and the achievement-unlocked dialog (achievements/AchievementCelebration.tsx).
+   Nebula glass over a blurred scrim, a gradient hairline across the top, restrained motion.
+   Stacking: shell ≤ 60 · toasts 85 · modals 90 · palette 95 · unlock dialog 100 · confetti 120.
+   ===================================================================== */
+
+/* ---------- modal shell ---------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--scrim);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.modal {
+  position: relative;
+  width: min(640px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 22px 26px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--line-2);
+  /* glass over the scrim, but solid enough to read on any page */
+  background:
+    linear-gradient(160deg, var(--glass-1), var(--glass-2)),
+    var(--glass-solid);
+  box-shadow: var(--shadow-lg);
+  outline: none;
+}
+.modal::before {
+  content: '';
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  top: 0;
+  height: 1px;
+  background: var(--grad);
+  opacity: 0.85;
+}
+.modal:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-lg);
+}
+
+/* ---------- welcome tour ---------- */
+.tour-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.tour-top .eyebrow svg {
+  color: var(--cyan);
+}
+.tour-top .btn-icon {
+  min-width: 36px;
+  min-height: 36px;
+}
+.tour-meter {
+  height: 3px;
+  margin: 12px 0 4px;
+  border-radius: 99px;
+  background: var(--tint);
+  overflow: hidden;
+}
+.tour-meter > i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--grad);
+  box-shadow: 0 0 10px var(--cyan-g);
+  transition: width 0.35s var(--ease-out);
+}
+.tour-stage {
+  min-height: 340px;
+  padding: 14px 0 16px;
+}
+.tour-stage h2 {
+  margin: 0 0 12px;
+  font-size: clamp(1.3rem, 1.1rem + 0.8vw, 1.6rem);
+}
+.tour-stage p {
+  margin: 0 0 12px;
+  color: var(--ink-2);
+}
+.tour-stage .lead {
+  font-size: 1.02rem;
+}
+.tour-inline-icon {
+  vertical-align: -3px;
+  margin-right: 4px;
+  color: var(--cyan);
+}
+/* phases */
+.tour-path {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  list-style: none;
+  padding: 0;
+  margin: 14px 0 0;
+}
+.tour-path li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 7px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--tint);
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.tour-path li.goal {
+  border-color: var(--amber-b);
+  background: var(--amber-s);
+  color: var(--amber);
+  font-weight: 700;
+}
+.tour-path-num {
+  flex: none;
+  min-width: 1.8em;
+  font: 600 12px/1 var(--f-mono);
+  color: var(--blue);
+}
+.tour-path li.goal .tour-path-num {
+  display: inline-flex;
+  color: var(--amber);
+}
+/* study loop: a wire through glowing nodes */
+.tour-loop {
+  position: relative;
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+.tour-loop li {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 7px 0;
+  font-size: 14px;
+}
+.tour-loop li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 17px;
+  top: 43px;
+  bottom: -7px;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--blue-b), var(--cyan-b));
+}
+.tour-loop-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid var(--blue-b);
+  background: var(--blue-s);
+  color: var(--blue);
+  box-shadow: 0 0 16px -6px var(--blue-g);
+}
+.tour-loop li > span:last-child {
+  padding-top: 7px;
+}
+/* top-bar mock + places */
+.tour-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 2px 0 14px;
+  padding: 5px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line-2);
+  background: var(--tint);
+}
+.tour-bar span {
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+.tour-bar span.on {
+  color: var(--ink);
+  background: var(--tint-2);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.tour-places {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 9px;
+  font-size: 14px;
+}
+.tour-places li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.tour-places li > span:last-child {
+  padding-top: 4px;
+}
+.tour-place-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  border: 1px solid var(--blue-b);
+  background: var(--blue-s);
+  color: var(--blue);
+}
+.tour-place-icon.tool {
+  border-color: var(--cyan-b);
+  background: var(--cyan-s);
+  color: var(--cyan);
+}
+.tour-tools {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+/* phone tab-bar mock */
+.tour-tabbar {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  max-width: 420px;
+  margin: 6px 0 16px;
+  padding: 6px;
+  border-radius: 22px;
+  border: 1px solid var(--line-2);
+  background: var(--tint);
+}
+.tour-tabbar span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 2px;
+  border-radius: 16px;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-3);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 480px) {
+  .tour-tabbar span {
+    font-size: 9.5px;
+  }
+}
+.tour-tabbar span.on {
+  color: var(--cyan);
+  background: var(--cyan-s);
+}
+/* saved */
+.tour-save {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+.tour-save ul {
+  margin: 0;
+  padding-left: 1.1em;
+  color: var(--ink-2);
+}
+.tour-save li {
+  margin-bottom: 8px;
+}
+.tour-save-icon {
+  flex: none;
+  padding: 12px;
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  border: 1px solid var(--cyan-b);
+  background: var(--cyan-s);
+  color: var(--cyan);
+  box-shadow: 0 0 24px -8px var(--cyan-g);
+}
+.tour-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+.tour-cta .btn-lg {
+  height: auto;
+  min-height: 50px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  white-space: normal;
+  text-align: left;
+}
+.tour-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.tour-dots {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+/* 24px hit area, a small light inside it */
+.tour-dot {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.tour-dot::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--line-2);
+  transition:
+    left 0.25s var(--ease-out),
+    width 0.25s var(--ease-out),
+    background-color 0.2s;
+}
+.tour-dot:hover::after {
+  background: var(--ink-4);
+}
+.tour-dot.on::after {
+  left: 2px;
+  width: 20px;
+  background: var(--grad-bar);
+  box-shadow: 0 0 10px var(--cyan-g);
+}
+
+/* ---------- command palette (cmdk) ---------- */
+.cmdk-backdrop {
+  z-index: 95;
+  place-items: start center;
+  padding-top: 12vh;
+}
+.cmdk-panel {
+  position: relative;
+  width: min(660px, 100%);
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--line-2);
+  background:
+    linear-gradient(160deg, var(--glass-1), var(--glass-2)),
+    var(--glass-solid);
+  box-shadow: var(--shadow-lg);
+}
+.cmdk-panel::before {
+  content: '';
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  top: 0;
+  height: 1px;
+  background: var(--grad);
+  opacity: 0.85;
+}
+.cmdk-input-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 14px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.cmdk-search-ic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: var(--grad-btn);
+  color: var(--on-accent);
+  box-shadow: 0 8px 20px -10px var(--cyan-g);
+}
+.cmdk-input-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font: 500 17px/1.4 var(--f-body);
+}
+.cmdk-input-row input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.cmdk-close {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+[cmdk-list] {
+  max-height: min(440px, 58vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px;
+  scrollbar-width: thin;
+}
+[cmdk-group-heading] {
+  padding: 12px 10px 6px;
+  font: 500 10.5px/1.3 var(--f-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+[cmdk-item] {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  color: var(--ink-2);
+  font-size: 14.5px;
+  cursor: pointer;
+  scroll-margin: 8px;
+}
+.cmdk-ic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--tint);
+  color: var(--ink-3);
+  transition:
+    color 0.12s,
+    border-color 0.12s,
+    background-color 0.12s;
+}
+.cmdk-ic.accent {
+  color: var(--amber);
+  border-color: var(--amber-b);
+  background: var(--amber-s);
+}
+[cmdk-item][data-selected='true'] {
+  color: var(--ink);
+  background: var(--tint-2);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+[cmdk-item][data-selected='true']::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--grad-bar);
+  box-shadow: 0 0 10px var(--cyan-g);
+}
+[cmdk-item][data-selected='true'] .cmdk-ic {
+  color: var(--cyan);
+  border-color: var(--cyan-b);
+  background: var(--cyan-s);
+}
+.cmdk-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cmdk-hint {
+  flex: 0 1 auto;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 11.5px/1.3 var(--f-mono);
+  color: var(--ink-3);
+}
+[cmdk-empty] {
+  padding: 32px 24px;
+  text-align: center;
+  color: var(--ink-3);
+}
+.cmdk-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--tint);
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.cmdk-foot-note {
+  margin-left: auto;
+}
+@media (max-width: 600px) {
+  /* a sheet from the top with the list filling the screen */
+  .cmdk-backdrop {
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 10px 10px;
+  }
+  .cmdk-panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: calc(100dvh - 20px - env(safe-area-inset-top, 0px));
+    border-radius: var(--radius-lg);
+  }
+  .cmdk-panel [cmdk-root] {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+  [cmdk-list] {
+    flex: 1;
+    max-height: none;
+  }
+  .cmdk-hint {
+    display: none;
+  }
+  .cmdk-input-row input {
+    font-size: 16px; /* no zoom-on-focus in iOS Safari */
+  }
+  .cmdk-foot {
+    display: none;
+  }
+}
+
+/* ---------- toasts ---------- */
+.toaster {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + var(--tabbar));
+  z-index: 85;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(380px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.toast {
+  position: relative;
+  overflow: hidden;
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 10px 12px 14px;
+  border-radius: var(--radius-lg);
+  border-color: var(--cyan-b);
+  background:
+    linear-gradient(160deg, var(--glass-1), var(--glass-2)),
+    var(--glass-solid);
+  box-shadow: var(--shadow-lg), 0 16px 40px -24px var(--cyan-g);
+}
+.toast::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: var(--grad);
+}
+.toast-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: var(--grad-btn);
+  color: var(--on-accent);
+  box-shadow: 0 8px 20px -10px var(--cyan-g);
+}
+.toast-body {
+  flex: 1;
+  min-width: 0;
+  padding-top: 1px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.toast-body strong {
+  display: block;
+  color: var(--ink);
+}
+.toast-detail {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+.toast-close.btn-ghost {
+  flex: none;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0;
+  border-radius: 50%;
+}
+@media (max-width: 600px) {
+  .toaster {
+    right: 12px;
+    left: 12px;
+    width: auto;
+    bottom: calc(10px + var(--tabbar));
+  }
+}
+
+/* ---------- achievement unlocked ---------- */
+.ach-backdrop {
+  z-index: 100; /* above toasts and the palette, below confetti (120) */
+}
+.ach-modal {
+  width: min(470px, 100%);
+  padding: 26px 24px 22px;
+  text-align: center;
+}
+.ach-modal-many {
+  width: min(660px, 100%);
+}
+.ach-modal h2 {
+  margin: 14px 0 6px;
+  font-size: clamp(1.35rem, 1.15rem + 0.9vw, 1.7rem);
+}
+.ach-modal p {
+  max-width: 40ch;
+  margin: 6px auto 0;
+  color: var(--ink-3);
+}
+.ach-eyebrow {
+  margin-top: 2px;
+}
+.ach-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+.ach-single {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.ach-single .ach-tier-pill {
+  margin-top: 2px;
+}
+/* the medal on a lit stage with an orbiting spark */
+.ach-hero {
+  --hero-glow: var(--tier-standard-hi);
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 216px;
+  height: 216px;
+  margin: 14px auto 0;
+}
+.ach-hero.tier-bronze {
+  --hero-glow: var(--tier-bronze-hi);
+}
+.ach-hero.tier-silver {
+  --hero-glow: var(--tier-silver-hi);
+}
+.ach-hero.tier-gold {
+  --hero-glow: var(--tier-gold-hi);
+}
+.ach-hero.tier-diamond {
+  --hero-glow: var(--tier-diamond-hi);
+}
+.ach-hero-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--hero-glow) 30%, transparent) 0%, transparent 66%);
+}
+.ach-hero-ring {
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  border: 1px dashed color-mix(in srgb, var(--hero-glow) 45%, var(--line-2));
+}
+.ach-hero .orbit {
+  inset: 8px;
+}
+.ach-hero .orbit-dot {
+  box-shadow: 0 0 14px 4px color-mix(in srgb, var(--hero-glow) 70%, transparent);
+}
+.ach-hero-medal {
+  position: relative;
+}
+.ach-burst-grid {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 4px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 16px 8px;
+  max-height: min(46vh, 420px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.ach-burst-grid li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.ach-burst-name {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--ink);
+}
+.ach-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+/* ---------- small screens ---------- */
+@media (max-width: 600px) {
+  .modal {
+    padding: 16px 16px 14px;
+    border-radius: var(--radius-lg);
+  }
+  .tour-stage {
+    min-height: 0;
+  }
+  .tour-path {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tour-foot {
+    justify-content: center;
+  }
+  .tour-foot > .btn-ghost {
+    order: 3;
+  }
+  .tour-save {
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+@media (max-width: 480px) {
+  .ach-actions .btn {
+    flex: 1 1 100%;
+  }
+  .ach-hero {
+    width: 184px;
+    height: 184px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-meter > i,
+  .tour-dot::after {
+    transition: none;
+  }
+  .ach-hero .orbit {
+    display: none;
+  }
+}

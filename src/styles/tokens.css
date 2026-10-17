@@ -1,0 +1,496 @@
+/* =====================================================================
+   Blueprint Nebula — design tokens (the single source of truth for custom properties)
+   Dark is the default. Light applies with data-theme="light", or with no data-theme ('system') when the
+   OS prefers light. data-accent (indigo | teal | rose | amber; ids are saved settings) shifts only the pen
+   colour (--accent*) and the primary-button gradient (--grad-btn); 'indigo' is the Nebula default.
+
+   Two layers:
+   1. Nebula tokens  --bg/--bg-2, --surface/-2, --ink/-2/-3/-4, --line/-2/-3, --glass-1/-2, --tint/-2,
+                     --blue --cyan --amber --mag --rose --green (+ -g glow, -s soft fill, -b border),
+                     --grad (brand), --grad-btn (primary button, carries --on-accent), --grad-bar (meters),
+                     --gtext (large display text only), --grid-minor/-major, --orb-o, --f-display/-body/-mono
+   2. Legacy names   (a contract with src/viz widgets, src/components/charts and the legacy CSS) mapped
+                     onto Nebula: --text=ink, --text-2=ink-2, --muted=ink-3, --control=ink-4,
+                     --accent=blue (pen), --accent-2=amber, --good=cyan (passed/correct), --warn=amber
+                     (in progress), --bad=rose (wrong/failed), --surface*=solid navy / white,
+                     --border=line, --border-strong=line-2, --rule=line-3, --brand-gradient=grad,
+                     --btn-gradient=grad-btn, --text-gradient=gtext, --code-bg = dark in BOTH themes.
+   Text pairs (ink, ink-2, ink-3, accent, good, warn, bad on bg / surface / their -soft fill) are >= 4.5:1
+   in both themes. --ink-4 / --control are for non-text marks only (3:1).
+   ===================================================================== */
+:root {
+  /* ---- type ---- */
+  --f-display: 'Unbounded Variable', 'Unbounded', 'Space Grotesk', system-ui, sans-serif;
+  --f-body: 'Manrope Variable', 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --f-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --display: var(--f-display);
+  --sans: var(--f-body);
+  --mono: var(--f-mono);
+  --serif: var(--f-display);
+  /* ---- Nebula palette (dark) ---- */
+  --bg: #030814;
+  --bg-2: #071027;
+  --surface: #081128;
+  --surface-2: #0c1734;
+  --surface-hover: #11203f;
+  --raised: #14244a;
+  --ink: #eef4ff;
+  --ink-2: #c3cfe7;
+  --ink-3: #94a3c3;
+  --ink-4: #6c7ca0;
+  --line: rgba(147, 197, 253, 0.13);
+  --line-2: rgba(147, 197, 253, 0.24);
+  --line-3: rgba(147, 197, 253, 0.08);
+  --glass-1: rgba(148, 190, 255, 0.075);
+  --glass-2: rgba(148, 190, 255, 0.018);
+  --glass-solid: rgba(8, 17, 40, 0.82);
+  --glass-shadow: 0 24px 60px -34px rgba(0, 0, 0, 0.8);
+  --tint: rgba(148, 190, 255, 0.08);
+  --tint-2: rgba(148, 190, 255, 0.15);
+  --blue: #60a5fa;
+  --cyan: #22d3ee;
+  --amber: #fbbf24;
+  --mag: #e879f9;
+  --rose: #fb7185;
+  --green: #34d399;
+  --blue-g: rgba(59, 130, 246, 0.6);
+  --cyan-g: rgba(34, 211, 238, 0.55);
+  --amber-g: rgba(251, 191, 36, 0.5);
+  --mag-g: rgba(232, 121, 249, 0.5);
+  --rose-g: rgba(251, 113, 133, 0.5);
+  --green-g: rgba(52, 211, 153, 0.5);
+  --blue-s: rgba(59, 130, 246, 0.16);
+  --cyan-s: rgba(34, 211, 238, 0.13);
+  --amber-s: rgba(251, 191, 36, 0.13);
+  --mag-s: rgba(232, 121, 249, 0.13);
+  --rose-s: rgba(251, 113, 133, 0.13);
+  --green-s: rgba(52, 211, 153, 0.13);
+  --blue-b: rgba(96, 165, 250, 0.38);
+  --cyan-b: rgba(34, 211, 238, 0.38);
+  --amber-b: rgba(251, 191, 36, 0.4);
+  --mag-b: rgba(232, 121, 249, 0.4);
+  --rose-b: rgba(251, 113, 133, 0.4);
+  --green-b: rgba(52, 211, 153, 0.4);
+  --on-accent: #041024;
+  --grad: linear-gradient(100deg, #3b82f6, #22d3ee 52%, #fbbf24);
+  --grad-btn: linear-gradient(100deg, #8ab8ff, #67e8f9 50%, #fcd34d);
+  --grad-bar: linear-gradient(90deg, #3b82f6, #22d3ee);
+  --gtext: linear-gradient(100deg, #ffffff 0%, #93c5fd 24%, #67e8f9 48%, #fcd34d 74%, #ffffff 100%);
+  --grid-minor: rgba(96, 165, 250, 0.055);
+  --grid-major: rgba(96, 165, 250, 0.12);
+  --orb-o: 0.5;
+  --node-off: #0c1734;
+  /* code is a dark island in both themes */
+  --code-bg: #050b1c;
+  --code-head: #0a1430;
+  --code-line: rgba(147, 197, 253, 0.16);
+  --code-ink: #dbe7ff;
+  --code-ink-2: #a9b8d8;
+  --code-ink-3: #7d8fb3;
+  --tk-comment: #7d8fb3;
+  --tk-keyword: #7cc4ff;
+  --tk-string: #fcd34d;
+  --tk-number: #f0abfc;
+  --tk-function: #67e8f9;
+  --tk-class: #a5b4fc;
+  --tk-operator: #c3cfe7;
+  --tk-property: #fda4af;
+  /* ---- pen (accent) ---- */
+  --accent: #60a5fa;
+  --accent-2: #fbbf24;
+  --accent-soft: rgba(59, 130, 246, 0.16);
+  --accent-text: var(--on-accent);
+  /* ---- legacy names mapped onto Nebula ---- */
+  --text: var(--ink);
+  --text-2: var(--ink-2);
+  --muted: var(--ink-3);
+  --control: var(--ink-4);
+  --border: var(--line);
+  --border-strong: var(--line-2);
+  --rule: var(--line-3);
+  --margin-rule: var(--accent-2);
+  --good: var(--cyan);
+  --good-soft: var(--cyan-s);
+  --warn: var(--amber);
+  --warn-soft: var(--amber-s);
+  --bad: var(--rose);
+  --bad-soft: var(--rose-s);
+  --on-status: var(--on-accent);
+  --grid-line: var(--grid-minor);
+  --brand-gradient: var(--grad);
+  --btn-gradient: var(--grad-btn);
+  --text-gradient: var(--gtext);
+  --ring: var(--cyan);
+  --glow: 0 0 0 3px color-mix(in srgb, var(--accent) 24%, transparent);
+  --focus-ring: 0 0 0 4px color-mix(in srgb, var(--ring) 24%, transparent);
+  --shadow-sm: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 40px -22px rgba(0, 0, 0, 0.8);
+  --shadow-lg: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 0 0 1px rgba(147, 197, 253, 0.08), 0 30px 80px -28px rgba(0, 0, 0, 0.85);
+  --shadow: var(--shadow-sm);
+  --mesh-a: 16%;
+  --mesh-b: 9%;
+  --topbar-bg: rgba(6, 13, 32, 0.72);
+  --scrim: rgba(1, 4, 12, 0.62);
+  --btn-from: var(--accent);
+  --btn-to: var(--accent);
+  --brand-1: var(--text);
+  --brand-2: var(--accent);
+  --brand-3: var(--accent-2);
+  /* ---- shape / space / motion ---- */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius: var(--radius-md);
+  --radius-pill: 999px;
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --sp-1: var(--s-1);
+  --sp-2: var(--s-2);
+  --sp-3: var(--s-3);
+  --sp-4: var(--s-4);
+  --sp-5: var(--s-5);
+  --sp-6: var(--s-6);
+  --sp-7: var(--s-7);
+  --fs-xs: 0.72rem;
+  --fs-s: 0.85rem;
+  --fs-m: 1rem;
+  --fs-l: 1.42rem;
+  --fs-xl: 1.7rem;
+  --fs-xxl: 2.15rem;
+  --measure: 72ch;
+  --cond: 100%;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* ---- shell geometry (shell.css) ---- */
+  --topbar: 88px; /* space a fixed/sticky element must leave under the floating top bar */
+  --tabbar: 0px; /* height reserved by the mobile tab bar (set in shell.css under 860px) */
+  --sidebar: 340px;
+  --content: 1200px;
+  /* ---- dataviz ---- */
+  --dv-1: #60a5fa;
+  --dv-2: #fbbf24;
+  --dv-ord-1: #1e3a8a;
+  --dv-ord-2: #3b82f6;
+  --dv-ord-3: #93c5fd;
+  --dv-ink-1: #ffffff;
+  --dv-ink-2: #041024;
+  --dv-ink-3: #041024;
+  --dv-rest: #0f1b38;
+  --dv-track: var(--surface-2);
+  --dv-grid: var(--line);
+  --dv-axis: color-mix(in srgb, var(--ink-2) 45%, var(--line-2));
+  --dv-st-pass: #22d3ee;
+  --dv-st-prog: #fbbf24;
+  --dv-st-new: #2a3a5e;
+  /* ---- achievement tiers ---- */
+  --tier-bronze-hi: #eab07f;
+  --tier-bronze-lo: #8f4f22;
+  --tier-bronze-face: #2b1f15;
+  --tier-bronze-ink: #f0ad78;
+  --tier-bronze-ribbon: #82451b;
+  --tier-silver-hi: #eef0f3;
+  --tier-silver-lo: #7a8291;
+  --tier-silver-face: #18233a;
+  --tier-silver-ink: #d6dbe3;
+  --tier-silver-ribbon: #525a66;
+  --tier-gold-hi: #f6dc7c;
+  --tier-gold-lo: #b98007;
+  --tier-gold-face: #2b2410;
+  --tier-gold-ink: #f3cd52;
+  --tier-gold-ribbon: #835600;
+  --tier-diamond-hi: #a9eaf7;
+  --tier-diamond-lo: #6476d8;
+  --tier-diamond-face: #1a1f36;
+  --tier-diamond-ink: #a9b6f5;
+  --tier-diamond-ribbon: #33449f;
+  --tier-locked-hi: #34456a;
+  --tier-locked-lo: #1f2d47;
+  --tier-locked-face: #121d33;
+  --tier-locked-ink: #8b9ab4;
+  --tier-standard-hi: color-mix(in srgb, var(--accent) 70%, #ffffff);
+  --tier-standard-lo: color-mix(in srgb, var(--accent) 70%, #000000);
+  --tier-standard-face: var(--accent-soft);
+  --tier-standard-ink: var(--accent);
+  --tier-standard-ribbon: color-mix(in srgb, var(--accent) 55%, #0a1530);
+  --tier-ribbon-text: #ffffff;
+  --tier-shine: rgba(255, 255, 255, 0.5);
+  color-scheme: dark;
+}
+
+/* ---------- accent families (dark) ---------- */
+:root[data-accent='teal'] {
+  --accent: #22d3ee;
+  --accent-2: #fbbf24;
+  --accent-soft: rgba(34, 211, 238, 0.13);
+  --grad-btn: linear-gradient(100deg, #67e8f9, #5eead4 50%, #fcd34d);
+}
+:root[data-accent='rose'] {
+  --accent: #f472b6;
+  --accent-2: #fbbf24;
+  --accent-soft: rgba(244, 114, 182, 0.14);
+  --grad-btn: linear-gradient(100deg, #f9a8d4, #d8b4fe 50%, #fcd34d);
+}
+:root[data-accent='amber'] {
+  --accent: #fbbf24;
+  --accent-2: #60a5fa;
+  --accent-soft: rgba(251, 191, 36, 0.13);
+  --grad-btn: linear-gradient(100deg, #fcd34d, #fdba74 50%, #67e8f9);
+}
+
+/* ---------- light: explicit ---------- */
+:root[data-theme='light'] {
+  --bg: #f1f5fd;
+  --bg-2: #e6edfb;
+  --surface: #ffffff;
+  --surface-2: #f6f9ff;
+  --surface-hover: #eaf0fc;
+  --raised: #ffffff;
+  --ink: #0a1530;
+  --ink-2: #2c3a59;
+  --ink-3: #4a5878;
+  --ink-4: #6f7d99;
+  --line: rgba(29, 78, 216, 0.14);
+  --line-2: rgba(29, 78, 216, 0.26);
+  --line-3: rgba(29, 78, 216, 0.08);
+  --glass-1: rgba(255, 255, 255, 0.9);
+  --glass-2: rgba(255, 255, 255, 0.66);
+  --glass-solid: rgba(255, 255, 255, 0.86);
+  --glass-shadow: 0 18px 50px -26px rgba(30, 58, 138, 0.3);
+  --tint: rgba(29, 78, 216, 0.08);
+  --tint-2: rgba(29, 78, 216, 0.15);
+  --blue: #1d4ed8;
+  --cyan: #0e7490;
+  --amber: #b45309;
+  --mag: #a21caf;
+  --rose: #be123c;
+  --green: #047857;
+  --blue-g: rgba(37, 99, 235, 0.3);
+  --cyan-g: rgba(8, 145, 178, 0.3);
+  --amber-g: rgba(217, 119, 6, 0.28);
+  --mag-g: rgba(192, 38, 211, 0.26);
+  --rose-g: rgba(190, 18, 60, 0.26);
+  --green-g: rgba(4, 120, 87, 0.26);
+  --blue-s: rgba(37, 99, 235, 0.09);
+  --cyan-s: rgba(8, 145, 178, 0.09);
+  --amber-s: rgba(217, 119, 6, 0.1);
+  --mag-s: rgba(192, 38, 211, 0.08);
+  --rose-s: rgba(190, 18, 60, 0.08);
+  --green-s: rgba(4, 120, 87, 0.09);
+  --blue-b: rgba(29, 78, 216, 0.32);
+  --cyan-b: rgba(14, 116, 144, 0.34);
+  --amber-b: rgba(180, 83, 9, 0.34);
+  --mag-b: rgba(162, 28, 175, 0.32);
+  --rose-b: rgba(190, 18, 60, 0.32);
+  --green-b: rgba(4, 120, 87, 0.32);
+  --on-accent: #ffffff;
+  --grad: linear-gradient(100deg, #2563eb, #0891b2 52%, #d97706);
+  --grad-btn: linear-gradient(100deg, #1d4ed8, #0369a1 55%, #0e7490);
+  --grad-bar: linear-gradient(90deg, #2563eb, #0891b2);
+  --gtext: linear-gradient(100deg, #0a1530 0%, #1d4ed8 26%, #0e7490 50%, #b45309 74%, #0a1530 100%);
+  --grid-minor: rgba(37, 99, 235, 0.06);
+  --grid-major: rgba(37, 99, 235, 0.11);
+  --orb-o: 0.2;
+  --node-off: #eef3fd;
+  --accent: #1d4ed8;
+  --accent-2: #b45309;
+  --accent-soft: rgba(37, 99, 235, 0.09);
+  /* status text a step deeper than the Nebula hues so it stays >= 4.5:1 on its soft fill over --bg */
+  --good: #0c6a85;
+  --warn: #9a4508;
+  --shadow-sm: 0 1px 2px rgba(10, 21, 48, 0.05), 0 1px 3px rgba(30, 58, 138, 0.06);
+  --shadow-md: 0 1px 2px rgba(10, 21, 48, 0.04), 0 14px 34px -18px rgba(30, 58, 138, 0.28);
+  --shadow-lg: 0 2px 4px rgba(10, 21, 48, 0.05), 0 24px 60px -24px rgba(30, 58, 138, 0.34);
+  --mesh-a: 10%;
+  --mesh-b: 8%;
+  --topbar-bg: rgba(255, 255, 255, 0.78);
+  --scrim: rgba(10, 21, 48, 0.36);
+  /* dataviz (charts read --dv-*) */
+  --dv-1: #2563eb;
+  --dv-2: #d97706;
+  --dv-ord-1: #bfdbfe;
+  --dv-ord-2: #2563eb;
+  --dv-ord-3: #1e3a8a;
+  --dv-ink-1: #0a1530;
+  --dv-ink-2: #ffffff;
+  --dv-ink-3: #ffffff;
+  --dv-rest: #e3e9f6;
+  --dv-st-pass: #0891b2;
+  --dv-st-prog: #d97706;
+  --dv-st-new: #c3cee3;
+  /* achievement tiers */
+  --tier-bronze-hi: #e4a26c;
+  --tier-bronze-lo: #8f4f22;
+  --tier-bronze-face: #f8eadb;
+  --tier-bronze-ink: #7f4219;
+  --tier-silver-hi: #eef0f2;
+  --tier-silver-lo: #858d99;
+  --tier-silver-face: #eff0ee;
+  --tier-silver-ink: #434b57;
+  --tier-gold-hi: #f6dc7c;
+  --tier-gold-lo: #b98007;
+  --tier-gold-face: #fbf1d3;
+  --tier-gold-ink: #7c5100;
+  --tier-diamond-hi: #b7ecf7;
+  --tier-diamond-lo: #4f63c9;
+  --tier-diamond-face: #e7edf8;
+  --tier-diamond-ink: #2e3f9e;
+  --tier-locked-hi: #dde3ec;
+  --tier-locked-lo: #9ca8ba;
+  --tier-locked-face: #edf1f7;
+  --tier-locked-ink: #5f6c80;
+  --tier-standard-hi: color-mix(in srgb, var(--accent) 35%, #ffffff);
+  --tier-standard-lo: var(--accent);
+  --tier-shine: rgba(255, 255, 255, 0.75);
+  color-scheme: light;
+}
+:root[data-theme='light'][data-accent='teal'] {
+  --accent: #0e7490;
+  --accent-2: #b45309;
+  --accent-soft: rgba(8, 145, 178, 0.09);
+  --grad-btn: linear-gradient(100deg, #0e7490, #0f766e 55%, #155e75);
+}
+:root[data-theme='light'][data-accent='rose'] {
+  --accent: #be185d;
+  --accent-2: #b45309;
+  --accent-soft: rgba(190, 24, 93, 0.08);
+  --grad-btn: linear-gradient(100deg, #be185d, #a21caf 55%, #7e22ce);
+}
+:root[data-theme='light'][data-accent='amber'] {
+  --accent: #b45309;
+  --accent-2: #1d4ed8;
+  --accent-soft: rgba(217, 119, 6, 0.1);
+  --grad-btn: linear-gradient(100deg, #b45309, #9a3412 55%, #92400e);
+}
+
+/* ---------- light: 'system' (no data-theme) when the OS prefers light ---------- */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --bg: #f1f5fd;
+    --bg-2: #e6edfb;
+    --surface: #ffffff;
+    --surface-2: #f6f9ff;
+    --surface-hover: #eaf0fc;
+    --raised: #ffffff;
+    --ink: #0a1530;
+    --ink-2: #2c3a59;
+    --ink-3: #4a5878;
+    --ink-4: #6f7d99;
+    --line: rgba(29, 78, 216, 0.14);
+    --line-2: rgba(29, 78, 216, 0.26);
+    --line-3: rgba(29, 78, 216, 0.08);
+    --glass-1: rgba(255, 255, 255, 0.9);
+    --glass-2: rgba(255, 255, 255, 0.66);
+    --glass-solid: rgba(255, 255, 255, 0.86);
+    --glass-shadow: 0 18px 50px -26px rgba(30, 58, 138, 0.3);
+    --tint: rgba(29, 78, 216, 0.08);
+    --tint-2: rgba(29, 78, 216, 0.15);
+    --blue: #1d4ed8;
+    --cyan: #0e7490;
+    --amber: #b45309;
+    --mag: #a21caf;
+    --rose: #be123c;
+    --green: #047857;
+    --blue-g: rgba(37, 99, 235, 0.3);
+    --cyan-g: rgba(8, 145, 178, 0.3);
+    --amber-g: rgba(217, 119, 6, 0.28);
+    --mag-g: rgba(192, 38, 211, 0.26);
+    --rose-g: rgba(190, 18, 60, 0.26);
+    --green-g: rgba(4, 120, 87, 0.26);
+    --blue-s: rgba(37, 99, 235, 0.09);
+    --cyan-s: rgba(8, 145, 178, 0.09);
+    --amber-s: rgba(217, 119, 6, 0.1);
+    --mag-s: rgba(192, 38, 211, 0.08);
+    --rose-s: rgba(190, 18, 60, 0.08);
+    --green-s: rgba(4, 120, 87, 0.09);
+    --blue-b: rgba(29, 78, 216, 0.32);
+    --cyan-b: rgba(14, 116, 144, 0.34);
+    --amber-b: rgba(180, 83, 9, 0.34);
+    --mag-b: rgba(162, 28, 175, 0.32);
+    --rose-b: rgba(190, 18, 60, 0.32);
+    --green-b: rgba(4, 120, 87, 0.32);
+    --on-accent: #ffffff;
+    --grad: linear-gradient(100deg, #2563eb, #0891b2 52%, #d97706);
+    --grad-btn: linear-gradient(100deg, #1d4ed8, #0369a1 55%, #0e7490);
+    --grad-bar: linear-gradient(90deg, #2563eb, #0891b2);
+    --gtext: linear-gradient(100deg, #0a1530 0%, #1d4ed8 26%, #0e7490 50%, #b45309 74%, #0a1530 100%);
+    --grid-minor: rgba(37, 99, 235, 0.06);
+    --grid-major: rgba(37, 99, 235, 0.11);
+    --orb-o: 0.2;
+    --node-off: #eef3fd;
+    --accent: #1d4ed8;
+    --accent-2: #b45309;
+    --accent-soft: rgba(37, 99, 235, 0.09);
+    /* status text a step deeper than the Nebula hues so it stays >= 4.5:1 on its soft fill over --bg */
+    --good: #0c6a85;
+    --warn: #9a4508;
+    --shadow-sm: 0 1px 2px rgba(10, 21, 48, 0.05), 0 1px 3px rgba(30, 58, 138, 0.06);
+    --shadow-md: 0 1px 2px rgba(10, 21, 48, 0.04), 0 14px 34px -18px rgba(30, 58, 138, 0.28);
+    --shadow-lg: 0 2px 4px rgba(10, 21, 48, 0.05), 0 24px 60px -24px rgba(30, 58, 138, 0.34);
+    --mesh-a: 10%;
+    --mesh-b: 8%;
+    --topbar-bg: rgba(255, 255, 255, 0.78);
+    --scrim: rgba(10, 21, 48, 0.36);
+    /* dataviz (charts read --dv-*) */
+    --dv-1: #2563eb;
+    --dv-2: #d97706;
+    --dv-ord-1: #bfdbfe;
+    --dv-ord-2: #2563eb;
+    --dv-ord-3: #1e3a8a;
+    --dv-ink-1: #0a1530;
+    --dv-ink-2: #ffffff;
+    --dv-ink-3: #ffffff;
+    --dv-rest: #e3e9f6;
+    --dv-st-pass: #0891b2;
+    --dv-st-prog: #d97706;
+    --dv-st-new: #c3cee3;
+    /* achievement tiers */
+    --tier-bronze-hi: #e4a26c;
+    --tier-bronze-lo: #8f4f22;
+    --tier-bronze-face: #f8eadb;
+    --tier-bronze-ink: #7f4219;
+    --tier-silver-hi: #eef0f2;
+    --tier-silver-lo: #858d99;
+    --tier-silver-face: #eff0ee;
+    --tier-silver-ink: #434b57;
+    --tier-gold-hi: #f6dc7c;
+    --tier-gold-lo: #b98007;
+    --tier-gold-face: #fbf1d3;
+    --tier-gold-ink: #7c5100;
+    --tier-diamond-hi: #b7ecf7;
+    --tier-diamond-lo: #4f63c9;
+    --tier-diamond-face: #e7edf8;
+    --tier-diamond-ink: #2e3f9e;
+    --tier-locked-hi: #dde3ec;
+    --tier-locked-lo: #9ca8ba;
+    --tier-locked-face: #edf1f7;
+    --tier-locked-ink: #5f6c80;
+    --tier-standard-hi: color-mix(in srgb, var(--accent) 35%, #ffffff);
+    --tier-standard-lo: var(--accent);
+    --tier-shine: rgba(255, 255, 255, 0.75);
+    color-scheme: light;
+  }
+  :root[data-accent='teal']:not([data-theme='dark']) {
+    --accent: #0e7490;
+    --accent-2: #b45309;
+    --accent-soft: rgba(8, 145, 178, 0.09);
+    --grad-btn: linear-gradient(100deg, #0e7490, #0f766e 55%, #155e75);
+  }
+  :root[data-accent='rose']:not([data-theme='dark']) {
+    --accent: #be185d;
+    --accent-2: #b45309;
+    --accent-soft: rgba(190, 24, 93, 0.08);
+    --grad-btn: linear-gradient(100deg, #be185d, #a21caf 55%, #7e22ce);
+  }
+  :root[data-accent='amber']:not([data-theme='dark']) {
+    --accent: #b45309;
+    --accent-2: #1d4ed8;
+    --accent-soft: rgba(217, 119, 6, 0.1);
+    --grad-btn: linear-gradient(100deg, #b45309, #9a3412 55%, #92400e);
+  }
+}

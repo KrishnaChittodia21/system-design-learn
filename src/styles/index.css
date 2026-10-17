@@ -1,0 +1,29 @@
+/* =====================================================================
+   Blueprint Nebula — stylesheet entry (imported once from src/main.tsx)
+   Order matters: later files win at equal specificity.
+   - tokens.css    the ONLY place CSS custom properties for colour/type/shape are defined
+                   (Nebula tokens + every legacy token name mapped onto them)
+   - legacy*.css   the pre-Nebula component styles; screens still rely on them until their
+                   owners move the rules into their own file below and delete them here
+   - prism.css     syntax-highlight token colours
+   - base.css      global element styles + shared primitives (.glass, .btn, .chip, .track…)
+   - shell.css     app chrome: top bar, mobile tab bar, syllabus drawer, ambient stage, footer
+   - today.css … charts.css   one file per screen/area, owned by the screen agents
+   ===================================================================== */
+@import './tokens.css';
+@import './legacy.css';
+@import './prism.css';
+@import './legacy-blueprint.css';
+@import './base.css';
+@import './shell.css';
+@import './today.css';
+@import './topic.css';
+@import './exam.css';
+@import './practice.css';
+@import './contents.css';
+@import './companies.css';
+@import './achievements.css';
+@import './settings.css';
+@import './overlays.css';
+@import './viz.css';
+@import './charts.css';

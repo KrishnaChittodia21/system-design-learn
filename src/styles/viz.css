@@ -1,0 +1,339 @@
+/* =====================================================================
+   Interactive visualisations (src/viz): the VizFrame chrome from core.tsx and the shared SVG
+   helpers the widgets use (.viz-svg, .viz-label, .viz-node…). A glass figure on blueprint grid.
+   Colours come only from tokens.css.
+   ===================================================================== */
+.viz {
+  position: relative;
+  margin: 8px 0 26px;
+  padding: 22px 22px 18px;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  overflow: hidden;
+  outline: none;
+  min-width: 0;
+}
+.viz::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--grid-minor) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-minor) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+.viz > * {
+  position: relative;
+}
+.viz:focus-visible {
+  border-color: var(--cyan-b);
+  box-shadow: 0 0 0 3px var(--cyan-s);
+}
+.viz-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.viz-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--cyan-b);
+  background: var(--cyan-s);
+  color: var(--cyan);
+  font: 500 10.5px/1.4 var(--f-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.viz-title {
+  margin-top: 10px;
+  font: 600 18px/1.3 var(--f-display);
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+.viz-blurb {
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-3);
+}
+.viz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin: 16px 0 6px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.viz-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 160px;
+  flex: 1 1 160px;
+}
+.viz-slider strong {
+  font-family: var(--f-mono);
+  color: var(--cyan);
+}
+.viz-slider input {
+  accent-color: var(--cyan);
+  width: 100%;
+}
+.viz-choice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.viz-choice .chip {
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12.5px;
+}
+.viz-choice .chip.on {
+  color: var(--cyan);
+  background: var(--cyan-s);
+  border-color: var(--cyan-b);
+  box-shadow: none;
+}
+.viz-stage {
+  margin: 12px 0 8px;
+  overflow-x: auto;
+}
+.viz-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+  font-family: var(--f-body);
+}
+.viz-svg text {
+  fill: var(--ink);
+}
+.viz-label {
+  font-size: 12px;
+  fill: var(--ink-2) !important;
+}
+.viz-edge {
+  fill: none;
+  stroke: var(--ink-4);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+.viz-node circle {
+  fill: var(--surface);
+  stroke: var(--line-2);
+  stroke-width: 2;
+  transition:
+    fill 0.35s ease,
+    stroke 0.35s ease,
+    r 0.35s ease;
+}
+.viz-node.active circle {
+  stroke-width: 4;
+}
+.viz-node.active.cb-closed circle {
+  fill: var(--good-soft);
+  stroke: var(--good);
+}
+.viz-node.active.cb-open circle {
+  fill: var(--bad-soft);
+  stroke: var(--bad);
+}
+.viz-node.active.cb-half-open circle {
+  fill: var(--warn-soft);
+  stroke: var(--warn);
+}
+.viz-node-label {
+  font-size: 13px;
+  font-weight: 700;
+}
+.viz-outage {
+  fill: var(--bad-soft);
+}
+.viz-dot {
+  transition:
+    r 0.25s ease,
+    fill 0.25s ease;
+}
+.viz-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.viz-key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: -10px;
+  vertical-align: -1px;
+}
+.viz-key.ring {
+  background: transparent;
+  border: 2px solid var(--ink);
+}
+.viz-caption {
+  margin-top: 12px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  min-height: 2.8em;
+}
+.viz-stepno {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: var(--cyan-s);
+  font: 600 11px/1.6 var(--f-mono);
+  letter-spacing: 0.06em;
+  color: var(--cyan);
+  font-variant-numeric: tabular-nums;
+}
+.viz-predict {
+  margin-top: 8px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--amber-b);
+  background: var(--amber-s);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+.viz-predict strong {
+  color: var(--ink);
+}
+.viz-predict-ic {
+  color: var(--amber);
+  vertical-align: -3px;
+  margin-right: 6px;
+}
+.viz-predict .link-btn {
+  color: var(--amber);
+  font-weight: 700;
+}
+.viz-transport {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.viz-transport .btn-xs {
+  min-height: 36px;
+}
+.viz-tbtn {
+  width: 36px;
+  padding: 0;
+}
+.viz-play {
+  min-width: 92px;
+}
+.viz-scrub {
+  flex: 1;
+  min-width: 120px;
+  accent-color: var(--cyan);
+}
+.viz-speed {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 11px/1 var(--f-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.viz-speed select {
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 10px;
+  font: 600 13px var(--f-mono);
+  color: var(--ink);
+  background: var(--tint);
+  border: 1px solid var(--line-2);
+}
+.viz-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 26px;
+  padding: 22px;
+  border: 1px dashed var(--line-2);
+  border-radius: 22px;
+  color: var(--ink-3);
+  font-size: 14px;
+  background:
+    linear-gradient(100deg, transparent 30%, var(--tint) 50%, transparent 70%) 0 0 / 200% 100% no-repeat,
+    var(--surface-2);
+  animation: viz-shimmer 1.4s linear infinite;
+}
+@keyframes viz-shimmer {
+  from {
+    background-position:
+      150% 0,
+      0 0;
+  }
+  to {
+    background-position:
+      -50% 0,
+      0 0;
+  }
+}
+.viz-backlink {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 8px 0 22px;
+  padding: 12px 16px;
+  border: 1px dashed var(--cyan-b);
+  border-radius: 16px;
+  background: var(--cyan-s);
+  color: var(--cyan);
+  font: 600 14px/1.45 var(--f-body);
+  text-align: left;
+  cursor: pointer;
+}
+.viz-backlink:hover {
+  border-style: solid;
+}
+@media (max-width: 600px) {
+  .viz {
+    padding: 16px 14px 14px;
+    border-radius: 18px;
+    margin-left: -6px;
+    margin-right: -6px;
+  }
+  .viz-scrub {
+    flex-basis: 100%;
+    order: 9;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .viz *,
+  .viz *::before,
+  .viz *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+  .viz-loading {
+    animation: none;
+  }
+}

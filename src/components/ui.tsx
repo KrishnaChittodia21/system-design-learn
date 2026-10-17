@@ -58,6 +58,7 @@ export function CodeBlock({ snippet, compact }: { snippet: CodeSnippet; compact?
   return (
     <figure className={`code ${compact ? 'code-compact' : ''}`}>
       <figcaption>
+        <span className="code-dot" aria-hidden />
         <span className="code-title">{snippet.title ?? ''}</span>
         <span className="code-lang">{lang}</span>
         <button className="btn-ghost btn-xs" onClick={copy} type="button">

@@ -5,13 +5,17 @@ import {
   Award,
   Building2,
   ChevronDown,
+  Compass,
   Dumbbell,
-  LayoutDashboard,
+  Flame,
+  Home as HomeIcon,
+  LayoutGrid,
   ListTree,
   Lock,
   LockOpen,
-  Menu,
   Moon,
+  MoreHorizontal,
+  Search,
   Settings as SettingsIcon,
   Sun,
   Target,
@@ -20,15 +24,17 @@ import {
 import { COMPANY_QUESTIONS, PHASES, TOPICS, TOPIC_BY_ID } from '../content';
 import { setSettings, useProgress } from '../lib/progress';
 import { companyUnlocked, topicCompletion, topicStatus } from '../lib/stats';
+import { studyStreak } from '../lib/streak';
 import { getUiPrefs, saveUiPrefs, stableLocation } from '../lib/uiPrefs';
 import { openPalette, openTour, closePalette, useGuide } from '../lib/guide';
 import { applyThemeAttrs } from '../lib/theme';
 import { phaseCode } from '../lib/labels';
+import { useFocusTrap } from '../lib/useFocusTrap';
 import WelcomeTour from './WelcomeTour';
 import { Toaster } from './Toaster';
 import { CelebrationWatcher } from './CelebrationWatcher';
 import { Footer } from './Footer';
-import { BrandMark } from './BrandMark';
+import { BrandMark, Wordmark } from './BrandMark';
 import { RouteMotion } from './RouteMotion';
 import { useAchievementDetection } from '../lib/useAchievements';
 import { achievementById, TIER_LABEL } from '../content/achievements';
@@ -38,22 +44,27 @@ import { refreshSoon, ScrollTrigger } from '../lib/gsap';
 const CommandPalette = lazy(() => import('./CommandPalette'));
 // the unlock dialog (and its badge art) loads on the first unlock
 const AchievementCelebration = lazy(() => import('./achievements/AchievementCelebration'));
-/** below this width the main nav and the syllabus share one drawer */
-const isCompact = () => window.matchMedia('(max-width: 1099px)').matches;
 
 const STATUS_LABEL = { new: 'not started', 'in-progress': 'in progress', passed: 'exam passed' } as const;
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
+/**
+ * App shell (Blueprint Nebula): a fixed ambient stage (blueprint grid + aurora orbs), a floating glass top bar,
+ * the syllabus as a drawer (button on lesson pages, and in the mobile "More" sheet), a frosted bottom tab bar
+ * under 1100px, the routed page and the footer. Styles: src/styles/shell.css.
+ */
 export default function Layout() {
   const p = useProgress();
   const [query, setQuery] = useState('');
   const [navOpen, setNavOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => getUiPrefs().sidebarCollapsed);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => getUiPrefs().collapsedPhases);
   const location = useLocation();
   const loc = location.pathname + location.search;
   const locRef = useRef(loc);
   const firstRoute = useRef(true);
   const sidebarRef = useRef<HTMLElement>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
   const { unlocked } = companyUnlocked(p, TOPICS);
   const guide = useGuide();
   const outlet = useOutlet();
@@ -72,17 +83,17 @@ export default function Layout() {
 
   useEffect(() => applyThemeAttrs(p.settings), [p.settings]);
 
-  // track the OS preference so the toggle icon is right while theme = 'system'
-  const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
+  // track the OS preference so the toggle icon is right while theme = 'system' (Nebula: dark unless the OS asks for light)
+  const [systemLight, setSystemLight] = useState(() => window.matchMedia('(prefers-color-scheme: light)').matches);
   useEffect(() => {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const onChange = (e: MediaQueryListEvent) => setSystemDark(e.matches);
+    const mq = window.matchMedia('(prefers-color-scheme: light)');
+    const onChange = (e: MediaQueryListEvent) => setSystemLight(e.matches);
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, []);
-  const isDark = p.settings.theme === 'dark' || (p.settings.theme === 'system' && systemDark);
+  const isDark = p.settings.theme === 'dark' || (p.settings.theme === 'system' && !systemLight);
+  const toggleTheme = () => setSettings({ theme: isDark ? 'light' : 'dark' });
 
-  useEffect(() => saveUiPrefs({ sidebarCollapsed }), [sidebarCollapsed]);
   useEffect(() => saveUiPrefs({ collapsedPhases: collapsed }), [collapsed]);
   useEffect(() => {
     saveUiPrefs(loc === '/' ? { lastLocation: loc } : { lastLocation: loc, lastStudyLocation: stableLocation(loc) });
@@ -93,7 +104,7 @@ export default function Layout() {
     if (!getUiPrefs().tourSeen) openTour();
   }, []);
 
-  // the syllabus sits beside lessons, not beside a running exam
+  // the syllabus button sits beside lessons, not beside a running exam
   const syllabusPage = location.pathname.startsWith('/topic/') && !location.pathname.endsWith('/exam');
 
   // ⌘K / Ctrl+K toggles the command palette; "?" opens the guide; "/" focuses the topic filter (when it is on screen).
@@ -123,11 +134,12 @@ export default function Layout() {
     return () => window.removeEventListener('keydown', onKey);
   }, [guide.palette, guide.tour]);
 
-  // New page → close the drawer (adjusted during render, not in an effect).
+  // New page → close the drawer and the sheet (adjusted during render, not in an effect).
   const [lastPath, setLastPath] = useState(location.pathname);
   if (lastPath !== location.pathname) {
     setLastPath(location.pathname);
     setNavOpen(false);
+    setMoreOpen(false);
   }
   // New page → top of page, except on app start, where we restore the saved scroll position.
   useEffect(() => {
@@ -167,13 +179,11 @@ export default function Layout() {
     };
   }, []);
 
-  // Escape closes the drawer.
-  useEffect(() => {
-    if (!navOpen) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setNavOpen(false);
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [navOpen]);
+  // The drawer and the sheet are modal: trap focus, Escape closes, focus returns to the opener.
+  const closeNav = useCallback(() => setNavOpen(false), []);
+  const closeMore = useCallback(() => setMoreOpen(false), []);
+  useFocusTrap(sidebarRef, navOpen, closeNav);
+  useFocusTrap(moreRef, moreOpen, closeMore);
 
   // Keep the active topic visible inside the syllabus.
   useEffect(() => {
@@ -184,9 +194,9 @@ export default function Layout() {
     }
   }, [location.pathname, navOpen]);
 
-  const toggleNav = () => {
-    if (isCompact() || !syllabusPage) setNavOpen((o) => !o);
-    else setSidebarCollapsed((c) => !c);
+  const openSyllabus = () => {
+    setMoreOpen(false);
+    setNavOpen(true);
   };
 
   const filtered = useMemo(() => {
@@ -201,14 +211,25 @@ export default function Layout() {
   }, [query]);
 
   const weakCount = Object.values(p.mcq).filter((r) => !r.lastCorrect).length;
-  const passedCount = TOPICS.filter((t) => topicStatus(p, t) === 'passed').length;
+  const streak = studyStreak(p.activityDays);
   // 81 topics: phases start folded except the one being read; a phase you open or close yourself stays that way
   const routeTopic = /^\/topic\/([^/]+)/.exec(location.pathname)?.[1];
   const routePhase = routeTopic ? TOPIC_BY_ID.get(routeTopic)?.phase : undefined;
   const lockIcon = unlocked ? <LockOpen size={13} aria-label="unlocked" /> : <Lock size={13} aria-label="locked" />;
+  const weakActive = location.pathname.startsWith('/weak-areas') || location.pathname.startsWith('/practice');
+  const moreActive = ['/practice', '/achievements', '/settings'].some((r) => location.pathname.startsWith(r));
+  const weakTag =
+    weakCount > 0 ? (
+      <span className="count-tag fail" aria-label={`, ${weakCount} questions to revisit`}>
+        {weakCount}
+      </span>
+    ) : null;
+
+  const themeLabel = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+  const ThemeIcon = isDark ? Sun : Moon;
 
   return (
-    <div className={`shell ${syllabusPage ? 'has-syllabus' : ''} ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`nb-shell ${navOpen ? 'drawer-open' : ''} ${syllabusPage ? 'has-syllabus-btn' : ''}`}>
       {/* hash routing owns the URL fragment, so the skip link moves focus itself instead of using href="#main" */}
       <a
         className="skip-link"
@@ -220,103 +241,101 @@ export default function Layout() {
       >
         Skip to content
       </a>
-      <header className="topbar">
-        <button
-          className={`btn-ghost nav-toggle ${syllabusPage ? 'nav-toggle-syllabus' : ''}`}
-          onClick={toggleNav}
-          aria-label={syllabusPage ? 'Toggle the syllabus' : 'Open the menu'}
-          aria-expanded={navOpen}
-          title={syllabusPage ? (sidebarCollapsed ? 'Show syllabus' : 'Hide syllabus') : 'Menu'}
-          type="button"
-        >
-          <Menu size={20} aria-hidden />
-        </button>
-        <Link to="/" className="brand" aria-label="System Design Interview Prep, overview">
-          <BrandMark />
-          <span className="brand-name">System Design</span>
-        </Link>
-        <nav className="topnav" aria-label="Main">
-          <TopNavLink to="/" end>
-            Overview
-          </TopNavLink>
-          <TopNavLink to="/contents">Contents</TopNavLink>
-          <TopNavLink to="/weak-areas">
-            Weak areas
-            {weakCount > 0 && (
-              <span className="count-tag fail" aria-label={`, ${weakCount} questions to revisit`}>
-                {weakCount}
-              </span>
+
+      {/* ambient stage: blueprint grid + drifting aurora (fixed, decorative, no blur filters) */}
+      <div className="nb-stage" aria-hidden>
+        <div className="nb-grid" />
+        <span className="nb-orb o1" />
+        <span className="nb-orb o2" />
+        <span className="nb-orb o3" />
+        <span className="nb-orb o4" />
+      </div>
+
+      <header className="nb-top">
+        <div className="nb-topbar glass">
+          <Link to="/" className="nb-brand" aria-label="SysDesign.prep, today">
+            <BrandMark />
+            <Wordmark />
+          </Link>
+          <nav className="nb-nav" aria-label="Main">
+            <TopNavLink to="/" end>
+              Today
+            </TopNavLink>
+            <TopNavLink to="/contents">Contents</TopNavLink>
+            <TopNavLink to="/companies">
+              Companies <span className="nb-nav-lock">{lockIcon}</span>
+            </TopNavLink>
+            <TopNavLink to="/weak-areas" active={weakActive}>
+              Weak areas
+              {weakTag}
+            </TopNavLink>
+            <TopNavLink to="/achievements">Achievements</TopNavLink>
+          </nav>
+          <div className="nb-tools">
+            {syllabusPage && (
+              <button
+                type="button"
+                className="nb-iconbtn nb-syllabus-btn"
+                onClick={openSyllabus}
+                aria-label="Open the syllabus"
+                aria-expanded={navOpen}
+                title="Syllabus"
+              >
+                <ListTree size={18} aria-hidden />
+                <span className="nb-syllabus-lbl">Syllabus</span>
+              </button>
             )}
-          </TopNavLink>
-          <span className="topnav-sep" aria-hidden />
-          <TopNavLink to="/practice">Practice</TopNavLink>
-          <TopNavLink to="/companies">Company track {lockIcon}</TopNavLink>
-        </nav>
-        <div className="topbar-right">
-          <span className="topbar-report" title="Topics whose timed exam you have passed">
-            <span className="report-pass">{passedCount}</span>/{TOPICS.length} passed
-          </span>
-          <button type="button" className="btn-ghost guide-btn" onClick={openTour} title="Open the guide (press ?)">
-            Guide me
-          </button>
-          <button
-            type="button"
-            className="btn-ghost icon-btn theme-toggle"
-            onClick={() => setSettings({ theme: isDark ? 'light' : 'dark' })}
-            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {isDark ? <Sun size={18} aria-hidden /> : <Moon size={18} aria-hidden />}
-          </button>
-          <NavLink to="/achievements" className="btn-ghost icon-btn topbar-ach" aria-label="Achievements" title="Achievements">
-            <Award size={18} aria-hidden />
-          </NavLink>
-          <NavLink to="/settings" className="btn-ghost icon-btn" aria-label="Settings" title="Settings">
-            <SettingsIcon size={18} aria-hidden />
-          </NavLink>
+            <button type="button" className="nb-search" onClick={openPalette} aria-label="Search topics and sections" title="Search (⌘K)">
+              <Search size={16} aria-hidden />
+              <span className="nb-search-lbl">Search topics, sections</span>
+              <kbd className="nb-search-kbd">{isMac ? '⌘K' : 'Ctrl K'}</kbd>
+            </button>
+            <span className="nb-streak" title={`Study streak: ${streak} day${streak === 1 ? '' : 's'} in a row`}>
+              <Flame size={16} aria-hidden className="nb-streak-icon" />
+              <span>
+                {streak}
+                <span className="nb-streak-lbl">-day streak</span>
+                <span className="sr-only"> day study streak</span>
+              </span>
+            </span>
+            <button type="button" className="nb-iconbtn nb-guide-btn" onClick={openTour} aria-label="Open the guide" title="Guide (press ?)">
+              <Compass size={18} aria-hidden />
+            </button>
+            <button type="button" className="nb-iconbtn" onClick={toggleTheme} aria-label={themeLabel} title={themeLabel}>
+              <ThemeIcon size={18} aria-hidden />
+            </button>
+            <NavLink to="/settings" className="nb-iconbtn nb-settings-btn" aria-label="Settings" title="Settings">
+              <SettingsIcon size={18} aria-hidden />
+            </NavLink>
+          </div>
         </div>
       </header>
 
-      <aside ref={sidebarRef} className={`sidebar ${navOpen ? 'open' : ''}`} aria-label="Syllabus">
-        <div className="drawer-head">
-          <span className="drawer-label">Menu</span>
-          <button type="button" className="btn-ghost icon-btn" onClick={() => setNavOpen(false)} aria-label="Close the menu">
+      <aside
+        ref={sidebarRef}
+        className={`nb-drawer ${navOpen ? 'open' : ''}`}
+        aria-label="Syllabus"
+        aria-hidden={!navOpen}
+        inert={!navOpen}
+        role="dialog"
+        aria-modal={navOpen}
+        tabIndex={-1}
+      >
+        <div className="nb-drawer-head">
+          <div>
+            <div className="eyebrow">Syllabus</div>
+            <span className="syllabus-legend" aria-hidden>
+              <span className="st-mark st-mark-passed" /> passed <span className="st-mark st-mark-in-progress" /> started{' '}
+              <span className="st-mark" /> new
+            </span>
+          </div>
+          <button type="button" className="nb-iconbtn" onClick={closeNav} aria-label="Close the syllabus">
             <X size={18} aria-hidden />
           </button>
         </div>
-        <nav className="drawer-nav" aria-label="Main (menu)">
-          <NavLink to="/" end className="drawer-link">
-            <LayoutDashboard size={16} aria-hidden /> Overview
-          </NavLink>
-          <NavLink to="/contents" className="drawer-link">
-            <ListTree size={16} aria-hidden /> Contents
-          </NavLink>
-          <NavLink to="/weak-areas" className="drawer-link">
-            <Target size={16} aria-hidden /> Weak areas{weakCount > 0 && <span className="count-tag fail">{weakCount}</span>}
-          </NavLink>
-          <div className="drawer-label">Practice</div>
-          <NavLink to="/practice" className="drawer-link">
-            <Dumbbell size={16} aria-hidden /> Practice mistakes
-          </NavLink>
-          <NavLink to="/companies" className="drawer-link">
-            <Building2 size={16} aria-hidden /> Company track ({COMPANY_QUESTIONS.length}) {lockIcon}
-          </NavLink>
-          <NavLink to="/achievements" className="drawer-link">
-            <Award size={16} aria-hidden /> Achievements
-          </NavLink>
-          <NavLink to="/settings" className="drawer-link">
-            <SettingsIcon size={16} aria-hidden /> Settings
-          </NavLink>
-        </nav>
-        <div className="syllabus-head">
-          <span className="syllabus-title">Syllabus</span>
-          <span className="syllabus-legend" aria-hidden>
-            <span className="st-mark st-mark-passed" /> passed <span className="st-mark st-mark-in-progress" /> started <span className="st-mark" /> new
-          </span>
-        </div>
         <input
           id="topic-filter"
-          className="search"
+          className="nb-filter"
           type="search"
           placeholder={`Filter ${TOPICS.length} topics, tags…`}
           aria-label="Filter topics (press / to focus)"
@@ -400,9 +419,9 @@ export default function Layout() {
           </NavLink>
         </div>
       </aside>
-      {navOpen && <div className="scrim" onClick={() => setNavOpen(false)} aria-hidden />}
+      {navOpen && <div className="nb-scrim" onClick={closeNav} aria-hidden />}
 
-      <main className="main" id="main" tabIndex={-1}>
+      <main className="nb-main" id="main" tabIndex={-1}>
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={location.pathname}
@@ -417,6 +436,99 @@ export default function Layout() {
         </AnimatePresence>
         <Footer />
       </main>
+
+      {/* under 1100px: frosted bottom tab bar; "More" opens a sheet with everything else */}
+      <nav className="nb-tabbar glass" aria-label="Main (tabs)">
+        <NavLink to="/" end className="nb-tab">
+          <HomeIcon size={21} aria-hidden />
+          <span>Today</span>
+        </NavLink>
+        <NavLink to="/contents" className="nb-tab">
+          <LayoutGrid size={21} aria-hidden />
+          <span>Contents</span>
+        </NavLink>
+        <NavLink to="/companies" className="nb-tab">
+          <Building2 size={21} aria-hidden />
+          <span>Companies</span>
+        </NavLink>
+        <NavLink to="/weak-areas" className={() => `nb-tab ${weakActive ? 'active' : ''}`} aria-current={weakActive ? 'page' : undefined}>
+          <span className="nb-tab-icon">
+            <Target size={21} aria-hidden />
+            {weakCount > 0 && <span className="nb-tab-dot" aria-label={`${weakCount} questions to revisit`} />}
+          </span>
+          <span>Weak areas</span>
+        </NavLink>
+        <button
+          type="button"
+          className={`nb-tab ${moreActive || moreOpen ? 'active' : ''}`}
+          onClick={() => setMoreOpen((o) => !o)}
+          aria-expanded={moreOpen}
+          aria-haspopup="dialog"
+        >
+          <MoreHorizontal size={21} aria-hidden />
+          <span>More</span>
+        </button>
+      </nav>
+
+      <AnimatePresence>
+        {moreOpen && (
+          <>
+            <motion.div
+              key="more-scrim"
+              className="nb-scrim nb-sheet-scrim"
+              onClick={closeMore}
+              aria-hidden
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            />
+            <motion.div
+              key="more-sheet"
+              ref={moreRef}
+              className="nb-sheet glass"
+              role="dialog"
+              aria-modal="true"
+              aria-label="More"
+              initial={{ y: 24, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 24, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 520, damping: 42 }}
+            >
+              <div className="nb-sheet-head">
+                <span className="eyebrow">More</span>
+                <button type="button" className="nb-iconbtn" onClick={closeMore} aria-label="Close">
+                  <X size={18} aria-hidden />
+                </button>
+              </div>
+              <div className="nb-sheet-grid">
+                <SheetLink to="/practice" icon={<Dumbbell size={20} aria-hidden />} label="Practice" hint="Drill missed questions" />
+                <SheetLink to="/achievements" icon={<Award size={20} aria-hidden />} label="Achievements" hint="Badges and streaks" />
+                <SheetLink to="/settings" icon={<SettingsIcon size={20} aria-hidden />} label="Settings" hint="Theme, exam, data" />
+                <SheetButton
+                  onClick={() => {
+                    closeMore();
+                    openPalette();
+                  }}
+                  icon={<Search size={20} aria-hidden />}
+                  label="Search"
+                  hint="Topics and sections"
+                />
+                <SheetButton onClick={openSyllabus} icon={<ListTree size={20} aria-hidden />} label="Syllabus" hint="All topics by phase" />
+                <SheetButton
+                  onClick={() => {
+                    closeMore();
+                    openTour();
+                  }}
+                  icon={<Compass size={20} aria-hidden />}
+                  label="Guide"
+                  hint="How this course works"
+                />
+                <SheetButton onClick={toggleTheme} icon={<ThemeIcon size={20} aria-hidden />} label={isDark ? 'Light mode' : 'Dark mode'} hint="Switch theme" />
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       <CelebrationWatcher />
       <Toaster />
@@ -443,15 +555,46 @@ export default function Layout() {
 }
 
 /** A main-nav link whose active state is a pill that slides between links (Framer Motion layoutId). */
-function TopNavLink({ to, end, children }: { to: string; end?: boolean; children: ReactNode }) {
+function TopNavLink({ to, end, active, children }: { to: string; end?: boolean; active?: boolean; children: ReactNode }) {
   return (
-    <NavLink to={to} end={end} className="topnav-link">
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) => `nb-nav-link ${(active ?? isActive) ? 'active' : ''}`}
+      aria-current={active ? 'page' : undefined}
+    >
       {({ isActive }) => (
         <>
-          {isActive && <motion.span layoutId="topnav-pill" className="topnav-pill" transition={{ type: 'spring', stiffness: 520, damping: 40 }} />}
+          {(active ?? isActive) && (
+            <motion.span layoutId="nb-nav-pill" className="nb-nav-pill" transition={{ type: 'spring', stiffness: 520, damping: 40 }} />
+          )}
           {children}
         </>
       )}
     </NavLink>
+  );
+}
+
+function SheetLink({ to, icon, label, hint }: { to: string; icon: ReactNode; label: string; hint: string }) {
+  return (
+    <NavLink to={to} className="nb-sheet-item">
+      <span className="nb-sheet-ic">{icon}</span>
+      <span>
+        <b>{label}</b>
+        <small>{hint}</small>
+      </span>
+    </NavLink>
+  );
+}
+
+function SheetButton({ onClick, icon, label, hint }: { onClick: () => void; icon: ReactNode; label: string; hint: string }) {
+  return (
+    <button type="button" className="nb-sheet-item" onClick={onClick}>
+      <span className="nb-sheet-ic">{icon}</span>
+      <span>
+        <b>{label}</b>
+        <small>{hint}</small>
+      </span>
+    </button>
   );
 }

@@ -19,14 +19,16 @@ export function CoachTip({ id, title, children }: { id: string; title: string; c
           aria-label="Tip"
         >
           <div className="coach-tip-inner">
-            <Lightbulb size={18} className="coach-tip-icon" aria-hidden />
-            <div>
+            <span className="coach-tip-icon" aria-hidden>
+              <Lightbulb size={17} />
+            </span>
+            <div className="coach-tip-text">
               <strong>{title}</strong> {children}
             </div>
             <button type="button" className="btn-ghost btn-xs" onClick={() => dismissTip(id)}>
               Got it
             </button>
-            <button type="button" className="btn-ghost btn-icon" aria-label="Dismiss tip" onClick={() => dismissTip(id)}>
+            <button type="button" className="btn-ghost btn-xs coach-tip-x" aria-label="Dismiss tip" onClick={() => dismissTip(id)}>
               <X size={14} aria-hidden />
             </button>
           </div>

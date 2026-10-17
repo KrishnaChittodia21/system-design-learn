@@ -2,7 +2,7 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { usePageMotion } from '../lib/usePageMotion';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { PHASES, TOPICS, TOPIC_BY_ID } from '../content';
-import type { CodeChallenge, EnvelopeQuestion, InterviewQuestion, Topic } from '../types';
+import type { CapstoneProject, CodeChallenge, Difficulty, EnvelopeQuestion, InterviewQuestion, Topic } from '../types';
 import {
   rateIQ,
   setDraft,
@@ -12,21 +12,44 @@ import {
   useProgress,
   type Rating,
 } from '../lib/progress';
-import { Badge, CodeBlock, CodeEditor, Diagram, DifficultyBadge, FollowUps, Markdown, ProgressBar, Reveal } from '../components/ui';
+import { CodeBlock, CodeEditor, Diagram, FollowUps, Markdown, ProgressBar, Reveal } from '../components/ui';
 import { practiceLocked, topicCompletion, topicStatus } from '../lib/stats';
 import { topicSteps } from '../lib/nextStep';
 import { StudyPath, type TabId } from '../components/StudyPath';
 import { CoachTip } from '../components/CoachTip';
 import { NextUp } from '../components/NextUp';
 import { topicCode } from '../lib/labels';
-import { BookOpen, CirclePlay, Crosshair, Library, Lightbulb, Lock } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  Check,
+  ChevronDown,
+  CirclePlay,
+  Clock,
+  GraduationCap,
+  Library,
+  Lightbulb,
+  ListChecks,
+  Lock,
+  Mic,
+  Target,
+  TriangleAlert,
+  Zap,
+} from 'lucide-react';
 import { PREREQS } from '../content/prereqs';
 import { projectsForTopic } from '../content/projects';
 import { CapstoneTab } from '../components/Capstone';
 import { vizForSection } from '../viz/registry';
 import { currentlyWrong, weakSections } from '../lib/weak';
 
-const STATUS_TEXT = { new: 'Not started', 'in-progress': 'In progress', passed: 'Exam passed' } as const;
+const STATUS = {
+  new: { text: 'Not started', tone: '' },
+  'in-progress': { text: 'In progress', tone: 'amber' },
+  passed: { text: 'Exam passed', tone: 'cyan' },
+} as const;
+
+const DIFF_TONE: Record<Difficulty, string> = { medium: 'blue', hard: 'amber', expert: 'rose' };
 
 const TAB_IDS: TabId[] = ['learn', 'code', 'interview', 'envelope', 'cheat', 'capstone', 'exam'];
 
@@ -34,7 +57,7 @@ const TAB_IDS: TabId[] = ['learn', 'code', 'interview', 'envelope', 'cheat', 'ca
 const TIPS: Record<TabId, { title: string; text: string }> = {
   learn: {
     title: 'How to use Learn:',
-    text: 'read a section, then tick "Read" at its top right. Sections with an interactive animation let you play with the idea. The study path above fills in as you go.',
+    text: 'read a section, then press "Mark read" (or tick "Read" at its top right). Sections with an interactive animation let you play with the idea. The rail and the tabs above fill in as you go.',
   },
   code: {
     title: 'How to use the lab:',
@@ -59,6 +82,8 @@ const TIPS: Record<TabId, { title: string; text: string }> = {
   },
 };
 
+const scrollToSection = (i: number) => document.getElementById(`s-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
 export default function TopicPage() {
   const { id = '' } = useParams();
   const [params, setParams] = useSearchParams();
@@ -67,8 +92,8 @@ export default function TopicPage() {
   const tabParam = params.get('tab');
   // GSAP: the topic header staggers in once; each tab's cards reveal as they scroll into view
   const root = useRef<HTMLDivElement>(null);
-  usePageMotion(root, { intro: '.topic-head > *, :scope > .study-path', deps: [id] });
-  usePageMotion(root, { reveal: '.learn > article, .learn > .cta, :scope > article, :scope > .card', deps: [id, tabParam] });
+  usePageMotion(root, { intro: ':scope > .tp-crumbs, :scope > .tp-hero, :scope > .tp-tabs', deps: [id] });
+  usePageMotion(root, { reveal: '.tp-sec, .tp-stack > article, .tp-stack > section, :scope > .tp-panel', deps: [id, tabParam] });
   if (!topic) {
     return (
       <div className="page">
@@ -89,6 +114,12 @@ export default function TopicPage() {
     exam: practiceLocked(p, topic, 'exam'),
   };
   const pct = topicCompletion(p, topic);
+  const status = STATUS[topicStatus(p, topic)];
+  const read = new Set(p.sections[topic.id] ?? []);
+  const readCount = topic.sections.filter((_, i) => read.has(i)).length;
+  const readPct = Math.round((readCount / Math.max(1, topic.sections.length)) * 100);
+  const code = topicCode(TOPICS, PHASES, topic.id);
+  const phaseLabel = `Phase ${String(phase?.number ?? 0).padStart(2, '0')} · ${phase?.title ?? ''}`;
   const selectTab = (t: TabId) => setParams({ tab: t }, { replace: true });
   // "Next up" target after the current tab: the following study-path step, else the next topic
   const stepIds = steps.map((s) => s.id as TabId);
@@ -123,82 +154,144 @@ export default function TopicPage() {
   );
 
   return (
-    <div className="page" ref={root} data-motion="own">
-      <div className="topic-head">
-        <div className="eyebrow">
-          Phase {phase?.number} · {phase?.title}
+    <div className="page tp" ref={root} data-motion="own">
+      <nav className="tp-crumbs" aria-label="Breadcrumb">
+        <Link to="/contents">Contents</Link>
+        <span aria-hidden>/</span>
+        <Link to={`/contents#phase-${topic.phase}`}>{phaseLabel}</Link>
+        <span aria-hidden>/</span>
+        <span className="tp-crumb-now" aria-current="page">
+          Topic {code}
+        </span>
+      </nav>
+
+      <header className="tp-hero glass holo" aria-labelledby="tp-title">
+        <div className="tp-hero-glow" aria-hidden />
+        <div className="tp-hero-row">
+          <div className="tp-hero-text">
+            <div className="tp-chips">
+              <span className="nb-chip amber">{phaseLabel}</span>
+              <span className="nb-chip">
+                {topic.estimatedMinutes} min · {topic.sections.length} sections
+                {topic.test.length > 0 && <> · {topic.test.length}-question exam</>}
+              </span>
+              <span className={`nb-chip ${status.tone}`}>{status.text}</span>
+            </div>
+            <h1 id="tp-title">
+              <span className="gtext">{topic.title}</span>
+            </h1>
+            <p className="lede">{topic.subtitle}</p>
+            {topic.tags.length > 0 && (
+              <p className="tp-tags" aria-label="Tags">
+                {topic.tags.slice(0, 8).map((t) => (
+                  <span key={t}>{t}</span>
+                ))}
+              </p>
+            )}
+            {topic.sources.length > 0 && (
+              <p className="tp-sources">
+                <BookOpen size={13} aria-hidden /> {topic.sources.join(' · ')}
+              </p>
+            )}
+          </div>
+          <div className="tp-ring-wrap">
+            <div
+              className="tp-ring"
+              role="img"
+              aria-label={`Topic progress: ${readCount} of ${topic.sections.length} sections read, ${pct}% of the topic complete`}
+              style={{ ['--p' as string]: `${readPct}%` }}
+            >
+              <div className="nb-ring tp-ring-bg" />
+              <div className="nb-ring tp-ring-fill" />
+              <div className="orbit slow tp-ring-orbit" aria-hidden>
+                <span className="orbit-dot" />
+              </div>
+              <div className="tp-ring-text">
+                <div className="num">
+                  {readCount}/{topic.sections.length}
+                </div>
+                <div className="eyebrow">sections read</div>
+              </div>
+            </div>
+            <div className="tp-ring-sub mono">
+              <span className="tp-ring-pct">{pct}%</span> of topic complete
+            </div>
+          </div>
         </div>
-        <h1>{topic.title}</h1>
-        <p className="lead">{topic.subtitle}</p>
-        <dl className="topic-meta" aria-label="About this topic">
-          <div>
-            <dt>Ref</dt>
-            <dd className="mono">{topicCode(TOPICS, PHASES, topic.id)}</dd>
-          </div>
-          <div>
-            <dt>Reading time</dt>
-            <dd>{topic.estimatedMinutes} min</dd>
-          </div>
-          <div>
-            <dt>Sections</dt>
-            <dd>{topic.sections.length}</dd>
-          </div>
-          <div>
-            <dt>Status</dt>
-            <dd>{STATUS_TEXT[topicStatus(p, topic)]}</dd>
-          </div>
-          <div>
-            <dt>Complete</dt>
-            <dd className="topic-progress">
-              <ProgressBar value={pct} tone={pct === 100 ? 'good' : undefined} />
-              <span className="mono small">{pct}%</span>
-            </dd>
-          </div>
-        </dl>
-        {topic.tags.length > 0 && (
-          <p className="topic-tags" aria-label="Tags">
-            {topic.tags.slice(0, 8).map((t) => (
-              <span key={t}>{t}</span>
-            ))}
-          </p>
-        )}
-        {topic.sources.length > 0 && <p className="topic-sources">Sources: {topic.sources.join(' · ')}</p>}
         {topic.phase === 'miscellaneous' && (
-          <div className="card info small misc-note">
+          <div className="tp-misc info">
             This is a <strong>question bank</strong> with short refreshers. Every concept below has a <strong>Learn this first</strong>{' '}
             link to its full lesson; study that if the refresher isn&apos;t enough.
           </div>
         )}
-      </div>
+      </header>
 
-      <StudyPath steps={steps} active={tab} locks={locks} onSelect={selectTab} />
+      <StudyPath
+        steps={steps}
+        active={tab}
+        locks={locks}
+        onSelect={selectTab}
+        counts={{ exam: topic.test.length, capstone: capstones.length }}
+      />
 
       <CoachTip id={`tab-${tab}`} title={TIPS[tab].title}>
         {TIPS[tab].text}
       </CoachTip>
 
-      {tab === 'learn' && <LearnTab topic={topic} />}
-      {tab === 'code' && topic.codeChallenges.map((c, i) => <ChallengeCard key={c.id} c={c} n={i + 1} />)}
+      {tab === 'learn' && <LearnTab topic={topic} capstones={capstones} />}
+      {tab === 'code' && (
+        <div className="tp-stack">
+          {topic.codeChallenges.map((c, i) => (
+            <ChallengeCard key={c.id} c={c} n={i + 1} of={topic.codeChallenges.length} />
+          ))}
+        </div>
+      )}
       {tab === 'interview' && (locks.interview ? <StudyLock topic={topic} what="interview questions" /> : <InterviewTab topic={topic} />)}
-      {tab === 'envelope' && topic.envelopeQuestions.map((q, i) => <EnvelopeCard key={q.id} q={q} n={i + 1} />)}
+      {tab === 'envelope' && <EnvelopeTab topic={topic} />}
       {tab === 'cheat' && <CheatSheet topic={topic} />}
       {tab === 'capstone' && <CapstoneTab projects={capstones} />}
       {tab === 'exam' && (locks.exam ? <StudyLock topic={topic} what="exam" /> : <ExamIntro topic={topic} />)}
       {!(tab === 'interview' && locks.interview) && !(tab === 'exam' && locks.exam) && nextUp}
 
-      <div className="pager">
-        {prev ? <Link to={`/topic/${prev.id}`}>← {prev.title}</Link> : <span />}
-        {next ? <Link to={`/topic/${next.id}`}>{next.title} →</Link> : <Link to="/companies">Company track →</Link>}
-      </div>
+      <nav className="tp-pager" aria-label="Previous and next topic">
+        {prev ? (
+          <Link className="tp-pg glass-flat" to={`/topic/${prev.id}`}>
+            <span className="eyebrow">
+              <ArrowLeft size={13} aria-hidden /> Previous topic
+            </span>
+            <span className="tp-pg-t">{prev.title}</span>
+          </Link>
+        ) : (
+          <span />
+        )}
+        <Link className="tp-pg tp-pg-next glass-flat" to={next ? `/topic/${next.id}` : '/companies'}>
+          <span className="eyebrow">
+            {next ? 'Next topic' : 'Up next'} <ArrowRight size={13} aria-hidden />
+          </span>
+          <span className="tp-pg-t">{next ? next.title : 'Company track'}</span>
+        </Link>
+      </nav>
     </div>
   );
 }
 
-function LearnTab({ topic }: { topic: Topic }) {
+/** Lessons that open with "**Intuition:** …" get that paragraph lifted into a callout. */
+function splitIntuition(body: string): { intuition?: string; rest: string } {
+  const m = /^\s*\*\*Intuition:?\*\*:?\s*([\s\S]*?)(?:\n\s*\n([\s\S]*))?$/.exec(body);
+  if (!m) return { rest: body };
+  return { intuition: m[1].trim(), rest: (m[2] ?? '').trim() };
+}
+
+function LearnTab({ topic, capstones }: { topic: Topic; capstones: CapstoneProject[] }) {
   const p = useProgress();
   const read = new Set(p.sections[topic.id] ?? []);
+  const readCount = topic.sections.filter((_, i) => read.has(i)).length;
   const [params] = useSearchParams();
   const target = params.get('s');
+  const [now, setNow] = useState(() => (target !== null ? Number(target) || 0 : 0));
+  const [railOpen, setRailOpen] = useState(false);
+  const n = topic.sections.length;
+  const minutes = Math.max(1, Math.round(topic.estimatedMinutes / Math.max(1, n)));
 
   // deep link from weak-area reports: /topic/:id?tab=learn&s=<section index>
   useEffect(() => {
@@ -212,76 +305,172 @@ function LearnTab({ topic }: { topic: Topic }) {
     });
     return () => cancelAnimationFrame(raf);
   }, [target]);
+
+  // scroll-spy: the section crossing the upper third of the viewport is "now" in the rail
+  useEffect(() => {
+    const els = topic.sections.map((_, i) => document.getElementById(`s-${i}`)).filter((x): x is HTMLElement => !!x);
+    if (!els.length || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const hit = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+        if (hit) setNow(Number(hit.target.id.slice(2)));
+      },
+      { rootMargin: '-30% 0px -60% 0px' },
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, [topic]);
+
   return (
-    <div className="learn">
-      <nav className="toc card">
-        <div className="toc-title">
-          In this topic <span className="muted small">({read.size}/{topic.sections.length} read)</span>
+    <div className="tp-learn">
+      <aside className={`tp-rail glass-flat ${railOpen ? 'open' : ''}`} aria-label="Sections">
+        <button type="button" className="tp-rail-toggle" aria-expanded={railOpen} onClick={() => setRailOpen((o) => !o)}>
+          <span className="eyebrow">
+            Sections · {readCount} of {n} read
+          </span>
+          <ChevronDown size={16} aria-hidden className="tp-rail-chev" />
+        </button>
+        <div className="eyebrow tp-rail-title">
+          Sections · {readCount} of {n} read
         </div>
-        <ol>
+        <div className="track tp-rail-track" aria-hidden>
+          <i className="f-pass" style={{ width: `${(readCount / Math.max(1, n)) * 100}%` }} />
+        </div>
+        <ol className="tp-rail-list">
           {topic.sections.map((s, i) => (
-            <li key={s.heading} className={read.has(i) ? 'done' : ''}>
+            <li key={s.heading} className={`${read.has(i) ? 'done' : ''} ${now === i ? 'now' : ''}`}>
               <button
                 type="button"
-                className="link-btn"
-                onClick={() => document.getElementById(`s-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                aria-current={now === i ? 'location' : undefined}
+                onClick={() => {
+                  scrollToSection(i);
+                  setRailOpen(false);
+                }}
               >
-                {s.heading}
+                <span className="b" aria-hidden />
+                <span className="tp-rail-h">{s.heading}</span>
+                {read.has(i) && <span className="sr-only"> (read)</span>}
               </button>
             </li>
           ))}
         </ol>
-      </nav>
-      {topic.sections.map((s, i) => (
-        <article key={s.heading} id={`s-${i}`} className="card section">
-          <div className="section-head">
-            <h2>
-              <span className="section-num">{i + 1}</span> {s.heading}
-            </h2>
-            <label className="check">
-              <input type="checkbox" checked={read.has(i)} onChange={() => toggleSectionRead(topic.id, i)} /> Read
-            </label>
-          </div>
-          {s.source && (
-            <div className="source">
-              <BookOpen size={13} aria-hidden /> {s.source}
-            </div>
-          )}
-          <PrereqLinks topicId={topic.id} heading={s.heading} />
-          <Markdown>{s.body}</Markdown>
-          {s.diagram && <Diagram text={s.diagram} />}
-          <SectionViz topic={topic} sectionIndex={i} />
-          {s.code?.map((c, j) => <CodeBlock key={j} snippet={c} />)}
-          {s.keyPoints && s.keyPoints.length > 0 && (
-            <div className="keypoints">
-              <div className="keypoints-title">Key points</div>
-              <ul>
-                {s.keyPoints.map((k) => (
-                  <li key={k}>{k}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </article>
-      ))}
-      {read.size < topic.sections.length && (
-        <div className="card cta">
-          <div>
-            <strong>
-              {read.size}/{topic.sections.length} sections ticked as read.
-            </strong>{' '}
-            Tick each one when you finish it, or mark them all if you already know this topic.
-          </div>
-          <button className="btn" type="button" onClick={() => markAllSectionsRead(topic.id, topic.sections.length)}>
-            Mark all as read
+        {readCount < n && (
+          <button type="button" className="btn-ghost btn-xs tp-rail-all" onClick={() => markAllSectionsRead(topic.id, n)}>
+            <ListChecks size={14} aria-hidden /> Mark all as read
           </button>
-        </div>
-      )}
+        )}
+        {capstones.length > 0 && (
+          <div className="tp-rail-caps">
+            <div className="eyebrow">Capstones for this topic</div>
+            {capstones.map((c) => (
+              <Link key={c.id} to={`/topic/${topic.id}?tab=capstone`} className="tp-rail-cap">
+                <span className="tp-rail-cap-t">{c.title}</span>
+                <span className="mono">
+                  {c.difficulty} · {c.estimatedHours} h
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </aside>
+
+      <div className="tp-sections">
+        {topic.sections.map((s, i) => {
+          const isRead = read.has(i);
+          const { intuition, rest } = splitIntuition(s.body);
+          return (
+            <article key={s.heading} id={`s-${i}`} className={`tp-sec glass-flat ${isRead ? 'is-read' : ''}`} aria-labelledby={`h-${i}`}>
+              <div className="tp-sec-top">
+                <div className={`eyebrow ${now === i ? 'tp-eb-amber' : ''}`}>
+                  Section {i + 1} of {n} · {minutes} min
+                </div>
+                <label className="tp-read">
+                  <input type="checkbox" checked={isRead} onChange={() => toggleSectionRead(topic.id, i)} />
+                  <span className="tp-read-box" aria-hidden>
+                    <Check size={12} strokeWidth={3.2} />
+                  </span>
+                  Read
+                </label>
+              </div>
+              <h2 id={`h-${i}`}>{s.heading}</h2>
+              {s.source && (
+                <div className="tp-source">
+                  <BookOpen size={13} aria-hidden /> {s.source}
+                </div>
+              )}
+              <PrereqLinks topicId={topic.id} heading={s.heading} />
+              {intuition && (
+                <div className="tp-intuition">
+                  <Lightbulb size={20} aria-hidden className="tp-intuition-ic" />
+                  <div>
+                    <strong>Intuition:</strong> <Markdown>{intuition}</Markdown>
+                  </div>
+                </div>
+              )}
+              {rest && <Markdown>{rest}</Markdown>}
+              {s.diagram && (
+                <figure className="tp-fig">
+                  <Diagram text={s.diagram} />
+                </figure>
+              )}
+              <SectionViz topic={topic} sectionIndex={i} />
+              {s.code?.map((c, j) => <CodeBlock key={j} snippet={c} />)}
+              {s.keyPoints && s.keyPoints.length > 0 && (
+                <div className="tp-kp" aria-label="Key points" role="list">
+                  {s.keyPoints.map((k, j) => (
+                    <div key={k} role="listitem">
+                      <b>Key point {j + 1}</b>
+                      {k}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="tp-sec-foot">
+                <button
+                  type="button"
+                  className={`btn btn-sm ${isRead ? '' : 'btn-primary'}`}
+                  aria-pressed={isRead}
+                  onClick={() => toggleSectionRead(topic.id, i)}
+                >
+                  {isRead ? (
+                    <>
+                      <Check size={15} aria-hidden /> §{i + 1} read
+                    </>
+                  ) : (
+                    <>Mark §{i + 1} read</>
+                  )}
+                </button>
+                {i < n - 1 && (
+                  <button type="button" className="btn-ghost btn-sm tp-sec-next" onClick={() => scrollToSection(i + 1)}>
+                    <span className="tp-sec-next-t">
+                      Next: §{i + 2} {topic.sections[i + 1].heading}
+                    </span>
+                    <ArrowRight size={15} aria-hidden />
+                  </button>
+                )}
+              </div>
+            </article>
+          );
+        })}
+        {readCount < n && (
+          <div className="tp-panel tp-cta glass-flat">
+            <div>
+              <strong>
+                {readCount}/{n} sections ticked as read.
+              </strong>{' '}
+              Tick each one when you finish it, or mark them all if you already know this topic.
+            </div>
+            <button className="btn" type="button" onClick={() => markAllSectionsRead(topic.id, n)}>
+              Mark all as read
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function ChallengeCard({ c, n }: { c: CodeChallenge; n: number }) {
+function ChallengeCard({ c, n, of }: { c: CodeChallenge; n: number; of: number }) {
   const p = useProgress();
   const draftKey = `cc:${c.id}`;
   const code = p.drafts[draftKey] ?? c.starter.code;
@@ -289,49 +478,62 @@ function ChallengeCard({ c, n }: { c: CodeChallenge; n: number }) {
   const [showSolution, setShowSolution] = useState(false);
   const done = !!p.cc[c.id];
   return (
-    <article className="card">
-      <div className="section-head">
-        <h2>
-          <span className="section-num">{n}</span> {c.title}
-        </h2>
-        {done && <Badge tone="good">Completed</Badge>}
+    <article className={`tp-card ${done ? 'is-done' : ''}`} aria-labelledby={`cc-${c.id}`}>
+      <div className="tp-card-top">
+        <span className="eyebrow tp-eb-cyan">
+          Challenge {n} of {of}
+        </span>
+        {done && (
+          <span className="nb-chip cyan">
+            <Check size={12} strokeWidth={3} aria-hidden /> Completed
+          </span>
+        )}
       </div>
+      <h2 id={`cc-${c.id}`} className="tp-card-title">
+        {c.title}
+      </h2>
       <Markdown>{c.context}</Markdown>
-      <div className="task">
-        <strong>Your task:</strong> <Markdown>{c.task}</Markdown>
+      <div className="tp-task">
+        <Target size={18} aria-hidden className="tp-task-ic" />
+        <div>
+          <strong>Your task:</strong> <Markdown>{c.task}</Markdown>
+        </div>
       </div>
-      <div className="row between">
+      <div className="tp-editor-head">
         <span className="small muted">
           {c.starter.language === 'text' ? 'Rewrite the answer below.' : 'Edit the code below.'} Your changes are saved automatically.{' '}
-          {c.starter.title && `(${c.starter.title})`}
+          {c.starter.title && <span className="mono">({c.starter.title})</span>}
         </span>
         <button className="btn-ghost btn-xs" type="button" onClick={() => setDraft(draftKey, c.starter.code)}>
           Reset to starter
         </button>
       </div>
       <CodeEditor value={code} onChange={(v) => setDraft(draftKey, v)} language={c.starter.language} />
-      <div className="hints">
-        {c.hints.slice(0, hints).map((h, i) => (
-          <div key={i} className="hint">
-            <Lightbulb size={15} aria-hidden className="inline-icon" /> <strong>Hint {i + 1}:</strong> {h}
-          </div>
-        ))}
-        <div className="row gap-s wrap">
-          {hints < c.hints.length && (
-            <button className="btn" type="button" onClick={() => setHints((h) => h + 1)}>
-              Show hint {hints + 1}/{c.hints.length}
-            </button>
-          )}
-          <button className="btn" type="button" onClick={() => setShowSolution((s) => !s)}>
-            {showSolution ? 'Hide solution' : 'Compare with reference solution'}
-          </button>
-          <button className={`btn ${done ? '' : 'btn-primary'}`} type="button" onClick={() => setFlag('cc', c.id, !done)}>
-            {done ? 'Mark not done' : 'Mark as done'}
-          </button>
+      {hints > 0 && (
+        <div className="tp-hints">
+          {c.hints.slice(0, hints).map((h, i) => (
+            <div key={i} className="tp-hint">
+              <Lightbulb size={15} aria-hidden className="inline-icon" /> <strong>Hint {i + 1}:</strong> {h}
+            </div>
+          ))}
         </div>
+      )}
+      <div className="tp-actions">
+        {hints < c.hints.length && (
+          <button className="btn btn-sm" type="button" onClick={() => setHints((h) => h + 1)}>
+            <Lightbulb size={15} aria-hidden /> Show hint {hints + 1}/{c.hints.length}
+          </button>
+        )}
+        <button className="btn btn-sm" type="button" aria-expanded={showSolution} onClick={() => setShowSolution((s) => !s)}>
+          {showSolution ? 'Hide solution' : 'Compare with reference solution'}
+        </button>
+        <button className={`btn btn-sm ${done ? '' : 'btn-primary'}`} type="button" onClick={() => setFlag('cc', c.id, !done)}>
+          {done ? 'Mark not done' : 'Mark as done'}
+        </button>
       </div>
       {showSolution && (
-        <div className="solution">
+        <div className="tp-solution">
+          <div className="tp-label">Reference solution</div>
           <CodeBlock snippet={c.solution} />
           <Markdown>{c.explanation}</Markdown>
           <FollowUps items={c.followUps} />
@@ -344,37 +546,58 @@ function ChallengeCard({ c, n }: { c: CodeChallenge; n: number }) {
 function InterviewTab({ topic }: { topic: Topic }) {
   const p = useProgress();
   const rated = topic.interviewQuestions.filter((q) => p.iq[q.id]).length;
+  const firstOpen = topic.interviewQuestions.findIndex((q) => !p.iq[q.id]);
   return (
-    <div>
-      <div className="card info">
-        <strong>How to practise:</strong> answer out loud or type your answer <em>before</em> revealing anything, as you would in a
-        real interview. Then compare with what the interviewer is looking for and the model answer, work through the follow-ups
-        and rate yourself honestly. <span className="muted">({rated}/{topic.interviewQuestions.length} rated)</span>
+    <div className="tp-stack">
+      <div className="tp-intro info">
+        <Mic size={18} aria-hidden className="tp-intro-ic" />
+        <div>
+          <strong>How to practise:</strong> answer out loud or type your answer <em>before</em> revealing anything, as you would in a
+          real interview. Then compare with what the interviewer is looking for and the model answer, work through the follow-ups
+          and rate yourself honestly.{' '}
+          <span className="mono small tp-intro-count">
+            {rated}/{topic.interviewQuestions.length} rated
+          </span>
+        </div>
       </div>
       {topic.interviewQuestions.map((q, i) => (
-        <InterviewCard key={q.id} q={q} n={i + 1} />
+        <InterviewCard key={q.id} q={q} n={i + 1} of={topic.interviewQuestions.length} focus={i === firstOpen} />
       ))}
     </div>
   );
 }
 
-function InterviewCard({ q, n }: { q: InterviewQuestion; n: number }) {
+const RATINGS: { r: Rating; label: string }[] = [
+  { r: 'nailed', label: 'Nailed it' },
+  { r: 'partial', label: 'Partially' },
+  { r: 'missed', label: 'Missed it' },
+];
+
+function InterviewCard({ q, n, of, focus }: { q: InterviewQuestion; n: number; of: number; focus: boolean }) {
   const p = useProgress();
   const draftKey = `iq:${q.id}`;
   const [answer, setAnswer] = useState(false);
   const [fu, setFu] = useState(0);
   const rating = p.iq[q.id];
   const rate = (r: Rating) => rateIQ(q.id, rating === r ? null : r);
-  return (
-    <article className="card iq">
-      <div className="section-head">
-        <h3>
-          <span className="section-num">Q{n}</span> {q.question}
-        </h3>
-        <DifficultyBadge d={q.difficulty} />
+  const body = (
+    <>
+      <div className="tp-card-top">
+        <span className="eyebrow tp-eb-mag">
+          Interview question {n} of {of}
+        </span>
+        <span className="tp-chips">
+          <span className={`nb-chip ${DIFF_TONE[q.difficulty]}`}>{q.difficulty}</span>
+          {rating && <span className={`nb-chip ${rating === 'nailed' ? 'cyan' : rating === 'partial' ? 'amber' : 'rose'}`}>{RATINGS.find((x) => x.r === rating)?.label}</span>}
+        </span>
       </div>
-      {q.context && <div className="context">{q.context}</div>}
+      <h3 className="tp-iq-q">{q.question}</h3>
+      {q.context && <p className="tp-iq-ctx mono">Context: {q.context}</p>}
+      <label className="tp-label" htmlFor={`d-${q.id}`}>
+        Your draft
+      </label>
       <textarea
+        id={`d-${q.id}`}
         className="answer-box"
         placeholder="Draft your answer: clarify requirements, estimate, design, trade-offs…"
         value={p.drafts[draftKey] ?? ''}
@@ -382,25 +605,32 @@ function InterviewCard({ q, n }: { q: InterviewQuestion; n: number }) {
         rows={5}
       />
       <Reveal label="What the interviewer is looking for">
-        <ul>
+        <ul className="tp-look">
           {q.whatInterviewerLooksFor.map((s) => (
-            <li key={s}>{s}</li>
+            <li key={s}>
+              <Check size={16} strokeWidth={2.6} aria-hidden />
+              <span>{s}</span>
+            </li>
           ))}
         </ul>
       </Reveal>
       {!answer ? (
-        <button className="btn" type="button" onClick={() => setAnswer(true)}>
-          Reveal model answer
-        </button>
+        <div className="tp-actions">
+          <button className="btn btn-sm" type="button" onClick={() => setAnswer(true)}>
+            Reveal model answer
+          </button>
+        </div>
       ) : (
-        <div className="model-answer">
-          <div className="label">Model answer</div>
+        <div className="tp-model">
+          <div className="tp-label">Model answer</div>
           <Markdown>{q.modelAnswer}</Markdown>
         </div>
       )}
       {answer && (
         <div className="followups">
-          <div className="label">Interviewer follow-ups</div>
+          <div className="label">
+            <Mic size={13} aria-hidden /> Interviewer follow-ups
+          </div>
           {q.followUps.slice(0, fu).map((f, i) => (
             <div key={i} className="followup">
               <div className="fq">↳ {f.q}</div>
@@ -410,114 +640,263 @@ function InterviewCard({ q, n }: { q: InterviewQuestion; n: number }) {
             </div>
           ))}
           {fu < q.followUps.length && (
-            <button className="btn-ghost" type="button" onClick={() => setFu((x) => x + 1)}>
+            <button className="btn-ghost btn-sm" type="button" onClick={() => setFu((x) => x + 1)}>
               + Next follow-up ({fu}/{q.followUps.length})
             </button>
           )}
           <Reveal label="Pitfalls: what weak candidates say">
-            <ul className="pitfalls">
+            <ul className="tp-pitfalls">
               {q.pitfalls.map((s) => (
-                <li key={s}>{s}</li>
+                <li key={s}>
+                  <TriangleAlert size={15} aria-hidden />
+                  <span>{s}</span>
+                </li>
               ))}
             </ul>
           </Reveal>
         </div>
       )}
-      <div className="rating">
-        <span className="small muted">How did you do?</span>
-        {(['nailed', 'partial', 'missed'] as Rating[]).map((r) => (
-          <button key={r} type="button" className={`chip chip-${r} ${rating === r ? 'on' : ''}`} onClick={() => rate(r)}>
-            {r === 'nailed' ? 'Nailed it' : r === 'partial' ? 'Partially' : 'Missed it'}
+      <div className="tp-rate" role="group" aria-label="How did you do?">
+        <span className="tp-label">How did you do?</span>
+        {RATINGS.map(({ r, label }) => (
+          <button key={r} type="button" className={`tp-rate-btn ${r}`} aria-pressed={rating === r} onClick={() => rate(r)}>
+            {label}
           </button>
         ))}
       </div>
+    </>
+  );
+  // the next question to practise wears the animated gradient border
+  return focus ? (
+    <article className="gborder tp-iq-focus" aria-label={`Interview question ${n}`}>
+      <div className="in tp-iq">{body}</div>
+    </article>
+  ) : (
+    <article className="tp-card tp-iq" aria-label={`Interview question ${n}`}>
+      {body}
     </article>
   );
 }
 
-function EnvelopeCard({ q, n }: { q: EnvelopeQuestion; n: number }) {
+function EnvelopeTab({ topic }: { topic: Topic }) {
+  const p = useProgress();
+  const qs = topic.envelopeQuestions;
+  const [cur, setCur] = useState(() => Math.max(0, qs.findIndex((q) => !p.boe[q.id])));
+  if (!qs.length) return null;
+  return (
+    <div className="tp-stack boe-tab">
+      {qs.length > 1 && (
+        <nav className="boe-drills" aria-label="Drills in this topic">
+          {qs.map((q, i) => (
+            <button
+              key={q.id}
+              type="button"
+              className={`boe-drill ${p.boe[q.id] ? 'done' : ''}`}
+              aria-current={i === cur ? 'step' : undefined}
+              onClick={() => setCur(i)}
+            >
+              <b>
+                Drill {i + 1}
+                {i === cur && ' · now'}
+                {p.boe[q.id] && ' · done'}
+              </b>
+              <span className="boe-drill-q">{q.question}</span>
+            </button>
+          ))}
+        </nav>
+      )}
+      {qs.map((q, i) => (
+        <div key={q.id} hidden={i !== cur}>
+          <EnvelopeCard q={q} n={i + 1} of={qs.length} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The figure a calculation lands on ("≈ 31.5K entries" → 31.5K / entries), for the big number beside each step. */
+function stepResult(calc: string): { big: string; cap?: string } | null {
+  const parts = calc.split(/\s(?:=|≈|→|⇒)\s/);
+  if (parts.length < 2) return null;
+  const last = parts[parts.length - 1].trim();
+  const m = /^([~<>≤≥]?\s?\$?\d[\d.,]*(?:\s?[–-]\s?\d[\d.,]*)?(?:\s?(?:%|×(?!\s?\d)|[KMGTP]B(?:\/s)?|[KMGT]bps|bps|ms|µs|min\b|h\b|s\b|[KMBT]\b))?)(.*)$/.exec(last);
+  if (!m) return null;
+  // "6 × 16 GB" or "2 × 10^12 rows" is an expression, not a result: show no big number
+  if (/^\s*[×x*÷+−/]\s?\d/.test(m[2])) return null;
+  const big = m[1].trim();
+  if (big.length > 11) return null;
+  const cap = m[2].replace(/\s*\(.*$/, '').replace(/^[\s,;:]+|[\s,;:]+$/g, '').trim();
+  return { big, cap: cap && cap.length <= 26 && !/[=≈→]/.test(cap) ? cap : undefined };
+}
+
+const WARN = /overload|exceed|without bound|unbounded|outage|unrealistic|over capacity|budget|> ?capacity|exhaust/i;
+
+function EnvelopeCard({ q, n, of }: { q: EnvelopeQuestion; n: number; of: number }) {
   const p = useProgress();
   const draftKey = `boe:${q.id}`;
   // stage 0: question only · 1: assumptions · 2..k+1: steps · k+2: answer
   const [stage, setStage] = useState(0);
   const total = q.steps.length + 2;
   const done = !!p.boe[q.id];
+  const shownSteps = Math.max(0, Math.min(q.steps.length, stage - 1));
   return (
-    <article className="card boe">
-      <div className="section-head">
-        <h3>
-          <span className="section-num">E{n}</span> {q.question}
-        </h3>
-        {done && <Badge tone="good">Done</Badge>}
-      </div>
-      <textarea
-        className="answer-box mono"
-        placeholder="Your estimate: write down assumptions and arithmetic…"
-        value={p.drafts[draftKey] ?? ''}
-        onChange={(e) => setDraft(draftKey, e.target.value)}
-        rows={4}
-      />
-      {stage >= 1 && (
-        <div className="assumptions">
-          <div className="label">Assumptions</div>
-          <ul>
-            {q.assumptions.map((a) => (
-              <li key={a}>{a}</li>
-            ))}
-          </ul>
+    <>
+      <div className="boe-grid">
+        <div className="boe-main">
+          <section className="tp-card boe-q holo" aria-labelledby={`bq-${q.id}`}>
+            <div className="tp-chips">
+              <span className="nb-chip cyan">Back-of-the-envelope</span>
+              <span className="nb-chip">
+                Drill {n} of {of}
+              </span>
+              {done && (
+                <span className="nb-chip green">
+                  <Check size={12} strokeWidth={3} aria-hidden /> Done
+                </span>
+              )}
+            </div>
+            <h2 id={`bq-${q.id}`} className="boe-question">
+              {q.question}
+            </h2>
+            <div className="eyebrow">Assumptions</div>
+            {stage >= 1 ? (
+              <ul className="boe-assume">
+                {q.assumptions.map((a, i) => (
+                  <li key={a}>
+                    <span>A{i + 1}</span>
+                    {a}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="boe-hidden">
+                <Lock size={14} aria-hidden /> {q.assumptions.length} assumptions hidden. Write down your own first.
+              </p>
+            )}
+          </section>
+
+          <section className="tp-card boe-calc" aria-labelledby={`bc-${q.id}`}>
+            <div className="boe-calc-head">
+              <h3 id={`bc-${q.id}`}>The calculation</h3>
+              <span className="mono small muted">
+                {shownSteps} of {q.steps.length} steps revealed
+              </span>
+            </div>
+            <ol className="boe-steps">
+              {q.steps.map((s, i) => {
+                if (i >= shownSteps) {
+                  return (
+                    <li key={i} className="boe-st locked" aria-label={`Step ${i + 1} hidden`}>
+                      <span className="k">{i + 1}</span>
+                      <div className="boe-ghost" aria-hidden>
+                        <i />
+                        <i />
+                      </div>
+                    </li>
+                  );
+                }
+                const r = stepResult(s.calc);
+                return (
+                  <li key={i} className={`boe-st ${WARN.test(s.calc) ? 'warn' : ''} ${i === shownSteps - 1 ? 'fresh' : ''}`}>
+                    <span className="k">{i + 1}</span>
+                    <div className="boe-st-body">
+                      <div className="l">{s.label}</div>
+                      <code className="c">{s.calc}</code>
+                    </div>
+                    {r && (
+                      <div className="r">
+                        <span className="num">{r.big}</span>
+                        {r.cap && <small>{r.cap}</small>}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+            {stage >= total && (
+              <div className="boe-answer">
+                <div className="eyebrow tp-eb-cyan">Answer</div>
+                <Markdown>{q.answer}</Markdown>
+              </div>
+            )}
+          </section>
         </div>
-      )}
-      {stage >= 2 && (
-        <ol className="steps">
-          {q.steps.slice(0, stage - 1).map((s, i) => (
-            <li key={i}>
-              <span className="step-label">{s.label}</span>
-              <code className="step-calc">{s.calc}</code>
-            </li>
-          ))}
-        </ol>
-      )}
+
+        <aside className="boe-side">
+          <section className="tp-card boe-you" aria-labelledby={`by-${q.id}`}>
+            <h3 id={`by-${q.id}`}>Your estimate</h3>
+            <label className="tp-label" htmlFor={`e-${q.id}`}>
+              Assumptions and arithmetic
+            </label>
+            <textarea
+              id={`e-${q.id}`}
+              className="answer-box mono"
+              placeholder="Your estimate: write down assumptions and arithmetic…"
+              value={p.drafts[draftKey] ?? ''}
+              onChange={(e) => setDraft(draftKey, e.target.value)}
+              rows={5}
+            />
+            <div className="boe-progress" aria-hidden>
+              <div className="track">
+                <i className="f-pass" style={{ width: `${(Math.min(stage, total) / total) * 100}%` }} />
+              </div>
+            </div>
+            <div className="tp-actions">
+              {stage < total && (
+                <button className="btn btn-sm btn-primary" type="button" onClick={() => setStage((s) => s + 1)}>
+                  {stage === 0 ? 'Reveal assumptions' : stage < total - 1 ? `Reveal step ${stage}/${q.steps.length}` : 'Reveal answer'}
+                </button>
+              )}
+              {stage < total && (
+                <button className="btn-ghost btn-sm" type="button" onClick={() => setStage(total)}>
+                  Show everything
+                </button>
+              )}
+            </div>
+            <div className="tp-label boe-done-l">When you have checked your numbers</div>
+            <button className={`btn btn-sm ${done ? '' : 'btn-primary'}`} type="button" aria-pressed={done} onClick={() => setFlag('boe', q.id, !done)}>
+              {done ? (
+                <>
+                  <Check size={15} aria-hidden /> Done · mark not done
+                </>
+              ) : (
+                'Mark as done'
+              )}
+            </button>
+          </section>
+        </aside>
+      </div>
       {stage >= total && (
-        <div className="boe-answer">
-          <div className="label">Answer</div>
-          <Markdown>{q.answer}</Markdown>
-          <div className="insight">
-            <Crosshair size={15} aria-hidden className="inline-icon" /> <strong>Design insight:</strong> {q.insight}
+        <aside className="boe-insight" aria-label="Design insight">
+          <Zap size={22} aria-hidden className="boe-insight-ic" />
+          <div>
+            <div className="eyebrow tp-eb-amber">Design insight</div>
+            <p>{q.insight}</p>
+            <FollowUps items={q.followUps} />
           </div>
-          <FollowUps items={q.followUps} />
-        </div>
+        </aside>
       )}
-      <div className="row gap-s wrap">
-        {stage < total && (
-          <button className="btn" type="button" onClick={() => setStage((s) => s + 1)}>
-            {stage === 0 ? 'Reveal assumptions' : stage < total - 1 ? `Reveal step ${stage}/${q.steps.length}` : 'Reveal answer'}
-          </button>
-        )}
-        {stage < total && (
-          <button className="btn-ghost" type="button" onClick={() => setStage(total)}>
-            Show everything
-          </button>
-        )}
-        <button className={`btn ${done ? '' : 'btn-primary'}`} type="button" onClick={() => setFlag('boe', q.id, !done)}>
-          {done ? 'Mark not done' : 'Mark as done'}
-        </button>
-      </div>
-    </article>
+    </>
   );
 }
 
 function CheatSheet({ topic }: { topic: Topic }) {
   return (
-    <div className="card">
-      <h2>Last-minute revision</h2>
-      <ul className="cheat">
+    <section className="tp-panel tp-card tp-cheat" aria-labelledby="cheat-h">
+      <div className="tp-card-top">
+        <span className="eyebrow tp-eb-cyan">Cheat sheet · {topic.cheatSheet.length} items</span>
+      </div>
+      <h2 id="cheat-h" className="tp-card-title">
+        Last-minute revision
+      </h2>
+      <ol className="tp-cheat-list">
         {topic.cheatSheet.map((c) => (
           <li key={c}>
             <Markdown>{c}</Markdown>
           </li>
         ))}
-      </ul>
-    </div>
+      </ol>
+    </section>
   );
 }
 
@@ -530,35 +909,77 @@ function ExamIntro({ topic }: { topic: Topic }) {
   const wrong = currentlyWrong(p, topic);
   const weak = weakSections(topic, wrong);
   return (
-    <div className="card exam-intro">
-      <h2>Timed exam: {topic.title}</h2>
-      <ul>
+    <section className="tp-panel tp-card tp-exam holo" aria-labelledby="exam-h">
+      <div className="tp-card-top">
+        <span className="eyebrow tp-eb-cyan">
+          <GraduationCap size={14} aria-hidden /> Timed exam
+        </span>
+        {rec?.passedAt && <span className="nb-chip cyan">Passed</span>}
+      </div>
+      <h2 id="exam-h" className="tp-card-title">
+        {topic.title}
+      </h2>
+      <div className="tp-exam-stats">
+        <div>
+          <span className="num">{topic.test.length}</span>
+          <span className="eyebrow">questions</span>
+        </div>
+        <div>
+          <span className="num">{minutes}</span>
+          <span className="eyebrow">minutes</span>
+        </div>
+        <div>
+          <span className="num">{p.settings.passMark}%</span>
+          <span className="eyebrow">pass mark</span>
+        </div>
+        {rec && (
+          <div>
+            <span className="num gtext">{rec.best}%</span>
+            <span className="eyebrow">best of {rec.attempts}</span>
+          </div>
+        )}
+      </div>
+      <ul className="tp-look tp-exam-rules">
         <li>
-          <strong>{topic.test.length}</strong> scenario-based questions ({multi} are "select all that apply", which need an exact match
-          to score)
+          <Check size={16} strokeWidth={2.6} aria-hidden />
+          <span>
+            <strong>{topic.test.length}</strong> scenario-based questions ({multi} are &quot;select all that apply&quot;, which need an exact
+            match to score)
+          </span>
         </li>
         <li>
-          Default time: <strong>{minutes} min</strong> ({p.settings.secondsPerQuestion}s/question). You can change it on the next
-          screen.
+          <Clock size={16} aria-hidden />
+          <span>
+            Default time: <strong>{minutes} min</strong> ({p.settings.secondsPerQuestion}s/question). You can change it on the next
+            screen.
+          </span>
         </li>
         <li>
-          Pass mark: <strong>{p.settings.passMark}%</strong>. Only full-length attempts count towards unlocking the company track.
+          <Target size={16} aria-hidden />
+          <span>
+            Pass mark: <strong>{p.settings.passMark}%</strong>. Only full-length attempts count towards unlocking the company track.
+          </span>
         </li>
-        <li>The exam auto-submits when time runs out. Each explanation says why the tempting wrong options are wrong.</li>
         <li>
-          <strong>Interview mode</strong> (on by default): lock in each answer to see instant feedback and the interviewer&apos;s
-          follow-up questions, just like a real round.
+          <Check size={16} strokeWidth={2.6} aria-hidden />
+          <span>The exam auto-submits when time runs out. Each explanation says why the tempting wrong options are wrong.</span>
+        </li>
+        <li>
+          <Mic size={16} aria-hidden />
+          <span>
+            <strong>Interview mode</strong> (on by default): lock in each answer to see instant feedback and the interviewer&apos;s
+            follow-up questions, just like a real round.
+          </span>
         </li>
       </ul>
       {rec && (
-        <p>
-          Attempts: {rec.attempts} · Best: <strong>{rec.best}%</strong> · Last: {rec.last}%{' '}
-          {rec.passedAt && <Badge tone="good">Passed</Badge>}
+        <p className="tp-exam-rec mono small">
+          Attempts: {rec.attempts} · Best: <strong>{rec.best}%</strong> · Last: {rec.last}%
         </p>
       )}
-      <div className="row gap-s wrap">
+      <div className="tp-actions">
         <button className="btn btn-primary" type="button" onClick={() => nav(`/topic/${topic.id}/exam`)}>
-          Set up exam →
+          Set up exam <ArrowRight size={16} aria-hidden />
         </button>
         {wrong.length > 0 && (
           <button className="btn" type="button" onClick={() => nav(`/practice?topic=${topic.id}`)}>
@@ -567,8 +988,8 @@ function ExamIntro({ topic }: { topic: Topic }) {
         )}
       </div>
       {weak.length > 0 && (
-        <div className="weak-card inline">
-          <div className="label">Your weak sections in this topic</div>
+        <div className="weak-card inline tp-weak">
+          <div className="tp-label">Your weak sections in this topic</div>
           <ul className="weak-sections">
             {weak.map((ws) => (
               <li key={ws.index}>
@@ -582,7 +1003,7 @@ function ExamIntro({ topic }: { topic: Topic }) {
           </ul>
         </div>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -616,39 +1037,48 @@ export function StudyLock({ topic, what }: { topic: Topic; what: string }) {
   const read = new Set(p.sections[topic.id] ?? []);
   const unread = topic.sections.map((s, i) => ({ s, i })).filter((x) => !read.has(x.i));
   const goRead = (i: number) => nav(`/topic/${topic.id}?tab=learn&s=${i}`);
+  const readCount = topic.sections.length - unread.length;
   return (
-    <div className="card study-lock">
-      <h2>
-        <Lock size={20} aria-hidden className="inline-icon" /> Study first
-      </h2>
+    <section className="tp-panel tp-card study-lock" aria-labelledby="lock-h">
+      <div className="study-lock-head">
+        <span className="study-lock-ic" aria-hidden>
+          <Lock size={22} />
+        </span>
+        <div>
+          <span className="eyebrow tp-eb-amber">Locked until you&apos;ve studied</span>
+          <h2 id="lock-h" className="tp-card-title">
+            Study first
+          </h2>
+        </div>
+      </div>
       <p>
         The {what} for this topic unlock once you&apos;ve read every Learn section, so the questions always come after the explanation.
       </p>
-      <div className="topic-progress">
-        <ProgressBar value={(read.size / Math.max(1, topic.sections.length)) * 100} />
-        <span className="small muted">
-          {read.size}/{topic.sections.length} sections read
+      <div className="study-lock-progress">
+        <ProgressBar value={(readCount / Math.max(1, topic.sections.length)) * 100} />
+        <span className="mono small muted">
+          {readCount}/{topic.sections.length} sections read
         </span>
       </div>
-      <div className="label">Still to read</div>
-      <ol className="unread">
+      <div className="tp-label">Still to read</div>
+      <ol className="study-lock-list">
         {unread.map(({ s, i }) => (
           <li key={i}>
-            <button type="button" className="link-btn" onClick={() => goRead(i)}>
-              §{i + 1} {s.heading}
+            <button type="button" onClick={() => goRead(i)}>
+              <span className="mono">§{i + 1}</span> {s.heading}
             </button>
           </li>
         ))}
       </ol>
-      <div className="row gap-s wrap">
+      <div className="tp-actions">
         {unread.length > 0 && (
           <button type="button" className="btn btn-primary" onClick={() => goRead(unread[0].i)}>
-            Continue reading →
+            Continue reading <ArrowRight size={16} aria-hidden />
           </button>
         )}
         <button
           type="button"
-          className="btn-ghost small"
+          className="btn-ghost btn-sm"
           onClick={() => {
             if (window.confirm('Mark every section of this topic as read and unlock its practice?')) {
               markAllSectionsRead(topic.id, topic.sections.length);
@@ -661,7 +1091,7 @@ export function StudyLock({ topic, what }: { topic: Topic; what: string }) {
       <p className="muted small">
         Tick &quot;Read&quot; on each section as you finish it. You can change or turn off this lock in <Link to="/settings">Settings</Link>.
       </p>
-    </div>
+    </section>
   );
 }
 
@@ -680,19 +1110,21 @@ function SectionViz({ topic, sectionIndex }: { topic: Topic; sectionIndex: numbe
         const first = firstIndex(meta.id);
         if (first !== sectionIndex) {
           return (
-            <button
-              key={meta.id}
-              type="button"
-              className="viz-backlink"
-              onClick={() => document.getElementById(`s-${first}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-            >
+            <button key={meta.id} type="button" className="viz-backlink" onClick={() => scrollToSection(first)}>
               <CirclePlay size={15} aria-hidden className="inline-icon" /> Interactive: {meta.title} (in §{first + 1} above), revisit it
               with this section in mind
             </button>
           );
         }
         return (
-          <Suspense key={meta.id} fallback={<div className="viz-loading">Loading interactive: {meta.title}…</div>}>
+          <Suspense
+            key={meta.id}
+            fallback={
+              <div className="viz-loading">
+                <CirclePlay size={14} aria-hidden /> Loading interactive: {meta.title}…
+              </div>
+            }
+          >
             <Component />
           </Suspense>
         );

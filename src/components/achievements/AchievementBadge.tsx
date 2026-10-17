@@ -132,7 +132,7 @@ export default function AchievementBadge({ art, tier = 'standard', locked = fals
 
   return (
     <svg
-      className={`ach-badge ach-badge-${size} ${locked ? 'is-locked' : ''} ${className}`}
+      className={`ach-badge ach-badge-${size} tier-${t} ${locked ? 'is-locked' : 'is-earned'} ${className}`}
       viewBox="0 0 100 112"
       width={px}
       height={(px * 112) / 100}
@@ -156,7 +156,11 @@ export default function AchievementBadge({ art, tier = 'standard', locked = fals
 
       {/* rim (the round join softens the corners) and a flat paper face */}
       <polygon points={OUTER} fill={`url(#rim-${uid})`} stroke={`url(#rim-${uid})`} strokeWidth="8" strokeLinejoin="round" />
+      {/* opaque underlay: some faces (the accent 'standard' one) are translucent tints */}
+      <polygon points={INNER} fill="var(--surface)" />
       <polygon points={INNER} fill={v('face')} stroke={v('lo')} strokeOpacity="0.5" strokeWidth="1.5" strokeLinejoin="round" />
+      {/* a soft gloss on the upper face: reads as polished metal / glass */}
+      {!locked && <ellipse cx="50" cy="34" rx="26" ry="12" fill="var(--tier-shine)" opacity="0.14" clipPath={`url(#clip-${uid})`} />}
       <Glyph x={31} y={33} width={38} height={38} color={v('ink')} strokeWidth={2} aria-hidden />
 
       {shine && !reduce && !locked && (
