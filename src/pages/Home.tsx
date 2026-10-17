@@ -1,22 +1,24 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Target } from 'lucide-react';
-import { COMPANY_QUESTIONS, PHASES, TOPICS, TOPIC_BY_ID } from '../content';
-import { useProgress } from '../lib/progress';
-import { topicCompletion, topicStatus } from '../lib/stats';
+import { ArrowRight, Check, Target } from 'lucide-react';
+import { COMPANIES, COMPANY_QUESTIONS, PHASES, TOPICS, TOPIC_BY_ID } from '../content';
+import { projectsForTopic } from '../content/projects';
+import { localDay, useProgress } from '../lib/progress';
+import { companyUnlocked, topicCompletion, topicStatus } from '../lib/stats';
 import { weakTopics } from '../lib/weak';
-import { codeLabLabel, nextStep } from '../lib/nextStep';
+import { codeLabLabel, nextStep, topicSteps, type StepId, type TopicStep } from '../lib/nextStep';
 import { getUiPrefs } from '../lib/uiPrefs';
 import { describeLocation, sameStudyTarget, type LocationLookup } from '../lib/studyLocation';
-import { mcqAccuracy, mistakesToDrill, phaseProgress } from '../lib/metrics';
+import { averageBest, mistakesToDrill, phaseProgress, practiceVolume, ratingCounts, statusCounts } from '../lib/metrics';
 import { studyStreak } from '../lib/streak';
-import { phaseCode, shortTitle, topicCode } from '../lib/labels';
+import { phaseCode, topicCode } from '../lib/labels';
+import { HeroDiagram } from '../components/HeroDiagram';
+import { PhaseList, SystemMap } from '../components/SystemMap';
 import { ProgressPanel } from '../components/ProgressPanel';
+import { CompanyTrackCard, StreakCard, WeakSpotCard } from '../components/TodayCards';
 import { DashboardMetrics } from '../components/DashboardMetrics';
-import { WeakReattempt } from '../components/WeakReattempt';
 import { AchievementsSummary } from '../components/achievements/AchievementsSummary';
 import { CountUp } from '../components/CountUp';
-import { HeroDiagram } from '../components/HeroDiagram';
 import { gsap, MOTION_OK, revealOnScroll, useGSAP } from '../lib/gsap';
 
 const TAB_LABELS: Record<string, string> = {
@@ -38,11 +40,40 @@ const LOOKUP: LocationLookup = {
   companyQuestion: (id) => COMPANY_QUESTIONS.find((q) => q.id === id)?.title,
 };
 
+/** which study-path pill the next step sits on */
+const KIND_STEP: Partial<Record<string, StepId>> = { start: 'learn', read: 'learn', code: 'code', interview: 'interview', envelope: 'envelope', exam: 'exam' };
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const pct = (n: number, d: number) => (d ? Math.round((n / d) * 100) : 0);
+
+function joinAnd(parts: string[]) {
+  return parts.length < 2 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
+
+/** "the Code Lab, 7 interview questions and 3 estimation drills follow": the unfinished steps after the current one */
+function whatFollows(steps: TopicStep[], current: StepId | undefined) {
+  const at = steps.findIndex((s) => s.id === current);
+  const parts = steps
+    .slice(at + 1)
+    .filter((s) => !s.complete && s.id !== 'capstone')
+    .map((s) => {
+      const left = s.total - s.done;
+      if (s.id === 'code') return `the ${s.label}`;
+      if (s.id === 'interview') return plural(left, 'interview question');
+      if (s.id === 'envelope') return plural(left, 'estimation drill');
+      if (s.id === 'exam') return 'the exam';
+      return s.label;
+    });
+  if (!parts.length) return '';
+  const many = parts.length > 1 || /s$/.test(parts[0]);
+  return `${joinAnd(parts)} ${many ? 'follow' : 'follows'}`;
+}
+
 export default function Home() {
   const p = useProgress();
   const root = useRef<HTMLDivElement>(null);
-  // GSAP: the hero sequence (kicker → title → detail → actions, the ledger sliding in with its bars filling),
-  // a magnetic primary button, and scroll reveals for the sections below. Reverted when the page unmounts.
+  // GSAP: scroll reveals for the sections below the hero (the hero uses the CSS .rise sequence) and a magnetic
+  // primary button for fine pointers. Nothing runs with reduced motion; everything is reverted on unmount.
   useGSAP(
     () => {
       const el = root.current;
@@ -50,16 +81,10 @@ export default function Home() {
       const q = gsap.utils.selector(el);
       const mm = gsap.matchMedia();
       mm.add(MOTION_OK, () => {
-        const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
-        tl.from(q('.today-lead'), { autoAlpha: 0, y: 18, duration: 0.7, clearProps: 'transform,opacity,visibility' })
-          .from(q('.today-main > :not(.hero-diagram)'), { autoAlpha: 0, y: 16, duration: 0.6, stagger: 0.07, clearProps: 'transform,opacity,visibility' }, 0.12)
-          .from(q('.ledger'), { autoAlpha: 0, x: 22, duration: 0.75, clearProps: 'transform,opacity,visibility' }, 0.2)
-          .from(q('.ledger-bar > span'), { scaleX: 0, transformOrigin: '0% 50%', duration: 0.8, stagger: 0.035, ease: 'power2.out', clearProps: 'transform' }, 0.45);
-        revealOnScroll(q('.dash > :not(.today-lead)'));
+        revealOnScroll(q('.td-reveal'));
       });
-      // magnetic primary action: the button leans a few pixels toward a fine pointer
       mm.add(`${MOTION_OK} and (pointer: fine)`, () => {
-        const btn = q('.today-actions .btn-primary')[0] as HTMLElement | undefined;
+        const btn = q('.td-cta')[0] as HTMLElement | undefined;
         if (!btn) return;
         const x = gsap.quickTo(btn, 'x', { duration: 0.4, ease: 'power3.out' });
         const y = gsap.quickTo(btn, 'y', { duration: 0.4, ease: 'power3.out' });
@@ -83,6 +108,7 @@ export default function Home() {
     },
     { scope: root },
   );
+
   const passMark = p.settings.passMark;
   const weak = useMemo(() => weakTopics(p, TOPICS), [p]);
   const readiness = TOPICS.length ? Math.round(TOPICS.reduce((a, t) => a + topicCompletion(p, t), 0) / TOPICS.length) : 0;
@@ -92,24 +118,101 @@ export default function Home() {
     weak: weakest ? { topic: weakest.topic, index: weakest.sections[0].index, heading: weakest.sections[0].heading } : null,
   });
   const fresh = step.kind === 'start';
-  const today = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  const topic = step.topic;
+  const phase = topic ? PHASES.find((ph) => ph.id === topic.phase) : undefined;
+  const steps = topic ? topicSteps(p, topic, projectsForTopic(topic.id).length) : [];
+  const currentStep = KIND_STEP[step.kind];
+  const learn = steps.find((s) => s.id === 'learn');
 
   const last = getUiPrefs().lastStudyLocation;
   const lastLabel = last ? describeLocation(last, LOOKUP) : null;
   const resume = last && lastLabel && !sameStudyTarget(last, step.href) ? { href: last, label: lastLabel } : null;
 
-  // ---- record ledger ----
+  // ---- figures (all derived from saved progress + content) ----
   const phases = phaseProgress(p, TOPICS, PHASES);
-  const passedTopics = phases.reduce((n, ph) => n + ph.passed, 0);
-  const examAnswers = mcqAccuracy(p, TOPICS).seen;
+  const counts = statusCounts(p, TOPICS);
+  const volume = practiceVolume(p, TOPICS, COMPANY_QUESTIONS.length);
+  const vol = (id: string) => volume.find((v) => v.id === id) ?? { done: 0, total: 0, pct: 0 };
+  const sections = vol('learn');
+  const boe = vol('envelope');
+  const ratings = ratingCounts(p, TOPICS);
+  const taken = TOPICS.filter((t) => p.tests[t.id]).length;
+  const avgBest = averageBest(p, TOPICS);
   const mistakes = mistakesToDrill(p, TOPICS);
-  const streak = studyStreak(p.activityDays);
+  const today = localDay();
+  const streak = studyStreak(p.activityDays, today);
+  const { unlocked, remaining } = companyUnlocked(p, TOPICS);
+  const companyNames = COMPANIES.length ? COMPANIES.map((c) => c.name) : [...new Set(COMPANY_QUESTIONS.map((q) => q.company))];
+  const answered = Object.keys(p.mcq).length;
+  const firstUntested = TOPICS.find((t) => !p.tests[t.id]) ?? TOPICS[0];
+  const firstExamHref = firstUntested ? `/topic/${firstUntested.id}?tab=exam` : '/contents';
+  const ringFigures = {
+    phases,
+    currentPhaseId: phase?.id,
+    passed: counts.passed,
+    topics: counts.total,
+    sectionsRead: sections.done,
+    sectionsTotal: sections.total,
+    iqRated: ratings.rated,
+    iqTotal: ratings.total,
+  };
 
-  // ---- on your desk ----
-  const onDesk = TOPICS.filter((t) => topicStatus(p, t) === 'in-progress')
-    .map((t) => ({ t, pct: topicCompletion(p, t) }))
-    .sort((a, b) => b.pct - a.pct)
+  // ---- on your desk: other in-progress topics, closest to done first ----
+  const onDesk = TOPICS.filter((t) => t.id !== topic?.id && topicStatus(p, t) === 'in-progress')
+    .map((t) => ({ t, done: topicCompletion(p, t) }))
+    .sort((a, b) => b.done - a.done)
     .slice(0, 4);
+
+  // ---- hero copy ----
+  const phaseName = phase ? (phase.title.length > 28 ? phase.title.replace(/^Miscellaneous:\s*/, '').replace(/\s*\([^)]*\)/, '') : phase.title) : '';
+  const eyebrow: ReactNode = phase ? (
+    <>
+      {fresh ? 'Start here' : 'Next step'} · Phase {phaseCode(phase.number)}
+      <span className="td-eyebrow-name"> · {phaseName}</span>
+    </>
+  ) : step.kind === 'company' ? (
+    'Next step · Company track'
+  ) : (
+    'Course complete'
+  );
+  const heading = topic ? topic.title : step.title;
+  const detail = topic && step.detail.startsWith(`${topic.title}: `) ? step.detail.slice(topic.title.length + 2) : step.detail;
+  const follows = topic ? whatFollows(steps, currentStep) : '';
+  let lede: ReactNode;
+  if (fresh && topic) {
+    lede = (
+      <>
+        Begin with <strong>§1 {topic.sections[0]?.heading}</strong>. Read each section, then tick &ldquo;Read&rdquo; so the app can guide you
+        {follows ? `; ${follows}` : ''}.
+      </>
+    );
+  } else if (step.kind === 'read' && learn) {
+    lede = (
+      <>
+        Read the next section: <strong>{step.title.replace(/^Read /, '')}</strong>. You have read {learn.done} of {plural(learn.total, 'section')}
+        {follows ? `; ${follows}` : ''}.
+      </>
+    );
+  } else if (topic) {
+    lede = (
+      <>
+        <strong>{step.title}.</strong> {detail}
+      </>
+    );
+  } else {
+    lede = detail;
+  }
+  const secNo = /§(\d+)/.exec(step.title)?.[1];
+  const ctaLabel: Record<string, string> = {
+    start: 'Open the first lesson',
+    read: secNo ? `Continue §${secNo}` : 'Continue reading',
+    code: `Open the ${topic ? codeLabLabel(topic) : 'Code Lab'}`,
+    interview: 'Practise interview Qs',
+    envelope: 'Start the drills',
+    exam: topic && p.tests[topic.id] ? 'Retake the exam' : 'Take the exam',
+    company: 'Open the company track',
+    done: 'Open weak areas',
+  };
 
   const HOW: [string, string][] = [
     ['Learn', 'Read each topic’s short sections and tick “Read” as you finish each one.'],
@@ -118,114 +221,175 @@ export default function Home() {
     ['Pass the timed exam', `Score ${passMark}% or more and the topic is passed. Pass every exam to unlock the company track.`],
   ];
 
-  const firstUntested = TOPICS.find((t) => !p.tests[t.id]) ?? TOPICS[0];
-  const firstExamHref = firstUntested ? `/topic/${firstUntested.id}?tab=exam` : '/contents';
-  const answered = Object.keys(p.mcq).length;
+  const tiles = [
+    {
+      id: 'topics',
+      label: 'Topics passed',
+      value: counts.passed,
+      of: `/${counts.total}`,
+      bar: counts.passed > 0 && <i className="f-pass" style={{ width: `${pct(counts.passed, counts.total)}%` }} />,
+      note: counts.inProgress ? `${counts.inProgress} more in progress` : counts.passed ? 'none in progress right now' : 'pass a topic’s exam to count it',
+    },
+    {
+      id: 'exams',
+      label: 'Exams passed',
+      value: counts.passed,
+      of: `of ${taken} taken`,
+      bar: counts.passed > 0 && <i className="td-fill-grad" style={{ width: `${pct(counts.passed, taken)}%` }} />,
+      note: avgBest === null ? `Pass mark ${passMark}%` : `Average best score ${avgBest}% · pass mark ${passMark}%`,
+    },
+    {
+      id: 'iq',
+      label: 'Interview Qs rated',
+      short: 'Interview Qs',
+      value: ratings.rated,
+      of: `/${ratings.total}`,
+      bar: ratings.rated > 0 && <i style={{ width: `${pct(ratings.rated, ratings.total)}%`, background: 'var(--mag)' }} />,
+      note: ratings.rated ? `${ratings.nailed} rated “nailed it”` : 'answer out loud, then rate yourself',
+    },
+    {
+      id: 'boe',
+      label: 'Back-of-envelope drills',
+      short: 'BoE drills',
+      value: boe.done,
+      of: `/${boe.total}`,
+      bar: boe.done > 0 && <i style={{ width: `${boe.pct}%`, background: 'var(--amber)' }} />,
+      note: boe.done ? `${plural(boe.total - boe.done, 'drill')} to go` : 'estimation maths, one step at a time',
+    },
+  ];
 
   return (
-    <div className="page dash" ref={root} data-motion="own">
-      <header className="today-lead">
-        <section className="today-main" aria-labelledby="today-title">
-          <p className="eyebrow today-date">{today}</p>
-          <p className="today-kicker">{fresh ? 'Start here' : 'Your next step'}</p>
-          <h1 id="today-title" className="today-title">
-            {step.title}
-          </h1>
-          <p className="today-detail">{step.detail}</p>
-          <div className="row gap-s wrap today-actions">
-            <Link className="btn btn-primary btn-lg" to={step.href}>
-              {fresh ? 'Open the first lesson' : step.kind === 'read' ? 'Continue reading' : 'Go'} <ArrowRight size={18} aria-hidden />
-            </Link>
-            {step.secondary && (
-              <Link className="btn btn-lg" to={step.secondary.href}>
-                <Target size={16} aria-hidden /> {step.secondary.title}
+    <div className="page today" ref={root} data-motion="own">
+      <section className="td-hero" aria-labelledby="today-title">
+        <div className="td-mission">
+          <div className="td-mission-in">
+            <p className="nb-chip amber td-eyebrow rise d1">
+              <span className="dot pulse-a td-key-amber" aria-hidden />
+              {eyebrow}
+            </p>
+            <h1 id="today-title" className="td-title rise d2">
+              <span className="gtext">{heading}</span>
+            </h1>
+            <p className="lede td-lede rise d3">{lede}</p>
+            {topic && <p className="td-mobile-only td-lede-s">{step.kind === 'read' || fresh ? (fresh ? `§1 ${topic.sections[0]?.heading ?? ''}` : step.title.replace(/^Read /, '')) : step.title}</p>}
+            {learn && (step.kind === 'read' || fresh) && (
+              <div className="td-mobile-only td-mission-meter">
+                <div className="track" aria-hidden>
+                  {learn.done > 0 && <i className="f-pass" style={{ width: `${pct(learn.done, learn.total)}%` }} />}
+                </div>
+                <div className="mono">
+                  {learn.done} of {plural(learn.total, 'section')} read
+                </div>
+              </div>
+            )}
+            <div className="td-actions rise d4">
+              <Link className="btn btn-primary btn-lg td-cta" to={step.href}>
+                {ctaLabel[step.kind]} <ArrowRight size={18} aria-hidden />
+              </Link>
+              {step.secondary ? (
+                <Link className="btn btn-lg td-cta-2" to={step.secondary.href} title={step.secondary.title}>
+                  <Target size={16} aria-hidden /> Revise weak spot<span className="sr-only">: {step.secondary.title.replace(/^Revise weak area:\s*/, '')}</span>
+                </Link>
+              ) : (
+                <Link className="btn btn-lg td-cta-2" to="/contents">
+                  Open contents
+                </Link>
+              )}
+            </div>
+            {resume && (
+              <Link to={resume.href} className="td-resume rise d5">
+                <span className="eyebrow">Where you left off</span>
+                <span className="td-resume-target">{resume.label}</span>
+                <ArrowRight size={14} aria-hidden />
               </Link>
             )}
+            {topic && steps.length > 0 && (
+              <nav className="td-steps rise d5" aria-label={`Study path for ${topic.title}`}>
+                {steps.map((s, i) => {
+                  const now = s.id === currentStep;
+                  return (
+                    <Link
+                      key={s.id}
+                      to={`/topic/${topic.id}?tab=${s.id}`}
+                      className={`td-step${now ? ' now' : ''}${s.complete ? ' done' : ''}`}
+                      aria-current={now ? 'step' : undefined}
+                      title={s.progress}
+                    >
+                      {now ? <i>{i + 1}</i> : s.complete ? <Check size={13} aria-hidden className="td-step-check" /> : null}
+                      {s.label}
+                      {s.complete && <span className="sr-only"> (done)</span>}
+                    </Link>
+                  );
+                })}
+              </nav>
+            )}
           </div>
-          {resume && (
-            <Link to={resume.href} className="resume-line">
-              <span className="resume-label">Where you left off</span>
-              <span className="resume-target">{resume.label}</span>
-              <ArrowRight size={14} aria-hidden />
-            </Link>
-          )}
-          <HeroDiagram />
-        </section>
+        </div>
 
-        <aside className="ledger" aria-labelledby="ledger-title">
-          <h2 id="ledger-title" className="ledger-title">
-            Record
-          </h2>
-          <table className="ledger-phases">
-            <caption className="sr-only">Topics passed per phase</caption>
-            <colgroup>
-              <col />
-              <col className="ledger-col-bar" />
-              <col className="ledger-col-count" />
-            </colgroup>
-            <tbody>
-              {phases.map((ph) => (
-                <tr key={ph.id} className={ph.passed === ph.total ? 'done' : ''}>
-                  <th scope="row">
-                    <span className="ledger-num">{phaseCode(ph.number)}</span>
-                    <span className="ledger-phase" title={ph.title}>
-                      {shortTitle(ph.title)}
-                    </span>
-                  </th>
-                  <td className="ledger-bar" aria-hidden>
-                    <span style={{ width: `${ph.pct}%` }} />
-                  </td>
-                  <td className="ledger-count">
-                    {ph.passed}/{ph.total}
-                    <span className="sr-only"> passed</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <dl className="ledger-facts">
-            <div>
-              <dt>Topics passed</dt>
-              <dd>
-                <CountUp value={passedTopics} />
-                <span>/{TOPICS.length}</span>
-              </dd>
+        <div className="td-ringcol td-desktop-only rise d2">
+          <HeroDiagram f={ringFigures} />
+        </div>
+      </section>
+
+      {/* phone: the compact ring with the key figures (Mobile mockup) */}
+      <section className="glass td-mini td-mobile-only rise d2" aria-label="Overall progress">
+        <HeroDiagram f={ringFigures} compact />
+        <dl className="td-kv">
+          <div>
+            <dt>Topics passed</dt>
+            <dd className="num">
+              {counts.passed}
+              <small>/{counts.total}</small>
+            </dd>
+          </div>
+          <div>
+            <dt>Exams taken</dt>
+            <dd className="num">{taken}</dd>
+          </div>
+          <div>
+            <dt>Company track</dt>
+            <dd className="mono td-kv-flag">{unlocked ? 'UNLOCKED' : 'LOCKED'}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="td-tiles" aria-label="Practice figures">
+        {tiles.map((t, i) => (
+          <div key={t.id} className={`glass td-tile td-tile-${t.id} rise d${i + 1}`}>
+            <div className="eyebrow">
+              {'short' in t ? (
+                <>
+                  <span className="td-desktop-inline">{t.label}</span>
+                  <span className="td-mobile-inline">{t.short}</span>
+                </>
+              ) : (
+                t.label
+              )}
             </div>
-            <div>
-              <dt>Exam answers</dt>
-              <dd>
-                <CountUp value={examAnswers} />
-              </dd>
+            <div className="num td-tile-n">
+              <CountUp value={t.value} />
+              <small>{t.of}</small>
             </div>
-            <div>
-              <dt>
-                <Link to="/practice">Mistakes to drill</Link>
-              </dt>
-              <dd className={mistakes > 0 ? 'flag' : ''}>
-                {mistakes}
-                {mistakes > 0 && <span className="sr-only"> (needs attention)</span>}
-              </dd>
+            <div className="track td-tile-track" aria-hidden>
+              {t.bar}
             </div>
-            <div>
-              <dt>Study streak</dt>
-              <dd>
-                <CountUp value={streak} />
-                <span> day{streak === 1 ? '' : 's'}</span>
-              </dd>
-            </div>
-          </dl>
-        </aside>
-      </header>
+            <div className="td-tile-note">{t.note}</div>
+          </div>
+        ))}
+      </section>
 
       {fresh && (
-        <section className="dash-section how" aria-labelledby="how-title">
-          <div className="dash-section-head">
-            <h2 id="how-title">How this works</h2>
+        <section className="glass card td-how td-reveal" aria-labelledby="how-title">
+          <div className="td-card-head">
+            <h2 id="how-title" className="td-h2">
+              How this works
+            </h2>
+            <span className="muted td-head-note">Every topic follows the same path</span>
           </div>
-          <ol className="how-steps">
+          <ol className="td-how-steps">
             {HOW.map(([verb, rest], i) => (
               <li key={verb}>
-                <span className="how-num">{phaseCode(i + 1)}</span>
+                <span className="mono td-how-n">{phaseCode(i + 1)}</span>
                 <strong>{verb}</strong>
                 <p>{rest}</p>
               </li>
@@ -234,24 +398,33 @@ export default function Home() {
         </section>
       )}
 
+      <div className="td-desktop-only td-reveal">
+        <SystemMap phases={phases} currentPhaseId={phase?.id} />
+      </div>
+      <div className="td-mobile-only">
+        <PhaseList phases={phases} currentPhaseId={phase?.id} />
+      </div>
+
       {onDesk.length > 0 && (
-        <section className="dash-section desk" aria-labelledby="desk-title">
-          <div className="dash-section-head">
-            <h2 id="desk-title">On your desk</h2>
-            <span className="muted small">In-progress topics, closest to done first</span>
+        <section className="glass card td-desk td-reveal" aria-labelledby="desk-title">
+          <div className="td-card-head">
+            <h2 id="desk-title" className="td-h2">
+              On your desk
+            </h2>
+            <span className="muted td-head-note">Other topics in progress, closest to done first</span>
           </div>
-          <ul className="desk-list">
-            {onDesk.map(({ t, pct }) => (
+          <ul className="td-desk-list">
+            {onDesk.map(({ t, done }) => (
               <li key={t.id}>
                 <Link to={`/topic/${t.id}`}>
-                  <span className="desk-code">{topicCode(TOPICS, PHASES, t.id)}</span>
-                  {t.title}
+                  <span className="mono td-desk-code">{topicCode(TOPICS, PHASES, t.id)}</span>
+                  <span className="td-desk-title">{t.title}</span>
                 </Link>
-                <span className="desk-bar" aria-hidden>
-                  <span style={{ width: `${pct}%` }} />
+                <span className="track td-desk-bar" aria-hidden>
+                  {done > 0 && <i className="f-prog" style={{ width: `${done}%` }} />}
                 </span>
-                <span className="desk-pct">
-                  {pct}%<span className="sr-only"> complete</span>
+                <span className="mono td-desk-pct">
+                  {done}%<span className="sr-only"> complete</span>
                 </span>
               </li>
             ))}
@@ -259,13 +432,38 @@ export default function Home() {
         </section>
       )}
 
-      <ProgressPanel p={p} />
+      <div className="td-reveal">
+        <ProgressPanel
+          counts={counts}
+          phases={phases}
+          currentPhaseId={phase?.id}
+          passMark={passMark}
+          volume={volume.filter((v) => v.id === 'learn' || v.id === 'code' || v.id === 'company')}
+        />
+      </div>
 
-      <AchievementsSummary p={p} />
+      <div className="td-three td-reveal">
+        <CompanyTrackCard
+          unlocked={unlocked}
+          remaining={remaining.length}
+          topics={TOPICS.length}
+          questions={COMPANY_QUESTIONS.length}
+          practised={Math.min(Object.keys(p.company).length, COMPANY_QUESTIONS.length)}
+          companies={companyNames}
+          mockMinutes={p.settings.mockMinutes}
+          passMark={passMark}
+        />
+        <WeakSpotCard weak={weak} answered={answered} passMark={passMark} firstExamHref={firstExamHref} mistakes={mistakes} />
+        <StreakCard days={p.activityDays ?? []} today={today} streak={streak} />
+      </div>
 
-      <WeakReattempt weak={weak} answered={answered} passMark={passMark} firstExamHref={firstExamHref} />
+      <div className="td-reveal">
+        <AchievementsSummary p={p} />
+      </div>
 
-      <DashboardMetrics p={p} topics={TOPICS} readiness={readiness} firstExamHref={firstExamHref} />
+      <div className="td-reveal">
+        <DashboardMetrics p={p} topics={TOPICS} readiness={readiness} firstExamHref={firstExamHref} />
+      </div>
     </div>
   );
 }

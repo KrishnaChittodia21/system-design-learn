@@ -3,19 +3,23 @@ import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowLeft,
   ArrowRight,
+  Award,
   BookOpen,
   Building,
+  Building2,
   Calculator,
   CodeXml,
   Compass,
-  Dumbbell,
   GraduationCap,
   Hammer,
+  Home,
+  LayoutGrid,
   ListTree,
   MessagesSquare,
-  PanelLeft,
+  MoreHorizontal,
   Save,
   Search,
+  Smartphone,
   Target,
   X,
 } from 'lucide-react';
@@ -36,12 +40,31 @@ const LOOP = [
   { icon: Hammer, label: 'Capstone', why: 'Some topics have a real project judged by tests. Pass every exam to unlock the company track.' },
 ];
 
-const PLACES = [
-  { icon: PanelLeft, label: 'Sidebar', why: 'Every phase and topic, with a coloured dot for your status.' },
-  { icon: ListTree, label: 'Contents', why: 'One page listing every topic, section, animation and practice page, with search.' },
-  { icon: Search, label: 'Search: ⌘K / Ctrl+K', why: 'Press it anywhere to jump to any topic, section or company question by typing.' },
-  { icon: Target, label: 'Weak Areas', why: 'The sections behind the questions you miss, and drills to fix them.' },
-  { icon: Building, label: 'Company track', why: `${COMPANY_QUESTIONS.length} real company questions with mock-interview timers.` },
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+
+/** the top bar's five destinations, in order */
+const TOP_NAV = [
+  { icon: Home, label: 'Today', why: 'Your next step, streak and progress at a glance.' },
+  { icon: LayoutGrid, label: 'Contents', why: 'Every phase, topic, section and animation on one page.' },
+  { icon: Building2, label: 'Companies', why: `${COMPANY_QUESTIONS.length} real company questions with mock-interview timers.` },
+  { icon: Target, label: 'Weak areas', why: 'The sections behind the questions you miss, and drills to fix them.' },
+  { icon: Award, label: 'Achievements', why: 'Badges that climb from bronze to diamond as you go.' },
+];
+
+/** the tools on the right of the top bar */
+const TOOLS = [
+  { icon: Search, label: `Search · ${isMac ? '⌘K' : 'Ctrl K'}`, why: 'From anywhere: jump to any topic, section or company question by typing.' },
+  { icon: ListTree, label: 'Syllabus', why: 'On lesson pages, opens every topic by phase in a drawer. Press / there to filter it.' },
+  { icon: Compass, label: 'Guide · ?', why: 'Reopens this tour. Settings sits next to it.' },
+];
+
+/** the mobile tab bar */
+const TABS = [
+  { icon: Home, label: 'Today' },
+  { icon: LayoutGrid, label: 'Contents' },
+  { icon: Building2, label: 'Companies' },
+  { icon: Target, label: 'Weak areas' },
+  { icon: MoreHorizontal, label: 'More' },
 ];
 
 /** First-visit welcome tour (also opened from the Guide button or the "?" key). */
@@ -78,7 +101,7 @@ export default function WelcomeTour() {
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
       <motion.div
         ref={ref}
-        className="modal tour"
+        className="modal tour glass"
         role="dialog"
         aria-modal="true"
         aria-labelledby="tour-title"
@@ -90,11 +113,14 @@ export default function WelcomeTour() {
       >
         <div className="tour-top">
           <span className="eyebrow">
-            <Compass size={14} aria-hidden /> Guide · step {step + 1} of {steps.length}
+            <Compass size={14} aria-hidden /> Guide · {step + 1} of {steps.length}
           </span>
           <button type="button" className="btn-ghost btn-icon" aria-label="Close guide" onClick={close}>
             <X size={18} aria-hidden />
           </button>
+        </div>
+        <div className="tour-meter" aria-hidden>
+          <i style={{ width: `${((step + 1) / steps.length) * 100}%` }} />
         </div>
         <div className="tour-stage">
           <AnimatePresence mode="wait" custom={dir} initial={false}>
@@ -216,24 +242,63 @@ function STEPS(nextTitle: string) {
       ),
     },
     {
-      title: 'Where things are',
+      title: 'Finding your way',
       body: (
-        <ul className="tour-places">
-          {PLACES.map(({ icon: Icon, label, why }) => (
-            <li key={label}>
-              <Icon size={18} aria-hidden />
-              <span>
-                <strong>{label}</strong> <span className="muted">· {why}</span>
+        <>
+          <p>The top bar takes you everywhere:</p>
+          <div className="tour-bar" aria-hidden>
+            {TOP_NAV.map(({ label }, i) => (
+              <span key={label} className={i === 0 ? 'on' : ''}>
+                {label}
               </span>
-            </li>
-          ))}
-          <li>
-            <Dumbbell size={18} aria-hidden />
-            <span>
-              <strong>Your next step</strong> <span className="muted">· the dashboard always shows one obvious thing to do next.</span>
-            </span>
-          </li>
-        </ul>
+            ))}
+          </div>
+          <ul className="tour-places">
+            {TOP_NAV.map(({ icon: Icon, label, why }) => (
+              <li key={label}>
+                <span className="tour-place-icon">
+                  <Icon size={16} aria-hidden />
+                </span>
+                <span>
+                  <strong>{label}</strong> <span className="muted">· {why}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <ul className="tour-places tour-tools">
+            {TOOLS.map(({ icon: Icon, label, why }) => (
+              <li key={label}>
+                <span className="tour-place-icon tool">
+                  <Icon size={16} aria-hidden />
+                </span>
+                <span>
+                  <strong>{label}</strong> <span className="muted">· {why}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ),
+    },
+    {
+      title: 'On a phone',
+      body: (
+        <>
+          <p>
+            <Smartphone size={16} aria-hidden className="tour-inline-icon" /> On small screens the same places sit in a tab bar at the bottom.
+          </p>
+          <div className="tour-tabbar" aria-hidden>
+            {TABS.map(({ icon: Icon, label }, i) => (
+              <span key={label} className={i === 0 ? 'on' : ''}>
+                <Icon size={18} />
+                {label}
+              </span>
+            ))}
+          </div>
+          <p className="muted">
+            <strong>More</strong> holds the rest: Practice, Achievements, Settings, Search, the Syllabus, this Guide and the light/dark switch.
+          </p>
+        </>
       ),
     },
     {
@@ -256,8 +321,8 @@ function STEPS(nextTitle: string) {
       title: 'Ready? Start here',
       body: (
         <p className="lead">
-          Your next step is <strong>{nextTitle}</strong>. You can reopen this guide any time with the <Compass size={14} aria-hidden />{' '}
-          Guide button or the <kbd>?</kbd> key.
+          Your next step is <strong>{nextTitle}</strong>. Reopen this guide any time with the <Compass size={14} aria-hidden /> Guide button in
+          the top bar (under <strong>More</strong> on a phone) or the <kbd>?</kbd> key.
         </p>
       ),
     },

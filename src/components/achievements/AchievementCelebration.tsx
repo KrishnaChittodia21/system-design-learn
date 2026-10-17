@@ -12,7 +12,7 @@ const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)'
 function burst(tiers: TierStep[]) {
   if (reducedMotion()) return;
   const css = getComputedStyle(document.documentElement);
-  const colors = [...new Set(tiers.flatMap((t) => [`--tier-${t}-hi`, `--tier-${t}-lo`]).concat('--accent', '--margin-rule'))]
+  const colors = [...new Set(tiers.flatMap((t) => [`--tier-${t}-hi`, `--tier-${t}-lo`]).concat('--cyan', '--blue', '--amber', '--mag'))]
     .map((v) => css.getPropertyValue(v).trim())
     // confetti needs plain hex/rgb colours, not color-mix() or var()
     .filter((c) => c && !c.includes('('));
@@ -55,7 +55,7 @@ export default function AchievementCelebration({ items, onClose, onViewAll }: { 
     <div className="modal-backdrop ach-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <motion.div
         ref={ref}
-        className={`modal ach-modal ${single ? '' : 'ach-modal-many'}`}
+        className={`modal ach-modal glass ${single ? '' : 'ach-modal-many'}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="ach-title"
@@ -68,18 +68,25 @@ export default function AchievementCelebration({ items, onClose, onViewAll }: { 
         <button type="button" className="btn-ghost icon-btn ach-close" aria-label="Close" onClick={onClose}>
           <X size={18} aria-hidden />
         </button>
-        <span className="eyebrow ach-eyebrow">
-          <Sparkles size={14} aria-hidden /> {single ? 'Achievement unlocked' : 'Achievements unlocked'}
+        <span className="nb-chip amber ach-eyebrow">
+          <Sparkles size={12} aria-hidden /> {single ? 'Achievement unlocked' : 'Achievements unlocked'}
         </span>
 
         {single && first ? (
           <div className="ach-single">
-            <div className="ach-hero" aria-hidden>
-              <motion.div {...pop} transition={reduce ? { duration: 0.2 } : { type: 'spring', stiffness: 170, damping: 14, delay: 0.1 }}>
+            <div className={`ach-hero tier-${first.tier}`} aria-hidden>
+              <span className="ach-hero-glow" />
+              <span className="ach-hero-ring" />
+              <span className="orbit slow">
+                <span className="orbit-dot" />
+              </span>
+              <motion.div className="ach-hero-medal" {...pop} transition={reduce ? { duration: 0.2 } : { type: 'spring', stiffness: 170, damping: 14, delay: 0.1 }}>
                 <AchievementBadge art={first.a.art} tier={first.tier} size="lg" shine />
               </motion.div>
             </div>
-            <h2 id="ach-title">{first.a.name}</h2>
+            <h2 id="ach-title" className="gtext">
+              {first.a.name}
+            </h2>
             {TIER_LABEL[first.tier] && <span className={`ach-tier-pill tier-${first.tier}`}>{TIER_LABEL[first.tier]} tier</span>}
             <p id="ach-desc" className="muted">
               {first.a.description}
@@ -101,7 +108,7 @@ export default function AchievementCelebration({ items, onClose, onViewAll }: { 
                 >
                   <AchievementBadge art={i.a.art} tier={i.tier} size="md" />
                   <span className="ach-burst-name">{i.a.name}</span>
-                  {TIER_LABEL[i.tier] && <span className="small muted">{TIER_LABEL[i.tier]}</span>}
+                  {TIER_LABEL[i.tier] && <span className={`ach-tier-pill tier-${i.tier}`}>{TIER_LABEL[i.tier]}</span>}
                 </motion.li>
               ))}
             </ul>

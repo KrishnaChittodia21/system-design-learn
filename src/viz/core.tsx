@@ -3,6 +3,7 @@
 // backwards, resetting and changing parameters are trivial and deterministic. Components
 // only render the current frame.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ChevronLeft, ChevronRight, CirclePlay, Pause, Play, RotateCcw, Sparkles } from 'lucide-react';
 
 export interface BaseFrame {
   /** one or two sentences narrating what just happened (read by screen readers) */
@@ -126,7 +127,9 @@ export function VizFrame({
     <div className="viz" ref={rootRef} tabIndex={0} onKeyDown={onKey} aria-label={`${title} interactive visualisation`}>
       <div className="viz-head">
         <div>
-          <div className="viz-eyebrow">▶ Interactive</div>
+          <div className="viz-eyebrow">
+            <CirclePlay size={13} aria-hidden /> Interactive
+          </div>
           <div className="viz-title">{title}</div>
           {blurb && <div className="viz-blurb">{blurb}</div>}
         </div>
@@ -142,7 +145,8 @@ export function VizFrame({
       </div>
       {frame.predict && (
         <div className="viz-predict">
-          <strong>🤔 Predict:</strong> {frame.predict}{' '}
+          <Sparkles size={15} aria-hidden className="viz-predict-ic" />
+          <strong>Predict:</strong> {frame.predict}{' '}
           {!revealed ? (
             <button type="button" className="link-btn" onClick={() => setRevealed(true)}>
               Think, then reveal →
@@ -155,23 +159,23 @@ export function VizFrame({
         </div>
       )}
       <div className="viz-transport">
-        <button type="button" className="btn btn-xs" onClick={stepper.reset} aria-label="Reset">
-          ⏮
+        <button type="button" className="btn btn-xs viz-tbtn" onClick={stepper.reset} aria-label="Reset">
+          <RotateCcw size={14} aria-hidden />
         </button>
-        <button type="button" className="btn btn-xs" onClick={stepper.prev} disabled={i === 0} aria-label="Previous step">
-          ◀
+        <button type="button" className="btn btn-xs viz-tbtn" onClick={stepper.prev} disabled={i === 0} aria-label="Previous step">
+          <ChevronLeft size={16} aria-hidden />
         </button>
         {playing ? (
-          <button type="button" className="btn btn-xs btn-primary" onClick={stepper.pause} aria-label="Pause">
-            ❚❚ Pause
+          <button type="button" className="btn btn-xs btn-primary viz-play" onClick={stepper.pause} aria-label="Pause">
+            <Pause size={14} aria-hidden /> Pause
           </button>
         ) : (
-          <button type="button" className="btn btn-xs btn-primary" onClick={stepper.play} aria-label="Play">
-            ▶ Play
+          <button type="button" className="btn btn-xs btn-primary viz-play" onClick={stepper.play} aria-label="Play">
+            <Play size={14} aria-hidden /> Play
           </button>
         )}
-        <button type="button" className="btn btn-xs" onClick={stepper.next} disabled={i === total - 1} aria-label="Next step">
-          ▶
+        <button type="button" className="btn btn-xs viz-tbtn" onClick={stepper.next} disabled={i === total - 1} aria-label="Next step">
+          <ChevronRight size={16} aria-hidden />
         </button>
         <input
           className="viz-scrub"

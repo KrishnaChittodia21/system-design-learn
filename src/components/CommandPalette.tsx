@@ -44,11 +44,11 @@ interface Item {
 }
 
 const PAGES: Item[] = [
-  { id: 'page:home', label: 'Dashboard', href: '/', icon: LayoutDashboard, keywords: ['home', 'progress'] },
+  { id: 'page:home', label: 'Today', hint: 'your next step and progress', href: '/', icon: LayoutDashboard, keywords: ['home', 'dashboard', 'progress'] },
   { id: 'page:contents', label: 'Contents', hint: 'everything in this course', href: '/contents', icon: ListTree, keywords: ['index', 'syllabus'] },
-  { id: 'page:weak', label: 'Weak Areas', href: '/weak-areas', icon: Target, keywords: ['mistakes', 'revise'] },
+  { id: 'page:weak', label: 'Weak areas', href: '/weak-areas', icon: Target, keywords: ['mistakes', 'revise'] },
   { id: 'page:practice', label: 'Practice', hint: 'drill missed exam questions', href: '/practice', icon: Dumbbell, keywords: ['drill', 'mistakes'] },
-  { id: 'page:companies', label: 'Company track', href: '/companies', icon: Building, keywords: ['mock', 'interview'] },
+  { id: 'page:companies', label: 'Companies', hint: 'company track', href: '/companies', icon: Building, keywords: ['company track', 'mock', 'interview'] },
   { id: 'page:achievements', label: 'Achievements', hint: 'badges earned and what unlocks next', href: '/achievements', icon: Award, keywords: ['badges', 'milestones', 'rewards', 'trophies', 'medals'] },
   { id: 'page:settings', label: 'Settings', href: '/settings', icon: Settings, keywords: ['theme', 'pass mark', 'reset'] },
 ];
@@ -135,14 +135,16 @@ export default function CommandPalette() {
   );
 
   const isDark =
-    p.settings.theme === 'dark' || (p.settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    p.settings.theme === 'dark' || (p.settings.theme === 'system' && !window.matchMedia('(prefers-color-scheme: light)').matches);
   const q = search.trim();
 
   const row = (item: Item, prefix = '') => {
     const Icon = item.icon;
     return (
       <Command.Item key={prefix + item.id} value={prefix + item.id} keywords={[item.label, item.hint ?? '', ...(item.keywords ?? [])]} onSelect={() => go(item)}>
-        <Icon size={16} aria-hidden />
+        <span className="cmdk-ic" aria-hidden>
+          <Icon size={16} aria-hidden />
+        </span>
         <span className="cmdk-label">{item.label}</span>
         {item.hint && <span className="cmdk-hint">{item.hint}</span>}
       </Command.Item>
@@ -153,7 +155,7 @@ export default function CommandPalette() {
     <div className="modal-backdrop cmdk-backdrop" onMouseDown={(e) => e.target === e.currentTarget && closePalette()}>
       <motion.div
         ref={ref}
-        className="cmdk-panel"
+        className="cmdk-panel glass"
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"
@@ -163,7 +165,9 @@ export default function CommandPalette() {
       >
         <Command label="Command palette" loop filter={rank}>
           <div className="cmdk-input-row">
-            <Search size={18} aria-hidden />
+            <span className="cmdk-search-ic" aria-hidden>
+              <Search size={17} aria-hidden />
+            </span>
             <Command.Input value={search} onValueChange={setSearch} placeholder="Search topics, sections, company questions…" data-autofocus />
             <button type="button" className="cmdk-close" onClick={closePalette} aria-label="Close search">
               <kbd>Esc</kbd>
@@ -185,7 +189,9 @@ export default function CommandPalette() {
                   go({ id: 'action:next', label: 'Go to my next step', href: s.href });
                 }}
               >
-                <ArrowRight size={16} aria-hidden />
+                <span className="cmdk-ic accent" aria-hidden>
+                  <ArrowRight size={16} aria-hidden />
+                </span>
                 <span className="cmdk-label">Go to my next step</span>
               </Command.Item>
               <Command.Item
@@ -196,7 +202,9 @@ export default function CommandPalette() {
                   openTour();
                 }}
               >
-                <Compass size={16} aria-hidden />
+                <span className="cmdk-ic" aria-hidden>
+                  <Compass size={16} aria-hidden />
+                </span>
                 <span className="cmdk-label">Open the guide</span>
               </Command.Item>
               <Command.Item
@@ -207,7 +215,9 @@ export default function CommandPalette() {
                   closePalette();
                 }}
               >
-                {isDark ? <SunMoon size={16} aria-hidden /> : <Moon size={16} aria-hidden />}
+                <span className="cmdk-ic" aria-hidden>
+                  {isDark ? <SunMoon size={16} aria-hidden /> : <Moon size={16} aria-hidden />}
+                </span>
                 <span className="cmdk-label">Switch to {isDark ? 'light' : 'dark'} mode</span>
               </Command.Item>
             </Command.Group>
@@ -217,14 +227,14 @@ export default function CommandPalette() {
             {company.length > 0 && <Command.Group heading="Company questions">{company.map((i) => row(i))}</Command.Group>}
             {capstones.length > 0 && <Command.Group heading="Capstone projects">{capstones.map((i) => row(i))}</Command.Group>}
           </Command.List>
-          <div className="cmdk-foot small muted">
+          <div className="cmdk-foot">
             <span>
               <kbd>↑</kbd> <kbd>↓</kbd> move
             </span>
             <span>
               <kbd>Enter</kbd> open
             </span>
-            <span>Sections appear once you type 2+ letters</span>
+            <span className="cmdk-foot-note">Sections appear once you type 2+ letters</span>
           </div>
         </Command>
       </motion.div>

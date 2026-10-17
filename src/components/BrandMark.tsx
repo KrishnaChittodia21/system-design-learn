@@ -1,18 +1,36 @@
+import { useId } from 'react';
+
 /**
- * System Design's mark: a gradient tile (the accent's --brand-gradient) carrying the smallest system diagram —
- * a component, a wire, the downstream component, and an amber "signal" dot in the accent's counterpoint colour.
- * The tile follows the theme and the chosen accent. The same drawing is the favicon (public/favicon.svg).
+ * SysDesign.prep's mark (Blueprint Nebula): a rounded blueprint tile drawn with the brand gradient
+ * (blue → cyan → amber) and a load balancer fanning one request out to three nodes.
+ * Decorative: the accessible name lives on the link that wraps it.
  */
 export function BrandMark({ size = 30 }: { size?: number }) {
-  const glyph = Math.round(size * 0.64);
+  const id = `bm${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   return (
-    <span className="brand-tile" style={{ width: size, height: size, borderRadius: Math.round(size * 0.3) }} aria-hidden>
-      <svg className="brand-mark" width={glyph} height={glyph} viewBox="0 0 24 24" fill="none" focusable="false">
-        <rect x="2.5" y="3" width="8.5" height="6.5" rx="1.8" stroke="currentColor" strokeWidth="1.8" />
-        <path d="M6.75 9.5v4.25a1.75 1.75 0 0 0 1.75 1.75H13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-        <rect x="13" y="12.5" width="8.5" height="6.5" rx="1.8" fill="currentColor" />
-        <circle cx="18" cy="5.75" r="2.3" fill="var(--accent-2)" stroke="currentColor" strokeWidth="1.2" />
-      </svg>
-    </span>
+    <svg className="nb-mark" width={size} height={size} viewBox="0 0 32 32" aria-hidden focusable="false">
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#3b82f6" />
+          <stop offset=".55" stopColor="#22d3ee" />
+          <stop offset="1" stopColor="#fbbf24" />
+        </linearGradient>
+      </defs>
+      <rect x="1.5" y="1.5" width="29" height="29" rx="9" fill="none" stroke={`url(#${id})`} strokeWidth="1.8" />
+      <path d="M9 16h5M14 16l6-6.5M14 16h6M14 16l6 6.5" fill="none" stroke={`url(#${id})`} strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="8" cy="16" r="2.6" fill="#22d3ee" />
+      <circle cx="22" cy="9.5" r="2" fill="#60a5fa" />
+      <circle cx="22" cy="16" r="2" fill="#22d3ee" />
+      <circle cx="22" cy="22.5" r="2" fill="#fbbf24" />
+    </svg>
+  );
+}
+
+/** The "SysDesign.prep" wordmark (Unbounded; the dot takes the cyan signal colour). */
+export function Wordmark() {
+  return (
+    <b className="nb-wordmark">
+      SysDesign<span>.</span>prep
+    </b>
   );
 }

@@ -1,0 +1,477 @@
+/* =====================================================================
+   LEGACY "Blueprint v4" surface layer (formerly src/styles/blueprint.css), loaded after legacy.css.
+   Its token block, page mesh, top bar, sidebar and footer rules were removed (tokens.css / shell.css own them).
+   The remaining per-screen rules are still in use: screen owners move what they need into their own
+   file (today.css, topic.css, …) and delete it here.
+   ===================================================================== */
+
+/* ---------- type ---------- */
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--display);
+  font-weight: 650;
+  letter-spacing: -0.022em;
+  line-height: 1.22;
+}
+h1 {
+  font-size: 2.1rem;
+  font-weight: 700;
+  letter-spacing: -0.032em;
+  line-height: 1.12;
+}
+h2 {
+  font-size: 1.36rem;
+}
+h3 {
+  font-size: 1.08rem;
+  letter-spacing: -0.015em;
+}
+.lead,
+.context,
+.toc-title .muted {
+  font-family: var(--sans);
+}
+.lead {
+  font-size: 1.08rem;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+}
+.eyebrow::before {
+  content: '';
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--brand-gradient);
+  flex: none;
+}
+.label {
+  letter-spacing: 0.1em;
+  font-size: 0.68rem;
+}
+a:hover {
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* ---------- focus: a soft halo plus a crisp outline ---------- */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--focus-ring);
+}
+
+/* ---------- surfaces ---------- */
+.card {
+  border-radius: var(--radius-lg);
+  border-color: color-mix(in srgb, var(--border) 90%, transparent);
+  box-shadow: var(--shadow-sm);
+  padding: 22px 24px;
+}
+.card.info,
+.info {
+  background: color-mix(in srgb, var(--accent-soft) 80%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: none;
+}
+.topic-card,
+.tool-card {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform 0.25s var(--ease-out),
+    box-shadow 0.25s var(--ease-out),
+    border-color 0.2s;
+}
+.topic-card:hover,
+a.tool-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+
+/* ---------- buttons ---------- */
+.btn,
+.btn-ghost {
+  border-radius: 10px;
+  min-height: 38px;
+  padding: 7px 15px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  transition:
+    transform 0.18s var(--ease-out),
+    box-shadow 0.2s var(--ease-out),
+    border-color 0.15s,
+    background-color 0.15s,
+    color 0.15s;
+}
+.btn {
+  border-color: color-mix(in srgb, var(--control) 55%, var(--border));
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--control);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+}
+.btn-ghost:hover {
+  background: color-mix(in srgb, var(--surface-2) 85%, transparent);
+}
+.btn-primary {
+  position: relative;
+  border: 1px solid transparent;
+  background: var(--btn-gradient);
+  color: var(--accent-text);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 1px 2px color-mix(in srgb, var(--accent) 30%, transparent),
+    0 8px 20px -10px color-mix(in srgb, var(--accent) 75%, transparent);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--btn-gradient);
+  border-color: transparent;
+  color: var(--accent-text);
+  filter: brightness(1.06) saturate(1.05);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 2px 4px color-mix(in srgb, var(--accent) 30%, transparent),
+    0 14px 28px -12px color-mix(in srgb, var(--accent) 80%, transparent);
+}
+.btn-danger {
+  border-color: transparent;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 8px 18px -10px color-mix(in srgb, var(--bad) 70%, transparent);
+}
+.btn-lg {
+  min-height: 46px;
+  padding: 10px 22px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+}
+.btn-sm {
+  border-radius: 9px;
+}
+.btn-xs {
+  border-radius: 7px;
+}
+.btn:active:not(:disabled),
+.btn-ghost:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
+}
+.link-btn {
+  border-radius: 4px;
+}
+
+/* ---------- badges, pills, chips ---------- */
+.pill,
+.badge,
+.status-pill,
+.ach-tier-pill {
+  border-radius: 999px;
+}
+.badge {
+  padding: 2px 9px;
+}
+.chip,
+.chip-link,
+.segmented button {
+  border-radius: 999px;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s,
+    color 0.15s,
+    box-shadow 0.2s;
+}
+.chip {
+  padding: 4px 14px;
+  border-color: var(--border);
+}
+.chip:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  color: var(--text);
+}
+.chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  box-shadow: 0 6px 14px -8px color-mix(in srgb, var(--accent) 80%, transparent);
+}
+.chip.on .chip-count {
+  color: inherit;
+  opacity: 0.85;
+}
+.chip-nailed.on,
+.chip-partial.on,
+.chip-missed.on {
+  box-shadow: none;
+}
+/* filter chip rows that use a sliding pill */
+.pill-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  width: fit-content;
+  max-width: 100%;
+}
+.pill-group .chip {
+  position: relative;
+  isolation: isolate;
+  border: 0;
+  background: transparent;
+  min-height: 30px;
+}
+.pill-group .chip.on {
+  background: transparent;
+  color: var(--accent-text);
+  box-shadow: none;
+}
+.chip-pill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 999px;
+  background: var(--btn-gradient);
+  box-shadow: 0 6px 14px -8px color-mix(in srgb, var(--accent) 80%, transparent);
+}
+
+/* ---------- progress fills ---------- */
+.pbar,
+.dv-meter {
+  border-radius: 999px;
+  overflow: hidden;
+}
+.pbar {
+  height: 6px;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 60%, transparent);
+}
+.pbar-fill,
+.dv-meter span {
+  border-radius: 999px;
+  background: var(--brand-gradient);
+}
+.pbar-good {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--good) 75%, var(--surface)), var(--good));
+}
+
+/* ---------- forms ---------- */
+input:not([type='checkbox']):not([type='radio']):not([type='range']),
+textarea,
+select {
+  border-radius: 10px;
+}
+.answer-box:focus,
+.editor:focus-within,
+.search:focus {
+  border-color: var(--ring);
+  box-shadow: var(--focus-ring);
+}
+.form input[type='number'] {
+  border-radius: 8px;
+}
+:not(pre) > code,
+.inline-code {
+  border-radius: 6px;
+}
+.hint,
+.model-answer,
+.insight,
+.judge,
+.viz-caption,
+.viz-predict,
+.prereq {
+  border-radius: var(--radius);
+}
+
+/* ---------- exam ---------- */
+
+/* ---------- companies / weak areas ---------- */
+
+.weak-card {
+  border-left-width: 3px;
+}
+
+.company-card.locked {
+  background: repeating-linear-gradient(-45deg, var(--surface), var(--surface) 10px, color-mix(in srgb, var(--surface-2) 70%, transparent) 10px, color-mix(in srgb, var(--surface-2) 70%, transparent) 20px);
+}
+
+/* ---------- contents page: numbered phase markers on a connector wire ---------- */
+
+.phase-num {
+  justify-content: center;
+  min-width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  background: var(--btn-gradient);
+  color: var(--accent-text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 6px 14px -8px color-mix(in srgb, var(--accent) 80%, transparent);
+}
+.phase-num svg {
+  color: inherit;
+}
+
+/* a node on the wire for every topic */
+
+.tool-card {
+  padding: 16px 18px;
+}
+.tool-card > svg {
+  padding: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+}
+
+/* ---------- dashboard ---------- */
+/* hero: a blueprint sheet; the next step is the focal point, the record ledger a raised panel beside it */
+
+/* the blueprint grid fades out towards the ledger */
+
+/* the hero diagram: a small system drawn in thin blueprint lines (decorative) */
+
+/* section heads: display title over a thin gradient rule */
+.dash-section-head {
+  position: relative;
+  padding-bottom: 12px;
+}
+.dash-section-head::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 45%, transparent), color-mix(in srgb, var(--accent-2) 30%, transparent) 40%, var(--border) 70%, transparent);
+}
+.dash-section-head h2 {
+  font-size: 1.42rem;
+  letter-spacing: -0.03em;
+}
+
+/* charts and key numbers */
+.dv-card,
+.chart-card {
+  border-radius: var(--radius-lg);
+}
+.dv-title {
+  font-family: var(--display);
+  font-size: 1.02rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.dv-stat-value,
+.kpi-value,
+.ach-count {
+  font-family: var(--display);
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+.dv-kpis,
+.kpi-row {
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  padding: 0 4px 0 18px;
+}
+
+.dv-empty {
+  border-radius: var(--radius);
+}
+.dv-tip {
+  border-radius: 10px;
+}
+.dv-heat-cell {
+  border-radius: 4px;
+}
+.dv-bar {
+  border-radius: 0 999px 999px 0;
+}
+.dv-col {
+  border-radius: 6px 6px 0 0;
+}
+
+kbd {
+  border-radius: 6px;
+  border-color: var(--border-strong);
+  background: var(--surface);
+  box-shadow: 0 1px 0 var(--border-strong);
+  border-bottom-width: 1px;
+}
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+.btn-ghost,
+.topic-card,
+.tool-card,
+.ach-card,
+.ink-swatch {
+    transition: none;
+  }
+  .btn-primary:hover:not(:disabled),
+  .topic-card:hover,
+  a.tool-card:hover,
+  .ach-card.is-earned:hover,
+  .ink-swatch:hover {
+    transform: none;
+  }
+}
+
+.route-motion {
+  display: contents;
+}
+/* long question prompts read as text, not as display headlines */
+.iq .section-head h3,
+.boe .section-head h3 {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 1.06rem;
+  letter-spacing: -0.008em;
+  line-height: 1.45;
+}
+.iq .section-num,
+.boe .section-num {
+  display: inline-block;
+  padding: 1px 7px;
+  margin-right: 8px;
+  border-radius: 7px;
+  background: var(--accent-soft);
+  font-size: 0.74rem;
+  vertical-align: 0.08em;
+}
+/* fields that draw their own focus state (a ring on the field or on its wrapper) skip the global outline */
+.search:focus-visible,
+.answer-box:focus-visible,
+.editor-textarea:focus-visible {
+  outline: none;
+}
+.cmdk-input-row input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.modal:focus-visible,
+.dv-hit:focus-visible {
+  outline: none;
+}
+.modal:focus-visible {
+  box-shadow: var(--shadow-lg);
+}
+/* forced colours (Windows contrast themes): no gradient text, plain system text instead */
+
