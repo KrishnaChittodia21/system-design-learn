@@ -1,17 +1,17 @@
 import { Link } from 'react-router-dom';
-import { Diamond } from 'lucide-react';
+import { BrandMark } from './BrandMark';
 
-/** Site footer at the end of every page: brand on the left, copyright on the right. */
+/** Footer at the end of every page: brand on the left, copyright on the right (as in QA Learn). */
 export function Footer() {
   return (
     <footer className="site-footer">
-      <Link to="/" className="brand footer-brand">
-        <span className="brand-tile" aria-hidden>
-          <Diamond size={15} strokeWidth={2.5} />
-        </span>
-        System Design
-      </Link>
-      <span className="footer-copy">© 2026 System Design Interview Prep</span>
+      <div className="footer-row">
+        <Link to="/" className="brand footer-brand">
+          <BrandMark size={20} />
+          <span className="brand-name">System Design</span>
+        </Link>
+        <span className="footer-copy">© 2026 System Design Interview Prep</span>
+      </div>
     </footer>
   );
 }

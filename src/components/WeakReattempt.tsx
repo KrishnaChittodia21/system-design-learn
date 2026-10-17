@@ -31,22 +31,10 @@ export function WeakReattempt({ weak, answered, passMark, firstExamHref }: { wea
   return (
     <section className="dash-section" aria-labelledby="weak-title">
       <div className="dash-section-head">
-        <div>
-          <div className="eyebrow">
-            <Target size={14} aria-hidden /> Weak areas
-          </div>
-          <h2 id="weak-title">Weak areas &amp; how to reattempt them</h2>
-        </div>
-        <div className="row gap-s wrap">
-          {totalWrong > 0 && (
-            <Link to="/practice" className="btn btn-primary">
-              <RotateCcw size={16} aria-hidden /> Practise all {totalWrong} wrong answer{totalWrong === 1 ? '' : 's'}
-            </Link>
-          )}
-          <Link to="/weak-areas" className="btn">
-            Full analysis →
-          </Link>
-        </div>
+        <h2 id="weak-title">Weak areas &amp; how to reattempt them</h2>
+        <Link to="/weak-areas" className="small">
+          Full weak-areas analysis →
+        </Link>
       </div>
       <div className="weak-grid">
         <ChartCard
@@ -105,7 +93,9 @@ export function WeakReattempt({ weak, answered, passMark, firstExamHref }: { wea
           )}
         </ChartCard>
         <aside className="card weak-howto" aria-labelledby="howto-title">
-          <h3 id="howto-title">How to clear a weak area</h3>
+          <h3 id="howto-title">
+            <Target size={16} aria-hidden className="card-icon" /> How to clear a weak area
+          </h3>
           <ol>
             <li>
               <strong>Practise the wrong answers.</strong> The mistakes drill asks only the questions whose <em>latest</em> answer was
@@ -125,9 +115,16 @@ export function WeakReattempt({ weak, answered, passMark, firstExamHref }: { wea
               rated partial or missed. Re-rate those after practising them.
             </li>
           </ol>
-          <Link to="/weak-areas" className="small">
-            See the full Weak Areas analysis →
-          </Link>
+          <div className="row gap-s wrap">
+            {totalWrong > 0 && (
+              <Link to="/practice" className="btn btn-primary btn-sm">
+                <RotateCcw size={14} aria-hidden /> Practise all {totalWrong} wrong answer{totalWrong === 1 ? '' : 's'}
+              </Link>
+            )}
+            <Link to="/weak-areas" className="btn btn-sm">
+              Weak areas page
+            </Link>
+          </div>
         </aside>
       </div>
     </section>

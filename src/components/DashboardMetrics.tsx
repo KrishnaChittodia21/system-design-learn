@@ -1,25 +1,20 @@
 import { Link } from 'react-router-dom';
-import { BarChart3, Lock, LockOpen } from 'lucide-react';
 import type { Topic } from '../types';
 import type { Progress } from '../lib/progress';
 import { localDay } from '../lib/progress';
 import { studyStreak } from '../lib/streak';
 import {
-  activeDaysLastWeek,
   activityGrid,
   attemptTimeline,
   averageBest,
   difficultyAccuracy,
   examScores,
   mcqAccuracy,
-  practiceVolume,
   ratingCounts,
-  statusCounts,
 } from '../lib/metrics';
 import { CountUp } from './CountUp';
 import { ChartCard } from './charts/ChartCard';
 import { StatTile } from './charts/StatTile';
-import { Donut } from './charts/Donut';
 import { BarList } from './charts/BarList';
 import { ColumnChart } from './charts/ColumnChart';
 import { LineChart } from './charts/LineChart';
@@ -32,24 +27,13 @@ function shortDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
-/** The dashboard's Metrics section: KPI row plus a responsive grid of chart cards. */
-export function DashboardMetrics({
-  p,
-  topics,
-  readiness,
-  companyTotal,
-  companyUnlocked,
-  firstExamHref,
-}: {
-  p: Progress;
-  topics: Topic[];
-  readiness: number;
-  companyTotal: number;
-  companyUnlocked: boolean;
-  firstExamHref: string;
-}) {
+/**
+ * The dashboard's "Study record": a KPI strip plus a responsive grid of chart cards. Topics passed, exam
+ * answers, mistakes and the streak live in the Record ledger at the top, practice volume in "Progress at a
+ * glance", so they are not repeated here.
+ */
+export function DashboardMetrics({ p, topics, readiness, firstExamHref }: { p: Progress; topics: Topic[]; readiness: number; firstExamHref: string }) {
   const today = localDay();
-  const status = statusCounts(p, topics);
   const scores = examScores(p, topics);
   const avg = averageBest(p, topics);
   const acc = mcqAccuracy(p, topics);
@@ -58,10 +42,8 @@ export function DashboardMetrics({
   const ratings = ratingCounts(p, topics);
   const timeline = attemptTimeline(p, topics);
   const streak = studyStreak(p.activityDays, today);
-  const week = activeDaysLastWeek(p.activityDays, today);
   const grid = activityGrid(p.activityDays, today, 12);
   const studied12 = grid.flat().filter((c) => c.active).length;
-  const volume = practiceVolume(p, topics, companyTotal);
   const passMark = p.settings.passMark;
   const takeExam = (
     <Link className="btn" to={firstExamHref}>
@@ -72,27 +54,11 @@ export function DashboardMetrics({
   return (
     <section className="dash-section" aria-labelledby="metrics-title">
       <div className="dash-section-head">
-        <div>
-          <div className="eyebrow">
-            <BarChart3 size={14} aria-hidden /> Metrics
-          </div>
-          <h2 id="metrics-title">How you are doing</h2>
-        </div>
+        <h2 id="metrics-title">Study record</h2>
       </div>
 
       <div className="dv-kpis">
-        <StatTile
-          label="Exams passed"
-          value={
-            <>
-              <CountUp value={status.passed} />
-              <span className="dv-stat-of">/{status.total}</span>
-            </>
-          }
-          meter={(status.passed / Math.max(1, status.total)) * 100}
-          hint={`pass mark ${passMark}%`}
-        />
-        <StatTile label="Readiness" value={<CountUp value={readiness} suffix="%" />} meter={readiness} hint="avg. completion of every topic" />
+        <StatTile label="Readiness" value={<CountUp value={readiness} suffix="%" />} meter={readiness} hint="average completion of every topic" />
         <StatTile label="Average best score" value={avg === null ? '—' : <CountUp value={avg} suffix="%" />} hint={scores.length ? `over ${scores.length} exam${scores.length === 1 ? '' : 's'} taken` : 'no exams yet'} />
         <StatTile label="Exam question accuracy" value={accPct === null ? '—' : <CountUp value={accPct} suffix="%" />} hint={acc.seen ? `${acc.correct}/${acc.seen} latest answers right` : 'answer a question to see this'} />
         <StatTile
@@ -106,46 +72,9 @@ export function DashboardMetrics({
           meter={(ratings.rated / Math.max(1, ratings.total)) * 100}
           hint="self-rated after answering"
         />
-        <StatTile
-          label="Study streak"
-          value={
-            <>
-              <CountUp value={streak} /> <span className="dv-stat-of">day{streak === 1 ? '' : 's'}</span>
-            </>
-          }
-          hint={`${week} of the last 7 days`}
-        />
       </div>
 
       <div className="dv-grid-cards">
-        <ChartCard
-          title="Overall progress"
-          subtitle={`${status.total} topics by status`}
-          table={{
-            columns: ['Status', 'Topics', 'Share'],
-            rows: [
-              ['Passed', status.passed, `${Math.round((status.passed / Math.max(1, status.total)) * 100)}%`],
-              ['In progress', status.inProgress, `${Math.round((status.inProgress / Math.max(1, status.total)) * 100)}%`],
-              ['Not started', status.notStarted, `${Math.round((status.notStarted / Math.max(1, status.total)) * 100)}%`],
-            ],
-          }}
-        >
-          <Donut
-            slices={[
-              { id: 'passed', label: 'Passed', value: status.passed, color: 'var(--dv-ord-3)' },
-              { id: 'progress', label: 'In progress', value: status.inProgress, color: 'var(--dv-ord-2)' },
-              { id: 'new', label: 'Not started', value: status.notStarted, color: 'var(--dv-rest)' },
-            ]}
-            unit=" topics"
-            center={
-              <>
-                <span className="dv-donut-value">{status.passed}</span>
-                <span className="dv-donut-caption">of {status.total} passed</span>
-              </>
-            }
-          />
-        </ChartCard>
-
         <ChartCard
           title="Exam scores"
           subtitle={scores.length ? `Best score per exam, most recent first · line = pass mark ${passMark}%` : undefined}
@@ -273,31 +202,6 @@ export function DashboardMetrics({
             <span className="dv-key dv-key-rect dv-key-today" aria-hidden />
             <span>today</span>
           </p>
-        </ChartCard>
-
-        <ChartCard
-          title="Practice done"
-          subtitle={
-            <>
-              Share of each kind of practice completed ·{' '}
-              <span className={`dv-lock ${companyUnlocked ? 'on' : ''}`}>
-                {companyUnlocked ? <LockOpen size={12} aria-hidden /> : <Lock size={12} aria-hidden />} company track {companyUnlocked ? 'unlocked' : 'locked'}
-              </span>
-            </>
-          }
-          table={{ columns: ['Practice', 'Done', 'Total', 'Share'], rows: volume.map((v) => [v.label, v.done, v.total, `${v.pct}%`]) }}
-        >
-          <BarList
-            seriesLabel="Practice completed by kind"
-            rows={volume.map((v) => ({
-              id: v.id,
-              label: v.label,
-              value: v.pct,
-              display: `${v.done}/${v.total}`,
-              detail: v.id === 'company' && !companyUnlocked ? `${v.pct}% · unlocks after every exam is passed` : `${v.pct}% done`,
-              href: v.href,
-            }))}
-          />
         </ChartCard>
       </div>
     </section>

@@ -27,7 +27,10 @@ export interface Settings {
   mockMinutes: number;
   /** study-first lock: which practice unlocks only after every Learn section is marked read */
   studyLock: 'off' | 'exam' | 'exam-interview';
-  /** UI accent theme (optional; older saves default to indigo) */
+  /**
+   * Settings → Ink (applied as data-accent on <html> by lib/theme.ts). Optional, so saves made before it existed
+   * load unchanged; a missing value means 'indigo' (blue-black).
+   */
   accent?: Accent;
 }
 

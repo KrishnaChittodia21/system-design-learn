@@ -4,7 +4,7 @@ import type { Difficulty, Topic } from '../types';
 import type { Phase } from '../content/phases';
 import type { Progress } from './progress';
 import { topicStatus } from './stats';
-import { accuracyBreakdown, type Accuracy } from './weak';
+import { accuracyBreakdown, currentlyWrong, type Accuracy } from './weak';
 
 export interface StatusCounts {
   passed: number;
@@ -30,20 +30,26 @@ export interface PhaseProgress {
   number: number;
   title: string;
   passed: number;
+  inProgress: number;
+  notStarted: number;
   total: number;
-  /** 0–100, rounded */
+  /** passed share, 0–100, rounded */
   pct: number;
 }
 
-/** exams passed per phase, in course order; phases without topics are left out */
+/** topic status counts per phase, in course order; phases without topics are left out */
 export function phaseProgress(p: Progress, topics: Topic[], phases: Phase[]): PhaseProgress[] {
   return phases
     .map((ph) => {
-      const ts = topics.filter((t) => t.phase === ph.id);
-      const passed = ts.filter((t) => !!p.tests[t.id]?.passedAt).length;
-      return { id: ph.id, number: ph.number, title: ph.title, passed, total: ts.length, pct: ts.length ? Math.round((passed / ts.length) * 100) : 0 };
+      const c = statusCounts(p, topics.filter((t) => t.phase === ph.id));
+      return { id: ph.id, number: ph.number, title: ph.title, passed: c.passed, inProgress: c.inProgress, notStarted: c.notStarted, total: c.total, pct: c.total ? Math.round((c.passed / c.total) * 100) : 0 };
     })
     .filter((x) => x.total > 0);
+}
+
+/** exam questions whose latest answer is wrong, counted over current content: exactly what the mistakes drill (/practice) asks */
+export function mistakesToDrill(p: Progress, topics: Topic[]): number {
+  return topics.reduce((n, t) => n + currentlyWrong(p, t).length, 0);
 }
 
 export interface ExamScore {

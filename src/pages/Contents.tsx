@@ -29,7 +29,7 @@ import { codeLabLabel } from '../lib/nextStep';
 import { currentlyWrong, weakTopics } from '../lib/weak';
 import { VIZ, vizForSection } from '../viz/registry';
 import { ProgressRing } from '../components/ProgressRing';
-import { shortTitle } from '../lib/labels';
+import { phaseCode, shortTitle, topicCode } from '../lib/labels';
 import type { Topic } from '../types';
 
 /** section → has an interactive visualisation (computed once) */
@@ -216,7 +216,7 @@ export default function ContentsPage() {
               aria-expanded={open}
               onClick={() => setCollapsed((c) => ({ ...c, [ph.id]: !c[ph.id] }))}
             >
-              <span className="phase-num">{ph.number}</span>
+              <span className="phase-num">{phaseCode(ph.number)}</span>
               <span className="contents-phase-text">
                 <span className="contents-phase-title">
                   <Hl text={ph.title} q={q} />
@@ -284,6 +284,7 @@ function TopicEntry({ view, q }: { view: TopicView; q: string }) {
         </ProgressRing>
         <div className="contents-topic-title">
           <Link to={base}>
+            <span className="contents-ref">{topicCode(TOPICS, PHASES, t.id)}</span>
             <Hl text={t.title} q={q} />
           </Link>
           <div className="muted small">

@@ -17,13 +17,15 @@ import { topicSteps } from '../lib/nextStep';
 import { StudyPath, type TabId } from '../components/StudyPath';
 import { CoachTip } from '../components/CoachTip';
 import { NextUp } from '../components/NextUp';
-import { ProgressRing } from '../components/ProgressRing';
+import { topicCode } from '../lib/labels';
 import { BookOpen, CirclePlay, Crosshair, Library, Lightbulb, Lock } from 'lucide-react';
 import { PREREQS } from '../content/prereqs';
 import { projectsForTopic } from '../content/projects';
 import { CapstoneTab } from '../components/Capstone';
 import { vizForSection } from '../viz/registry';
 import { currentlyWrong, weakSections } from '../lib/weak';
+
+const STATUS_TEXT = { new: 'Not started', 'in-progress': 'In progress', passed: 'Exam passed' } as const;
 
 const TAB_IDS: TabId[] = ['learn', 'code', 'interview', 'envelope', 'cheat', 'capstone', 'exam'];
 
@@ -122,20 +124,39 @@ export default function TopicPage() {
         </div>
         <h1>{topic.title}</h1>
         <p className="lead">{topic.subtitle}</p>
-        <div className="row wrap gap-s">
-          <Badge>{topic.estimatedMinutes} min</Badge>
-          {topic.tags.slice(0, 8).map((t) => (
-            <Badge key={t} tone="tag">
-              {t}
-            </Badge>
-          ))}
-        </div>
-        {topic.sources.length > 0 && <p className="muted small">Sources: {topic.sources.join(' · ')}</p>}
-        <div className="topic-progress">
-          <ProgressRing value={pct} size={34} tone={pct === 100 ? 'good' : undefined} />
-          <ProgressBar value={pct} tone={pct === 100 ? 'good' : undefined} />
-          <span className="small muted">{pct}% complete</span>
-        </div>
+        <dl className="topic-meta" aria-label="About this topic">
+          <div>
+            <dt>Ref</dt>
+            <dd className="mono">{topicCode(TOPICS, PHASES, topic.id)}</dd>
+          </div>
+          <div>
+            <dt>Reading time</dt>
+            <dd>{topic.estimatedMinutes} min</dd>
+          </div>
+          <div>
+            <dt>Sections</dt>
+            <dd>{topic.sections.length}</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd>{STATUS_TEXT[topicStatus(p, topic)]}</dd>
+          </div>
+          <div>
+            <dt>Complete</dt>
+            <dd className="topic-progress">
+              <ProgressBar value={pct} tone={pct === 100 ? 'good' : undefined} />
+              <span className="mono small">{pct}%</span>
+            </dd>
+          </div>
+        </dl>
+        {topic.tags.length > 0 && (
+          <p className="topic-tags" aria-label="Tags">
+            {topic.tags.slice(0, 8).map((t) => (
+              <span key={t}>{t}</span>
+            ))}
+          </p>
+        )}
+        {topic.sources.length > 0 && <p className="topic-sources">Sources: {topic.sources.join(' · ')}</p>}
         {topic.phase === 'miscellaneous' && (
           <div className="card info small misc-note">
             This is a <strong>question bank</strong> with short refreshers. Every concept below has a <strong>Learn this first</strong>{' '}

@@ -51,7 +51,7 @@ export function ProgressRing({
           r={r}
           strokeWidth={stroke}
           fill="none"
-          strokeLinecap="round"
+          strokeLinecap="butt"
           strokeDasharray={c}
           initial={{ strokeDashoffset: c }}
           animate={{ strokeDashoffset: c - (v / 100) * c }}

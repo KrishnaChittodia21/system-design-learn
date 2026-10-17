@@ -1,14 +1,14 @@
-import { Check, Compass, Lightbulb } from 'lucide-react';
-import { resetProgress, setSettings, useProgress, type Accent } from '../lib/progress';
+import { Check, Compass, Lightbulb, Monitor, Moon, Sun } from 'lucide-react';
+import { resetProgress, setSettings, useProgress } from '../lib/progress';
 import { saveUiPrefs, useUiPrefs } from '../lib/uiPrefs';
 import { openTour } from '../lib/guide';
+import { ACCENTS } from '../lib/theme';
 
-const ACCENTS: { id: Accent; label: string }[] = [
-  { id: 'indigo', label: 'Indigo' },
-  { id: 'teal', label: 'Teal' },
-  { id: 'rose', label: 'Rose' },
-  { id: 'amber', label: 'Amber' },
-];
+const THEMES = [
+  { id: 'system', label: 'System', Icon: Monitor },
+  { id: 'light', label: 'Light', Icon: Sun },
+  { id: 'dark', label: 'Dark', Icon: Moon },
+] as const;
 
 export default function SettingsPage() {
   const p = useProgress();
@@ -17,8 +17,11 @@ export default function SettingsPage() {
   const tipsOn = prefs.coachTips !== false;
   const dismissed = Object.keys(prefs.dismissedTips ?? {}).length;
   return (
-    <div className="page narrow">
-      <h1>Settings</h1>
+    <div className="page narrow settings-page">
+      <div className="eyebrow">Settings</div>
+      <h1>Exam, study and display settings</h1>
+      <p className="lead">Saved in this browser together with your progress.</p>
+      <h2 className="settings-group">Exams</h2>
       <div className="card form">
         <label>
           <span>
@@ -47,6 +50,13 @@ export default function SettingsPage() {
           </span>
           <input type="range" min={15} max={90} step={5} value={s.mockMinutes} onChange={(e) => setSettings({ mockMinutes: Number(e.target.value) })} />
         </label>
+        <label className="check">
+          <input type="checkbox" checked={s.shuffle} onChange={(e) => setSettings({ shuffle: e.target.checked })} /> Shuffle questions
+          and options by default
+        </label>
+      </div>
+      <h2 className="settings-group">Study</h2>
+      <div className="card form">
         <div className="field">
           <span>Study-first lock</span>
           <div className="row gap-s wrap">
@@ -66,40 +76,50 @@ export default function SettingsPage() {
             Practice unlocks once every Learn section of the topic is marked read. Topics you have already passed are never re-locked.
           </span>
         </div>
-        <label className="check">
-          <input type="checkbox" checked={s.shuffle} onChange={(e) => setSettings({ shuffle: e.target.checked })} /> Shuffle questions
-          and options by default
-        </label>
+      </div>
+      <h2 className="settings-group">Appearance</h2>
+      <div className="card form">
         <div className="field">
-          <span>Theme</span>
-          <div className="row gap-s wrap">
-            {(['system', 'light', 'dark'] as const).map((t) => (
-              <button key={t} type="button" className={`chip ${s.theme === t ? 'on' : ''}`} aria-pressed={s.theme === t} onClick={() => setSettings({ theme: t })}>
-                {t}
+          <span id="theme-label">Theme</span>
+          <div className="segmented" role="group" aria-labelledby="theme-label">
+            {THEMES.map(({ id, label, Icon }) => (
+              <button key={id} type="button" className={s.theme === id ? 'on' : ''} aria-pressed={s.theme === id} onClick={() => setSettings({ theme: id })}>
+                <Icon size={15} aria-hidden /> {label}
               </button>
             ))}
           </div>
+          <span className="muted small">System follows your device. The top bar's sun/moon button switches between light and dark.</span>
         </div>
         <div className="field">
-          <span id="accent-label">Accent colour</span>
-          <div className="accent-picker" role="group" aria-labelledby="accent-label">
+          <span id="accent-label">Ink</span>
+          <div className="ink-picker" role="group" aria-labelledby="accent-label">
             {ACCENTS.map((a) => {
               const on = (s.accent ?? 'indigo') === a.id;
               return (
-                <button key={a.id} type="button" className={`accent-swatch ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => setSettings({ accent: a.id })}>
-                  <span className={`accent-dot accent-dot-${a.id}`} aria-hidden>
-                    {on && <Check size={14} strokeWidth={3} />}
+                <button
+                  key={a.id}
+                  type="button"
+                  className={`ink-swatch ${on ? 'on' : ''}`}
+                  data-value={a.id}
+                  aria-pressed={on}
+                  onClick={() => setSettings({ accent: a.id })}
+                >
+                  <span className="ink-sample" aria-hidden>
+                    Aa
                   </span>
-                  {a.label}
+                  <span className="ink-label">
+                    {on && <Check size={13} strokeWidth={3} aria-hidden />}
+                    {a.label}
+                  </span>
                 </button>
               );
             })}
           </div>
-          <span className="muted small">Changes buttons, links and highlights. Chart colours stay fixed so they read the same in every theme.</span>
+          <span className="muted small">The pen colour for links, buttons and highlights. Passed, in progress and wrong keep their own colours.</span>
         </div>
       </div>
+      <h2 className="settings-group">Guide</h2>
       <div className="card form">
-        <h3>Guide</h3>
         <label className="check">
           <input type="checkbox" checked={tipsOn} onChange={(e) => saveUiPrefs({ coachTips: e.target.checked })} />
           <Lightbulb size={15} aria-hidden /> Show coach tips (a short tip the first time you open each kind of tab)
@@ -114,10 +134,28 @@ export default function SettingsPage() {
             </button>
           )}
         </div>
-        <span className="muted small">
-          Tip: press <kbd>?</kbd> anywhere to open the guide, and <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd> to search everything.
-        </span>
+        <dl className="shortcuts" aria-label="Keyboard shortcuts">
+          <div>
+            <dt>
+              <kbd>Ctrl</kbd>/<kbd>⌘</kbd> <kbd>K</kbd>
+            </dt>
+            <dd>Search topics, sections and pages, and jump there</dd>
+          </div>
+          <div>
+            <dt>
+              <kbd>/</kbd>
+            </dt>
+            <dd>Filter the syllabus (on lesson pages)</dd>
+          </div>
+          <div>
+            <dt>
+              <kbd>?</kbd>
+            </dt>
+            <dd>Open the guide</dd>
+          </div>
+        </dl>
       </div>
+      <h2 className="settings-group">Data</h2>
       <div className="card danger">
         <h3>Reset progress</h3>
         <p className="muted small">Clears exam results, read markers, ratings and drafts. Settings are kept.</p>
