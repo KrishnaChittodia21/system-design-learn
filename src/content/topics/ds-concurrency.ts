@@ -191,7 +191,7 @@ If \`rowCount = 0\`, someone else won; reload and retry (or return **409 Conflic
 - Long "think time" (user holds a form open for minutes — you can't hold a DB lock that long).
 - Across service boundaries (ETags on REST resources).
 
-**When it hurts:** high contention on one row (flash-sale SKU, hot counter). With N concurrent writers, only one succeeds per round; the rest retry — wasted work grows roughly O(N²) and p99 explodes. Alex Xu's hotel reservation chapter makes the same point: optimistic locking is the favoured option *when contention is low*, but performance collapses when many users hit the same room type.
+**When it hurts:** high contention on one row (flash-sale SKU, hot counter). With N concurrent writers, only one succeeds per round; the rest retry — wasted work grows roughly O(N²) and p99 explodes. The classic hotel-reservation design makes the same point: optimistic locking is the favoured option *when contention is low*, but performance collapses when many users hit the same room type.
 
 **Details that matter:**
 - Use an integer version, not \`updated_at\` — two writes in the same millisecond (or clock skew) break timestamps.
@@ -391,7 +391,7 @@ FOR UPDATE;`,
 3. If inserted → you own it; process, then store the response. If conflict → return the stored response (or 409 "in progress" if still running; 422 if the request body hash differs).
 4. Keep keys 24h–7 days; expire with a TTL job.
 
-**Natural keys are even better:** \`UNIQUE (user_id, cart_id)\` on orders, \`UNIQUE (payment_intent_id)\` on charges, \`UNIQUE (message_id)\` in a consumer's processed table. Alex Xu's payment chapter uses exactly this: the idempotency key is the primary key of the payment order, so a duplicate insert fails.
+**Natural keys are even better:** \`UNIQUE (user_id, cart_id)\` on orders, \`UNIQUE (payment_intent_id)\` on charges, \`UNIQUE (message_id)\` in a consumer's processed table. The classic payment-system design uses exactly this: the idempotency key is the primary key of the payment order, so a duplicate insert fails.
 
 **Downstream calls:** pass the same key to the PSP (Stripe, Adyen accept idempotency keys). Your dedupe is useless if you call a non-idempotent external API twice.
 
@@ -510,7 +510,7 @@ export async function withLock<T>(
 
 **Redlock (antirez):** acquire the same key on **N = 5 independent** Redis masters; you hold the lock if you got a **majority (3)** within a time well under the TTL; validity = TTL − elapsed − clock-drift allowance. It survives one Redis node crashing (unlike single-instance).
 
-**The controversy (Kleppmann, 2016):**
+**The controversy (2016):**
 1. **No fencing token:** Redlock's random value is not monotonic, so storage can't tell an old holder from a new one.
 2. **Timing assumptions:** safety depends on bounded network delay, bounded process pauses and roughly synchronized clocks. A GC pause or a clock jump on a Redis node (e.g., NTP step) can let two clients hold a majority.
 3. antirez's rebuttal: with monotonic clocks and careful ops, the assumptions are reasonable. Practical consensus: **use Redlock only where an occasional double-holder is tolerable; for correctness use consensus + fencing**.
@@ -1094,7 +1094,7 @@ A TTL lock can guarantee **mutual exclusion only under timing assumptions**. For
 - If a lock must guard a non-idempotent resource, use **etcd/ZooKeeper** leases and a **fencing token** (etcd revision) that the resource checks: \`WHERE fence < $token\`.
 
 ### On Redlock
-Redlock (5 independent masters, majority) survives a single node loss but still has no fencing token and depends on clock/pause assumptions (Kleppmann's critique). It does not fix this incident class; idempotency does.
+Redlock (5 independent masters, majority) survives a single node loss but still has no fencing token and depends on clock/pause assumptions (the well-known 2016 critique). It does not fix this incident class; idempotency does.
 
 ### Verification
 Chaos test: kill the Redis primary and inject a 45s \`SIGSTOP\` into a worker during a payout run; assert exactly one bank transfer per payout id.`,
@@ -1131,7 +1131,7 @@ Chaos test: kill the Redis primary and inject a 45s \`SIGSTOP\` into a worker du
       ],
       modelAnswer: `### Model the invariant
 - Cinema: one seat per show can be sold once → \`UNIQUE (show_id, seat_no)\` on bookings, or a seat row with a status.
-- Hotel: per room type per date, \`reserved <= total\` (Alex Xu Ch 7 models \`room_type_inventory(hotel_id, room_type_id, date, total_inventory, total_reserved)\`).
+- Hotel: per room type per date, \`reserved <= total\` (the classic hotel design models \`room_type_inventory(hotel_id, room_type_id, date, total_inventory, total_reserved)\`).
 
 ### Options
 | | Pessimistic (\`FOR UPDATE\`) | Optimistic (version) | DB constraint |
@@ -1240,7 +1240,7 @@ Load-test both paths concurrently with a hot set of 10 wallets; expect zero 40P0
 - **Intent before side effect:** write \`payment(status=PENDING)\` and commit **before** calling the PSP. The payment id is the PSP idempotency key (Stripe keeps keys ~24h and replays the original response).
 - **Ambiguous outcome** (timeout/5xx): never blindly create a new charge. Retry with the **same** key, or query the PSP by our reference; mark \`UNKNOWN\` and let a resolver job settle it.
 - **Conditional transitions:** \`UPDATE payments SET status='SUCCEEDED' WHERE id=$1 AND status IN ('PENDING','UNKNOWN')\` — webhooks and polling can both arrive without double-processing.
-- **Reconciliation:** daily PSP settlement file vs ledger (Alex Xu Ch 11). Any charge without a matching payment row triggers an automatic refund plus an alert.
+- **Reconciliation:** daily PSP settlement file vs ledger. Any charge without a matching payment row triggers an automatic refund plus an alert.
 
 ### Why not a lock?
 A lock around "charge" only serializes the two attempts; the second still charges after the first finishes. The problem is identity, not concurrency.`,
@@ -1626,7 +1626,7 @@ WHERE  id = 42 AND version = 5;`,
       ],
       correct: [0],
       explanation:
-        'Nodes {1,2,3} and {3,4,5} are both majorities; they overlap only on node 3, where A\'s key expired early. This is Kleppmann\'s example: TTL expiry happens on the server clock, so client-side monotonic time does not help. B needs only 3 of 5 nodes, and it has them. Redlock tolerates node crashes, not arbitrary timing faults, which is why correctness-critical locks need fencing or consensus.',
+        'Nodes {1,2,3} and {3,4,5} are both majorities; they overlap only on node 3, where A\'s key expired early. This is the classic Redlock counter-example: TTL expiry happens on the server clock, so client-side monotonic time does not help. B needs only 3 of 5 nodes, and it has them. Redlock tolerates node crashes, not arbitrary timing faults, which is why correctness-critical locks need fencing or consensus.',
       followUps: [
         {
           "q": "Suppose the team keeps Redlock because it's already deployed. What's the minimum you must add so this clock-jump scenario can't corrupt data?",

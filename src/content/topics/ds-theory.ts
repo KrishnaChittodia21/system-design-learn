@@ -38,7 +38,7 @@ const topic: Topic = {
       heading: 'System models: timing, node faults and links',
       body: `**Intuition:** every distributed algorithm carries a contract that says "I work as long as the world is no worse than X". A **system model** is that X. If you choose the wrong X, a proof of correctness tells you nothing about production.
 
-A model is three choices, as in Kleppmann's Cambridge notes and DDIA Ch 8:
+A model is three choices, in the standard formulation:
 
 | Dimension | Options | What it means |
 |---|---|---|
@@ -362,7 +362,7 @@ curl -s -X POST -H 'Content-Type: application/vnd.schemaregistry.v1+json' \\
 
 **"Data outlives code."** You deploy new application code in minutes, but the data in your database, your Kafka topics, your S3 lake and your backups stays in the old format until something rewrites it. A schema migration that rewrites a 2 TB table is expensive, so most databases let old rows keep the old encoding (Postgres \`ADD COLUMN\` with a default is metadata-only since PG 11). Your code is effectively reading **every version that has ever been written**.
 
-**The three modes of dataflow** (DDIA Ch 4) and what each one demands:
+**The three modes of dataflow** and what each one demands:
 
 | Mode | Who writes, who reads | Compatibility you need | Typical trap |
 |---|---|---|---|
@@ -431,7 +431,7 @@ export function parseTier(raw: string): 'GOLD' | 'SILVER' | 'BASIC' | 'UNKNOWN' 
 - **Redis leaderboard** fed from score events.
 
 **Why this matters in design interviews:**
-1. **Rebuildability.** If the view is a pure function of the log, a corrupted Elasticsearch index or a bad view-code release is fixed by replaying into a fresh index and switching an alias. You can only do this while the log still covers the history: use compaction or long retention, plus a snapshot (DDIA calls it "log compaction" + "initial snapshot" for CDC).
+1. **Rebuildability.** If the view is a pure function of the log, a corrupted Elasticsearch index or a bad view-code release is fixed by replaying into a fresh index and switching an alias. You can only do this while the log still covers the history: use compaction or long retention, plus a snapshot ("log compaction" + "initial snapshot" in CDC terms).
 2. **Incremental maintenance.** \`SUM\`/\`COUNT\` update in O(1) per event. \`MAX\` is not invertible: if the max row is deleted you need the other values, so the operator keeps more state.
 3. **Retractions.** When an input row changes, an aggregate must *subtract* the old contribution and add the new one. Kafka Streams sends old+new values internally, and Flink emits \`-U/+U\` changelog rows. A sink that cannot apply updates (append-only files) will double count.`,
       code: [
@@ -468,7 +468,7 @@ SELECT revenue_paise FROM revenue_by_city WHERE city = 'Bengaluru';`,
       heading: 'Stream joins: stream-stream, stream-table, table-table, and why joins depend on time',
       body: `**Intuition:** joining two database tables is easy because both are sitting still. Joining streams means at least one side is *still arriving*, so you have to decide **how long to wait** and **which version of the other side counts**.
 
-**The three joins (DDIA Ch 11):**
+**The three joins:**
 
 | Join | Example | State kept | Output |
 |---|---|---|---|
@@ -523,9 +523,9 @@ JOIN merchant_risk FOR SYSTEM_TIME AS OF p.paid_at AS r
     },
     {
       heading: 'Derived data and "unbundling the database"',
-      body: `**Intuition:** inside one database, the secondary index, the materialised view and the replica are all *derived* from the table and kept in sync automatically. Kleppmann's 2015 talk "Turning the database inside out" asks: what if we pulled those pieces out, made the **replication log** a first-class, public thing, and built every index, cache and view as an independent consumer of it?
+      body: `**Intuition:** inside one database, the secondary index, the materialised view and the replica are all *derived* from the table and kept in sync automatically. The well-known 2015 idea "turning the database inside out" asks: what if we pulled those pieces out, made the **replication log** a first-class, public thing, and built every index, cache and view as an independent consumer of it?
 
-**System of record vs derived data** (DDIA Ch 3/12):
+**System of record vs derived data:**
 - **System of record (source of truth):** where a fact is written first and authoritatively, e.g. the Postgres \`orders\` table or an event log. If it disagrees with anything, it wins.
 - **Derived data:** anything you can recompute from it, e.g. the Elasticsearch index, the Redis cache, the ClickHouse rollups, the recommendation features. If you lose it, rebuild it. If it is wrong, recompute it.
 
@@ -614,12 +614,12 @@ export async function run(): Promise<void> {
 - **Kafka EOS** (idempotent producer + transactions + \`read_committed\`) makes a *read-process-write cycle inside Kafka* atomic. It does not cover the user's double-tap on "Pay", the HTTP retry from the mobile app, or the side effect your consumer performs on an external API.
 - **Database transactions** make a single DB write atomic, but cannot tell that two transactions represent the same user intent.
 
-**The end-to-end fix (DDIA Ch 12, "operation identifiers"):** generate a **unique request id at the very start** (the client, when the user taps the button), carry it through every hop (HTTP header → Kafka message → consumer), and enforce uniqueness **at the final point of effect**, in the same transaction as the effect. Every intermediate layer can then retry freely.
+**The end-to-end fix ("operation identifiers"):** generate a **unique request id at the very start** (the client, when the user taps the button), carry it through every hop (HTTP header → Kafka message → consumer), and enforce uniqueness **at the final point of effect**, in the same transaction as the effect. Every intermediate layer can then retry freely.
 
 **Same argument, other properties:**
 - **Integrity:** TCP checksums and disk ECC miss bugs in your own code. End-to-end checksums (an S3 \`Content-MD5\`/CRC header computed by the client) detect corruption anywhere on the path.
 - **Encryption:** TLS per hop still exposes data at every proxy, so end-to-end encryption is needed if intermediaries are untrusted.
-- **Auditing over trusting:** DDIA's "trust, but verify" means continuously re-checking derived data against the system of record (reconciliation jobs), because each layer's guarantee is weaker than the whole.
+- **Auditing over trusting:** "Trust, but verify" means continuously re-checking derived data against the system of record (reconciliation jobs), because each layer's guarantee is weaker than the whole.
 
 **Interview phrasing:** "Kafka exactly-once is necessary for my stream job, not sufficient for the business. The business guarantee is a unique constraint on \`request_id\` at the ledger, checked in the same transaction as the debit."`,
       code: [
@@ -723,7 +723,7 @@ export function verify(log: AuditEntry[], publishedHead: string): boolean {
     },
     {
       heading: 'What DDIA 2nd edition (2026) adds that is worth knowing',
-      body: `**Context:** the second edition of *Designing Data-Intensive Applications* (Martin Kleppmann and Chris Riccomini, O'Reilly, March 2026) keeps the first edition's goals and scope but is revised throughout. These are the changes that can be verified from the authors' announcement, the preface and published chapter outlines. This is not a full diff.
+      body: `**Context:** the second edition of *Designing Data-Intensive Applications* (O'Reilly, March 2026) keeps the first edition's goals and scope but is revised throughout. These are the changes that can be verified from the authors' announcement, the preface and published chapter outlines. This is not a full diff.
 
 | Change | Why it matters for your interviews |
 |---|---|
@@ -739,7 +739,7 @@ export function verify(log: AuditEntry[], publishedHead: string): boolean {
 
 **How to use this in an interview:** don't cite the book. Use its *framing*. For example: "This is a system of record, the search index is derived, and I'd use the managed Postgres service rather than self-hosting because our team is small. Storage is in object storage, so compute can scale independently."`,
       keyPoints: [
-        'DDIA 2e (Kleppmann & Riccomini, 2026): a new trade-offs chapter, cloud and object-storage-first architecture, vector indexes, local-first/sync.',
+        'DDIA 2e (2026): a new trade-offs chapter, cloud and object-storage-first architecture, vector indexes, local-first/sync.',
         '"Sharding" replaces "Partitioning" as the chapter name. The ideas are unchanged.',
         'Use the framing (system of record vs derived, cloud vs self-host), not the citation.',
       ],
@@ -1297,7 +1297,7 @@ The job is a stream-table join that looks up the **current** pricing plan when e
 - In the original run, a payment at 10:00 was joined with whatever plan the table held when it was processed (usually the plan valid at 10:00, but sometimes a newer plan if CDC was ahead, or an older one if CDC lagged).
 - In the replay, all payments were processed **after** every plan change, so each one got the **latest** plan. Merchants who changed plans mid-quarter account for the 0.7%.
 
-The join's output depends on processing order, so it is **non-deterministic**: DDIA calls this the time-dependence of joins.
+The join's output depends on processing order, so it is **non-deterministic**: This is called the time-dependence of joins.
 
 ### Redesign: a temporal (as-of) join
 1. Keep the pricing plans as a **versioned table**: per merchant, \`(valid_from, plan)\` versions with event-time timestamps taken from the source commit time.

@@ -426,7 +426,7 @@ export function chooseLayer(
 
 Why batching is everything: a 70B fp16 model is ~140 GB of weights. On 8 × H100 (≈ 3.35 TB/s HBM each, 26.8 TB/s total) one decode step takes at least 140 GB ÷ 26.8 TB/s ≈ **5.2 ms**, so a single stream tops out near ~190 tokens/s. Because each step reads the weights once **regardless of batch size**, batching 100+ sequences multiplies throughput almost for free, until KV-cache memory runs out.
 
-**Estimation (own assumptions; Hello Interview's breakdown lands in the same range):**
+**Estimation (own assumptions; common interview breakdowns land in the same range):**
 - Peak 20K prompts/s × 300 output tokens = **6M output tokens/s**.
 - Each stream lasts 300 ÷ 50 tok/s = 6 s → Little's law: 20K × 6 = **120K concurrent streams**.
 - KV cache for a 70B GQA model: 2 × 80 layers × 8 KV heads × 128 dims × 2 bytes = **320 KiB/token** → 1.25 GiB per 4K-token conversation.

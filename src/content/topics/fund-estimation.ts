@@ -16,7 +16,7 @@ const topic: Topic = {
   tags: ['estimation', 'capacity-planning', 'qps', 'storage', 'bandwidth', 'latency-numbers', 'interview'],
   cheatSheet: [
     'Arithmetic: write numbers as a × 10^n. Multiply → multiply fronts, add exponents; divide → subtract. 1M × 1 KB = 1 GB, 1B × 1 KB = 1 TB, 1B × 1 MB = 1 PB. Year ≈ π × 10^7 s.',
-    '1 day = 86,400 s ≈ 10^5 s (Alex Xu trick, ~16% high on QPS — fine for sizing). 1M/day ≈ 12 QPS; 1B/day ≈ 12K QPS.',
+    '1 day = 86,400 s ≈ 10^5 s (standard trick, ~16% high on QPS — fine for sizing). 1M/day ≈ 12 QPS; 1B/day ≈ 12K QPS.',
     'Average QPS = DAU × actions/user/day ÷ 86,400. Peak = avg × 2–3 (diurnal), × 5–10+ for launches/sales. Size for peak, not average.',
     'Powers of two: 2^10 ≈ 1K, 2^20 ≈ 1M, 2^30 ≈ 1G, 2^40 ≈ 1T. Signed INT32 max ≈ 2.1B, UINT32 ≈ 4.3B → use BIGINT for anything that grows.',
     'Latency ladder: memory 100 ns → SSD random read ~20–150 µs → same-DC RTT ~0.5 ms → HDD seek ~10 ms → cross-continent RTT ~150 ms.',
@@ -40,7 +40,7 @@ const topic: Topic = {
 - **Separate read and write paths.** They scale differently and lead to different components (read replicas / caches vs partitioned write stores / queues).
 - **Finish with the implication.** "~50K peak reads/s of 2 KB → 100 MB/s → a single Redis primary is borderline on network; plan 3–4 shards." A number without a decision is wasted airtime.
 
-**In interviews, say this:** "Let me do a quick envelope so we know which components are forced on us — I'll round to powers of ten and we can adjust the inputs if you have different numbers." Then spend **3–5 minutes max** — Alex Xu's framework puts estimation inside step 1 (scope) precisely so it informs the high-level design rather than replacing it.`,
+**In interviews, say this:** "Let me do a quick envelope so we know which components are forced on us — I'll round to powers of ten and we can adjust the inputs if you have different numbers." Then spend **3–5 minutes max** — the 4-step framework puts estimation inside step 1 (scope) precisely so it informs the high-level design rather than replacing it.`,
       diagram: `  ASSUMPTIONS            DERIVED LOAD              DESIGN IMPLICATION
  +-------------+      +-------------------+      +-------------------------+
  | DAU         |----->| avg QPS (÷10^5)   |----->| #app servers, LB tier   |
@@ -95,7 +95,7 @@ So 300 million users = **3 × 10^8**, 86,400 s = **8.64 × 10^4 ≈ 10^5**, 2 KB
 | Period | Seconds | Use as |
 |---|---|---|
 | 1 hour | 3,600 | ≈ 4 × 10^3 |
-| 1 day | 86,400 | ≈ 10^5 (Alex Xu) |
+| 1 day | 86,400 | ≈ 10^5 |
 | 1 month | ~2.6 × 10^6 | ≈ 2.5 × 10^6 |
 | 1 year | ~3.15 × 10^7 | ≈ π × 10^7 ≈ 3 × 10^7 |
 
@@ -288,7 +288,7 @@ console.log(daysUntilOverflow(2_147_483_647, 0, 50_000_000).toFixed(0)); // "43"
 | Push notification blast / live event start | 5–20× for minutes |
 | Flash sale / ticket drop / Black Friday | 10–100× vs normal peak |
 
-Alex Xu's Vol 2 chapters use this exact pattern: **Ad click aggregation** — 1B clicks/day ÷ 10^5 = **10K QPS avg, peak 5× = 50K**; **Proximity service** — 100M DAU × 5 searches ÷ 10^5 = **5K QPS**; **Gaming leaderboard** — 5M DAU × 10 games ÷ 10^5 = **500 QPS avg, 2,500 peak**; **Nearby friends** — 10M concurrent users updating every 30 s ≈ **334K updates/s**.
+Classic interview designs use this exact pattern: **Ad click aggregation** — 1B clicks/day ÷ 10^5 = **10K QPS avg, peak 5× = 50K**; **Proximity service** — 100M DAU × 5 searches ÷ 10^5 = **5K QPS**; **Gaming leaderboard** — 5M DAU × 10 games ÷ 10^5 = **500 QPS avg, 2,500 peak**; **Nearby friends** — 10M concurrent users updating every 30 s ≈ **334K updates/s**.
 
 **Two traps:**
 
@@ -477,7 +477,7 @@ console.log(egress(50_000, 20_000, 0.95));`,
       heading: 'Cache memory sizing — the 80/20 rule done properly',
       body: `**Intuition:** access patterns are skewed — a small fraction of keys serves most reads. If ~20% of items get ~80% of traffic, caching that 20% gives most of the benefit at a fraction of the memory.
 
-**Naive estimate (Alex Xu style):** cache 20% of daily read volume. E.g. 100M unique items read per day × 20% × 1 KB = **20 GB**.
+**Naive estimate (classic style):** cache 20% of daily read volume. E.g. 100M unique items read per day × 20% × 1 KB = **20 GB**.
 
 **Senior-level correction — what actually lands in RAM:**
 
@@ -1187,7 +1187,7 @@ console.log(redisCluster({ hotKeys: 5e6, valueBytes: 1_000, keyBytes: 40,
       answer:
         '~5K average / ~15K peak search QPS. The whole geo index is ~13 GB — it fits in RAM on one commodity server, and the 200 GB business table fits on one database node.',
       insight:
-        'The numbers say "read-heavy, small index": scale by replicating the index/DB to ~5 read replicas (per region) rather than sharding. Sharding would add cross-shard radius queries for no benefit — exactly the conclusion Alex Xu reaches in Vol 2 Ch 1. Cache popular cells\' results, since lunchtime queries cluster in a few dense cities.',
+        'The numbers say "read-heavy, small index": scale by replicating the index/DB to ~5 read replicas (per region) rather than sharding. Sharding would add cross-shard radius queries for no benefit — exactly the conclusion the classic proximity-service design reaches. Cache popular cells\' results, since lunchtime queries cluster in a few dense cities.',
       followUps: [
         {
           "q": "DAU grows 10× to 1B and the product adds an 'open now' filter. Does the index finally force sharding?",

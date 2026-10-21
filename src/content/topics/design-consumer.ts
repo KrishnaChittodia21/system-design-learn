@@ -270,7 +270,7 @@ RETURNING unit_no;
 - Notify by email and push; manage, pause and delete alerts; one-click unsubscribe.
 - Accept price reports from a browser extension (1M users) as an extra, untrusted signal.
 
-**Non-functional:** notify within 1 hour of a real change (Hello Interview's breakdown uses this SLA; for a deal the sooner the better), **never notify twice for the same drop**, never notify on a parsing glitch (₹1,299 parsed as ₹1.299), eventual consistency is fine, and survive Prime Day / Big Billion Days when thousands of popular products drop at the same minute.
+**Non-functional:** notify within 1 hour of a real change (a common interview SLA; for a deal the sooner the better), **never notify twice for the same drop**, never notify on a parsing glitch (₹1,299 parsed as ₹1.299), eventual consistency is fine, and survive Prime Day / Big Billion Days when thousands of popular products drop at the same minute.
 
 **Estimation:**
 
@@ -593,7 +593,7 @@ export class SwipedFilter {
 
 **Functional:** ingest articles from ~100K publishers (RSS/Atom, sitemaps, publisher APIs, raw HTML); group articles about the same event into **stories**; show a ranked feed per **edition** (country × language) with Top Stories, local news and topic sections; personalise "For you"; infinite scroll; clicking opens the publisher's page (we store metadata, snippet and thumbnail, never full text).
 
-**Non-functional:** a new article from a major publisher appears within minutes (Hello Interview's breakdown sets 30 minutes as the bar; aim for under 5 for top sources); feed p99 < 200 ms; availability over consistency (a feed one minute old is fine); survive breaking-news surges of 5–10× on both ingestion and reads; be polite to publishers.
+**Non-functional:** a new article from a major publisher appears within minutes (30 minutes is a common bar; aim for under 5 for top sources); feed p99 < 200 ms; availability over consistency (a feed one minute old is fine); survive breaking-news surges of 5–10× on both ingestion and reads; be polite to publishers.
 
 **Estimation:**
 
@@ -1426,7 +1426,7 @@ export async function handleObservation(obs: { productId: string; pricePaise: nu
       question:
         'Design a price-drop tracker like CamelCamelCamel: users set target prices on Amazon products and get notified when the price falls below their target. Focus on the alerting side: rule matching, fan-out and not spamming users.',
       context:
-        'Reported in Meta system design interviews (Hello Interview community question list: "Design a Price Drop Tracker like CamelCamelCamel"). Assume a crawler already produces price observations.',
+        'Reported in Meta system design interviews (community-reported question: "Design a Price Drop Tracker like CamelCamelCamel"). Assume a crawler already produces price observations.',
       whatInterviewerLooksFor: [
         'Draws the crawler/alerting boundary and focuses on changes, not observations',
         'Indexes alerts so a change is a range scan per product',
@@ -1515,7 +1515,7 @@ export async function handleObservation(obs: { productId: string; pricePaise: nu
       question:
         'Design a dating app like Tinder: nearby profiles in a swipeable stack, likes and passes, and an instant notification when two people like each other.',
       context:
-        'Reported in Uber interviews (Hello Interview community question list: "Design a Dating App Like Tinder"). Chat after the match is out of scope.',
+        'Reported in Uber interviews (community-reported question: "Design a Dating App Like Tinder"). Chat after the match is out of scope.',
       whatInterviewerLooksFor: [
         'Estimates swipe throughput and storage',
         'Gets match detection exactly-once under concurrent swipes',

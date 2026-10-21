@@ -46,7 +46,7 @@ const topic: Topic = {
     'refunds',
   ],
   cheatSheet: [
-    'Instagram scale to quote: Meta reported 3B MAU (Sept 2025); the Hello Interview framing is 500M DAU and 100M posts/day ≈ 1.2K posts/s avg, ~3.5K/s peak, while feed reads run ~46K QPS avg. It is read-heavy by ~40×, so spend the design budget on the read path and the CDN.',
+    'Instagram scale to quote: Meta reported 3B MAU (Sept 2025); a common interview framing is 500M DAU and 100M posts/day ≈ 1.2K posts/s avg, ~3.5K/s peak, while feed reads run ~46K QPS avg. It is read-heavy by ~40×, so spend the design budget on the read path and the CDN.',
     'Upload: client asks for a presigned URL (multipart for video), uploads straight to object storage, then calls /complete. A worker verifies the object, fixes orientation, strips EXIF (GPS), builds renditions (e.g. 1080/640/320/150 px WebP/AVIF), runs moderation and perceptual-hash dedup, and only then flips the post to PUBLISHED and emits PostPublished.',
     'IDs: 64-bit, time-sortable, minted in the shard (41 bits ms since a custom epoch ≈ 69.7 years, 13 bits logical shard = 8,192 shards, 10 bits sequence = 1,024 IDs/ms/shard). The shard is recoverable from the ID, so no lookup table is needed.',
     'Feed beyond fan-out: candidates (followees + suggested) → light ranker → heavy multi-task ranker (P(like), P(comment), P(dwell), P(hide)) → rules (diversity, seen filter, ads every N slots with spacing). Paginate over a per-session ranked snapshot with an opaque cursor, never OFFSET.',
@@ -69,7 +69,7 @@ const topic: Topic = {
 
 **Non-functional:** feed p99 < 500 ms; upload acknowledged fast with processing allowed to take seconds; high availability over strong consistency for feeds and counts (eventual is fine), **but** a user must see their own post at once (read-your-writes); media durability 11 nines (object storage); privacy (private accounts, blocks, EXIF GPS stripped).
 
-**Estimation (Hello Interview framing; Meta reported 3B MAU in Sept 2025):**
+**Estimation (common interview framing; Meta reported 3B MAU in Sept 2025):**
 
 | Quantity | Calculation | Result |
 |---|---|---|
@@ -113,7 +113,7 @@ Two conclusions drive the design: **egress dominates cost** (so the CDN, renditi
       body: `**Intuition:** never let a 4 GB video flow through your API servers. Hand the client a time-limited "key" to the storage bucket, let it upload directly, and treat processing as a **background job with a state**.
 
 **Flow:**
-1. \`POST /uploads {type, size, sha256?}\` → Upload service validates quota and size limits (photos ≤ 8 MB, videos ≤ 4 GB in the Hello Interview framing), creates \`media(id, owner, status='UPLOADING')\`, returns a presigned PUT (photo) or a multipart upload ID + part URLs (video). Mechanics of presigning and multipart are in the object-storage topic.
+1. \`POST /uploads {type, size, sha256?}\` → Upload service validates quota and size limits (photos ≤ 8 MB, videos ≤ 4 GB in the common interview framing), creates \`media(id, owner, status='UPLOADING')\`, returns a presigned PUT (photo) or a multipart upload ID + part URLs (video). Mechanics of presigning and multipart are in the object-storage topic.
 2. Client uploads; on success calls \`POST /posts {mediaIds, caption}\` → post row with \`status='PROCESSING'\`. The **author** sees it immediately (from the local file + own-posts cache).
 3. \`ObjectCreated\` event (or the /posts call) enqueues a job keyed by \`mediaId\` (idempotent).
 4. **Worker steps:** HEAD/inspect the object (real MIME by magic bytes, not the client header; size; dimensions) → apply EXIF orientation, then **strip metadata** (GPS location is a privacy leak) → resize into renditions (e.g. 1080, 640, 320, 150 px) in WebP/AVIF with JPEG fallback → compute a **perceptual hash** (pHash/PDQ) for near-duplicate and known-abuse matching (a SHA-256 only catches byte-identical copies) → moderation classifier (nudity/violence) → store renditions under content-addressed keys.

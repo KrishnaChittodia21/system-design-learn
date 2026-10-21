@@ -308,7 +308,7 @@ SELECT DISTINCT city, count(*) OVER () FROM customers;`,
       heading: 'Physical execution: parser, rewriter, planner, executor and the three join algorithms',
       body: `**Intuition:** the SQL text says *what*; the planner decides *how*. It is a cost-based search over equivalent plans, and the most consequential choices are the join order and the join algorithm.
 
-**The pipeline.** The ByteByteGo posts describe a generic engine: a transport layer (connection, auth), a query processor (parser + optimizer), an execution engine, and a storage engine (transactions, locks, buffers, recovery). In PostgreSQL that maps onto:
+**The pipeline.** A generic engine has a transport layer (connection, auth), a query processor (parser + optimizer), an execution engine, and a storage engine (transactions, locks, buffers, recovery). In PostgreSQL that maps onto:
 1. **Parser**: text → parse tree; syntax errors are raised here.
 2. **Analyzer**: resolves tables, columns and types through the catalog; "relation does not exist" is raised here.
 3. **Rewriter**: expands views and rules into the query tree.

@@ -843,7 +843,7 @@ Opaque blobs, loss-tolerant, possibly large and very read-heavy. **Memcached** f
 These need **availability** (losing them logs users out) and per-key TTL. **Redis** with a replica and failover (Sentinel/Cluster or managed), optionally AOF everysec. Store as a hash so fields can be updated independently, sliding expiry with \`EXPIRE\` on access. Memcached has no replication, so a node loss logs out ~1/N of users.
 
 ### Leaderboard
-Needs ordered data with atomic increments: **Redis sorted set** — \`ZINCRBY lb:season5 10 user42\`, \`ZREVRANGE lb 0 99 WITHSCORES\`, \`ZREVRANK\` for "my rank". All are O(log N). 10M players × ~100 bytes ≈ 1 GB, which fits on one shard. Memcached can't do this at all (Alex Xu Vol 2, Ch 10 uses exactly this design). Persist scores in a DB asynchronously for recovery.
+Needs ordered data with atomic increments: **Redis sorted set** — \`ZINCRBY lb:season5 10 user42\`, \`ZREVRANGE lb 0 99 WITHSCORES\`, \`ZREVRANK\` for "my rank". All are O(log N). 10M players × ~100 bytes ≈ 1 GB, which fits on one shard. Memcached can't do this at all (the classic leaderboard design uses exactly this). Persist scores in a DB asynchronously for recovery.
 
 ### Decision
 **Redis for all three** unless fragment volume is huge and cheap multi-threaded blob caching matters. Then add Memcached for fragments only. Use separate Redis instances/clusters per use case so that fragment evictions (\`allkeys-lru\`) never evict sessions or leaderboards (\`noeviction\` + alerts).`,

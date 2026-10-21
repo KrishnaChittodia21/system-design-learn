@@ -191,7 +191,7 @@ SELECT click_id, ad_id, user_id, ip, event_time FROM (
 | Complexity | operational + logic duplication | streaming correctness |
 | Good when | billing-grade numbers, heavy historical ML, legacy batch | freshness matters everywhere, logic evolves often |
 
-**What Alex Xu's ad-click design does:** a streaming (kappa-style) aggregation for real-time numbers, plus an **end-of-day batch reconciliation** over the raw events that corrects the stream if they disagree — a pragmatic hybrid many companies run.
+**What the classic ad-click design does:** a streaming (kappa-style) aggregation for real-time numbers, plus an **end-of-day batch reconciliation** over the raw events that corrects the stream if they disagree — a pragmatic hybrid many companies run.
 
 **Modern twist:** unified engines (Flink batch/stream mode, Spark Structured Streaming, Beam) let one codebase run in both modes, and lakehouse tables (Iceberg/Delta) act as both stream sink and batch source — narrowing the gap.`,
       diagram: `  LAMBDA
@@ -225,9 +225,9 @@ SELECT click_id, ad_id, user_id, ip, event_time FROM (
 - **Alignment:** tumbling windows are aligned to the epoch (00:00, 00:01...) in UTC by default; daily windows in a local timezone need an offset.
 - **Hopping cost:** each event belongs to size/hop windows — a 1-hour window with 1-minute hop puts every event into 60 windows (60× state and output). Use pre-aggregated tumbling "panes" then sum.
 - **Session merging:** an out-of-order event can **merge** two sessions into one — sessions are only final after the watermark passes the gap.
-- **Top-N per window** (Alex Xu's "top 100 most clicked ads in the last M minutes"): aggregate counts per ad per window, then a second keyed operator keeps a min-heap of size N per window.
+- **Top-N per window** (the classic "top 100 most clicked ads in the last M minutes"): aggregate counts per ad per window, then a second keyed operator keeps a min-heap of size N per window.
 
-**Alex Xu's ad-click system** uses 1-minute tumbling windows for per-ad click counts and a sliding window for top-N most-clicked ads, with watermarks to accept slightly late events.`,
+**The classic ad-click system** uses 1-minute tumbling windows for per-ad click counts and a sliding window for top-N most-clicked ads, with watermarks to accept slightly late events.`,
       diagram: `  time --->   0    1    2    3    4    5    6   (minutes)
   tumbling    [----)[----)[----)[----)[----)[----)
   hopping     [--------------)                      size 3, hop 1
@@ -279,7 +279,7 @@ GROUP BY user_id, window_start, window_end;`,
 - A window [12:00, 12:01) fires when the watermark passes 12:01.
 - With parallel inputs, an operator's watermark is the **minimum** of its inputs' watermarks. One **idle Kafka partition** (no events) holds the minimum back and **stalls all windows** — configure idleness (\`WatermarkStrategy.withIdleness\`, \`table.exec.source.idle-timeout\`).
 
-**The latency/completeness trade-off:** a bigger watermark delay = more complete results but later output. Alex Xu's design extends the window by a watermark (e.g., 15 s) and accepts that events later than that are dropped or corrected by reconciliation.
+**The latency/completeness trade-off:** a bigger watermark delay = more complete results but later output. The classic ad-click design extends the window by a watermark (e.g., 15 s) and accepts that events later than that are dropped or corrected by reconciliation.
 
 **Handling data that is later than the watermark:**
 | Strategy | Effect |
@@ -345,7 +345,7 @@ counts.getSideOutput(late).sinkTo(lateClicksSink);  // for reconciliation + metr
 | **Idempotent upsert** | write keyed results with deterministic keys (\`ad_id, window_start\`) → replays overwrite | needs keyed, deterministic results; sink must support upserts |
 | At-least-once append | plain inserts | duplicates after recovery |
 
-**Alex Xu's ad-click approach:** consume from Kafka, aggregate, and record the offset **together with the result** only after downstream acknowledges; on recovery, resume from the stored offset — the same "atomic progress + output" idea.
+**The classic ad-click approach:** consume from Kafka, aggregate, and record the offset **together with the result** only after downstream acknowledges; on recovery, resume from the stored offset — the same "atomic progress + output" idea.
 
 **What exactly-once does NOT fix:** duplicates *in the source data* (client retries producing two click events). Those need **business-level dedup** (click_id) in the pipeline.`,
       code: [
@@ -586,7 +586,7 @@ ORDER BY hour, clicks DESC;`,
       heading: 'Reconciliation, data quality and the pipeline scenario playbook',
       body: `**Intuition:** streaming gives you fast numbers; reconciliation tells you whether they were right. Like a shop counting the till at the end of the day against the receipts.
 
-**Reconciliation (Alex Xu Ch 6):** an end-of-day batch job recomputes aggregates from **raw events** in the lake and compares them with the streaming results — per key and window. Differences come from late data beyond the watermark, duplicates, dropped poison messages or bugs. The batch result is authoritative; corrections are written back (overwrite the day's partition) and discrepancies above a threshold (e.g., > 0.1%) alert.
+**Reconciliation:** an end-of-day batch job recomputes aggregates from **raw events** in the lake and compares them with the streaming results — per key and window. Differences come from late data beyond the watermark, duplicates, dropped poison messages or bugs. The batch result is authoritative; corrections are written back (overwrite the day's partition) and discrepancies above a threshold (e.g., > 0.1%) alert.
 
 **Data quality checks (per run or per partition):** row counts vs source (CDC: source table count vs lake), null rates, uniqueness of keys, referential integrity, freshness (max event time vs now), distribution drift. Tools: dbt tests, Great Expectations, Soda. **Data contracts** between producing teams and the platform (schema + semantics + SLOs) prevent silent breakage.
 
@@ -842,7 +842,7 @@ export async function syncOrders() {
       difficulty: 'expert',
       question:
         'Design a real-time ad click aggregation system: 1B clicks/day, advertisers see per-ad click counts per minute with <1 min freshness, and the same numbers drive billing. Walk me through ingestion, aggregation, storage, correctness and reconciliation.',
-      context: 'Classic Alex Xu Vol 2 Ch 6 prompt, asked at ad-tech and marketplace companies.',
+      context: 'Classic ad-click aggregation prompt, asked at ad-tech and marketplace companies.',
       whatInterviewerLooksFor: [
         'Back-of-envelope throughput and state sizing',
         'Event-time windows with watermarks and a late-data policy',

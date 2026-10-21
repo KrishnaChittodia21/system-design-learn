@@ -36,10 +36,10 @@ const topic: Topic = {
     'MQ storage: partition = append-only segmented log (Kafka default 1 GB segments) + sparse offset index; sequential I/O, OS page cache, zero-copy sendfile, batching + compression → 100s of MB/s per broker.',
     'Durability knobs: RF=3, acks=all, min.insync.replicas=2 → survives 1 broker loss without losing acked writes; acks=1 can lose data on leader failover; unclean leader election trades durability for availability.',
     'Consumer groups: each partition consumed by exactly one member of a group; ordering is per partition only; commit offsets after processing for at-least-once, before for at-most-once; exactly-once = idempotent producer + transactions (read-process-write inside Kafka) or idempotent sinks.',
-    'Metrics (Alex Xu): ~10M active series (1,000 pools × 100 hosts × 100 metrics); write-heavy, read-spiky; TSDB with Gorilla compression (delta-of-delta timestamps + XOR values ≈ 1.37 B/sample).',
+    'Metrics: ~10M active series (1,000 pools × 100 hosts × 100 metrics); write-heavy, read-spiky; TSDB with Gorilla compression (delta-of-delta timestamps + XOR values ≈ 1.37 B/sample).',
     'Pull (Prometheus: scrape /metrics, easy health detection) vs push (agents → collector/Kafka: short-lived jobs, firewalls, multi-DC); downsample raw → 1-min (30 d) → 1-h (1 yr); cardinality (labels like user_id) is the #1 killer.',
     'Alerting: rules evaluated on a schedule → alert manager (dedup, group, inhibit, silence, route) → PagerDuty/Slack/email; alert on symptoms (SLO burn rate), not every cause.',
-    'Ad clicks (Alex Xu): 1B clicks/day ≈ 10K QPS avg, 50K peak; 0.1 KB/event ≈ 100 GB/day; aggregate per ad per minute + top-100 per minute; results are billing data → correctness first.',
+    'Ad clicks: 1B clicks/day ≈ 10K QPS avg, 50K peak; 0.1 KB/event ≈ 100 GB/day; aggregate per ad per minute + top-100 per minute; results are billing data → correctness first.',
     'Streaming correctness: event time + watermarks (allowed lateness), tumbling windows per minute, dedup by click_id, exactly-once by committing offsets atomically with results; nightly batch reconciliation against raw data; kappa (replay the log) over lambda (two code paths).',
     'Job scheduler: jobs table indexed by next_run_at, partitioned; schedulers own partitions via leases; near-term jobs in a (hierarchical) timing wheel; workers claim with lease + fencing token; handlers must be idempotent because execution is at-least-once.',
     'Logging platform: agents (Fluent Bit/Vector) → Kafka (buffer) → processors (parse, enrich, redact PII, sample) → index (Elasticsearch/OpenSearch or Loki) with hot (SSD, 1–7 d) → warm → cold/frozen (S3) lifecycle; raw archive in S3 for replay and compliance.',
@@ -49,7 +49,7 @@ const topic: Topic = {
       heading: 'Distributed Message Queue (1/3): requirements, messaging model & high-level design',
       body: `**Intuition:** a Kafka-style queue is a **giant, replicated, append-only notebook split into chapters (partitions)**. Producers write at the end; each consumer keeps a bookmark (offset). Nothing is deleted when read — it expires by retention — so many readers can replay the same data.
 
-**Requirements (Alex Xu Vol 2):** producers send, consumers consume; messages can be **consumed repeatedly** (and by multiple consumer groups); old data is truncated by **retention (e.g. 2 weeks)**; message size KB range; **ordering** preserved (within a partition); configurable delivery semantics (at-most-once / at-least-once / exactly-once); configurable **throughput vs latency**; scalable; persistent and durable.
+**Requirements:** producers send, consumers consume; messages can be **consumed repeatedly** (and by multiple consumer groups); old data is truncated by **retention (e.g. 2 weeks)**; message size KB range; **ordering** preserved (within a partition); configurable delivery semantics (at-most-once / at-least-once / exactly-once); configurable **throughput vs latency**; scalable; persistent and durable.
 
 **Traditional queue vs event-streaming log:**
 
@@ -227,7 +227,7 @@ export async function run(enrich: (v: Buffer) => Buffer) {
       heading: 'Metrics Monitoring (1/3): requirements, data model & time-series storage',
       body: `**Intuition:** metrics are billions of tiny "(what, where, when, how much)" tuples, written constantly and read in bursts (dashboards, alerts, incidents). A time-series database is optimised for exactly that shape.
 
-**Requirements (Alex Xu Vol 2):** monitor a large infra — 100M DAU product, **1,000 server pools × 100 machines × ~100 metrics ≈ 10M metrics** (series); 1-year retention with policy **raw for 7 days, 1-minute rollups for 30 days, 1-hour rollups for 1 year**; metrics: CPU, memory, disk, request counts, latency, queue lag…; alerting and visualization. Out of scope: log monitoring and distributed tracing (separate systems).
+**Requirements:** monitor a large infra — 100M DAU product, **1,000 server pools × 100 machines × ~100 metrics ≈ 10M metrics** (series); 1-year retention with policy **raw for 7 days, 1-minute rollups for 30 days, 1-hour rollups for 1 year**; metrics: CPU, memory, disk, request counts, latency, queue lag…; alerting and visualization. Out of scope: log monitoring and distributed tracing (separate systems).
 
 **Non-functional:** scalability with growing series, low query latency for dashboards/alerts, **reliability** (don't miss critical alerts — the monitoring system must be more available than what it monitors), flexibility (plug in new sources/sinks).
 
@@ -291,7 +291,7 @@ export async function metricsHandler(): Promise<{ body: string; contentType: str
 | Performance | Scrapes over HTTP; collector controls rate | Often UDP (StatsD) or batched gRPC; senders can overwhelm collector |
 | Data authenticity | Only scrapes known targets | Need auth/allow-listing of senders |
 
-Large companies use **both** (Alex Xu's conclusion): pull inside clusters, push for serverless/edge, unified by OpenTelemetry collectors.
+Large companies use **both**: pull inside clusters, push for serverless/edge, unified by OpenTelemetry collectors.
 
 **Scaling the pull collectors:** shard targets across a pool of collectors with **consistent hashing** on target ID so each target is scraped by exactly one collector; ring membership in etcd/ZooKeeper.
 
@@ -333,7 +333,7 @@ Large companies use **both** (Alex Xu's conclusion): pull inside clusters, push 
       heading: 'Metrics Monitoring (3/3): query, storage tiers, alerting & visualization',
       body: `**Query service:** exposes PromQL/SQL-like queries; a **cache** stores results for repeated dashboard panels (e.g., last-24h panels refreshed every 30 s: cache aligned time buckets and only compute the newest bucket). Query splitting by time range and parallelism across shards (Thanos/Mimir query frontends).
 
-**Storage optimizations (Alex Xu):**
+**Storage optimizations:**
 - **Data encoding & compression** (Gorilla).
 - **Downsampling**: raw 7 days → 1-minute resolution for 30 days → 1-hour for 1 year. Keep min/max/sum/count per bucket so averages and extrema remain correct.
 - **Cold storage**: old, rarely queried data in object storage at a fraction of the cost.
@@ -400,7 +400,7 @@ Large companies use **both** (Alex Xu's conclusion): pull inside clusters, push 
       heading: 'Ad Click Aggregation (1/4): requirements, estimation & data model',
       body: `**Intuition:** every ad click is a coin in a till. Advertisers are billed from the totals, so this is an **accounting system disguised as a streaming system** — being a few minutes late is fine, being wrong is not.
 
-**Requirements (Alex Xu Vol 2):**
+**Requirements:**
 - Aggregate the number of clicks of \`ad_id\` in the last M minutes.
 - Return the **top 100 most clicked ads** every minute.
 - Support **filtering** by attributes (ip, user_id, country).
@@ -433,7 +433,7 @@ Large companies use **both** (Alex Xu's conclusion): pull inside clusters, push 
     },
     {
       heading: 'Ad Click Aggregation (2/4): architecture & the MapReduce-style aggregation DAG',
-      body: `**Pipeline (Alex Xu):** log watcher on ad servers → **Kafka (raw clicks)** → **aggregation service** → **Kafka (aggregated results)** → **database writer** → aggregation DB → query service. Raw events are also written to raw storage (S3/Cassandra).
+      body: `**Pipeline:** log watcher on ad servers → **Kafka (raw clicks)** → **aggregation service** → **Kafka (aggregated results)** → **database writer** → aggregation DB → query service. Raw events are also written to raw storage (S3/Cassandra).
 
 **Why a second queue for results?** It decouples aggregation from the DB (slow writes don't back-pressure aggregation) and, crucially, is how we get **end-to-end exactly-once**: results + consumed offsets can be committed atomically in Kafka (transactions), and the DB writer can apply them idempotently.
 
@@ -527,7 +527,7 @@ export function reduceTopK(perNode: [string, number][][], k: number) {
 
 **Lambda vs kappa:**
 - **Lambda:** a batch layer (accurate, slow) and a speed layer (fast, approximate) with results merged at serving. Two codebases doing the same logic → drift and double maintenance.
-- **Kappa (Alex Xu's choice):** one streaming path; **recalculation** = replay raw data from storage through the same (or a dedicated instance of the) aggregation service into the results pipeline. Keeping the raw events retained is what makes kappa feasible.
+- **Kappa (the classic design's choice):** one streaming path; **recalculation** = replay raw data from storage through the same (or a dedicated instance of the) aggregation service into the results pipeline. Keeping the raw events retained is what makes kappa feasible.
 
 **Recalculation flow (bug found in aggregation logic):** recalculation service reads raw data from storage for the affected time range → dedicated aggregation service (so real-time processing isn't slowed) → second Kafka topic → aggregation DB overwrites affected buckets (idempotent upserts keyed by (ad, minute, filter)).`,
       code: [
@@ -584,7 +584,7 @@ export class TumblingCounter {
       heading: 'Ad Click Aggregation (4/4): exactly-once, dedup, hot spots, fault tolerance & reconciliation',
       body: `**Where duplicates come from:** clients/ad servers retry (same click sent twice — often fraud too), and aggregators reprocess after a crash (at-least-once consumption).
 
-**Exactly-once processing (Alex Xu):** the danger window is "results sent downstream, but offset not yet committed" (→ double count on restart) or "offset committed, but results not yet sent" (→ lost clicks). Solution: treat **sending results + committing the consumed offset as one atomic operation** — Kafka transactions, or a distributed transaction, or store the last processed offset *inside* the results store in the same write. Flink achieves this with **checkpoints** (Chandy-Lamport barriers snapshot operator state + source offsets) and **two-phase-commit sinks**.
+**Exactly-once processing:** the danger window is "results sent downstream, but offset not yet committed" (→ double count on restart) or "offset committed, but results not yet sent" (→ lost clicks). Solution: treat **sending results + committing the consumed offset as one atomic operation** — Kafka transactions, or a distributed transaction, or store the last processed offset *inside* the results store in the same write. Flink achieves this with **checkpoints** (Chandy-Lamport barriers snapshot operator state + source offsets) and **two-phase-commit sinks**.
 
 **Event-level dedup:** each click carries a unique \`click_id\` (generated at the ad server); aggregators dedup within a window (keyed state with TTL, or a Bloom filter for approximate dedup at huge scale). Fraud filtering (bots, click farms) is a separate stage.
 
@@ -1556,7 +1556,7 @@ export async function markFailed(pool: Pool, runKey: string, fence: number, atte
     },
     {
       id: 'design-infra-boe-2',
-      question: 'Estimate TSDB ingestion and storage for 10M active series scraped every 15 s, with the Alex Xu retention policy.',
+      question: 'Estimate TSDB ingestion and storage for 10M active series scraped every 15 s, with tiered retention: raw 7 days, 1-minute rollups 30 days, 1-hour rollups 1 year.',
       assumptions: [
         'Gorilla-style compression ≈ 1.37 B per raw sample',
         'Rollup points store min/max/sum/count ≈ 4 values ≈ ~6 B compressed per rollup point',
@@ -1872,7 +1872,7 @@ await consumer.commitOffsets(offsets);`,
     {
       id: 'design-infra-mcq-12',
       difficulty: 'medium',
-      question: 'Why does Alex Xu’s ad-click design keep raw click events even though queries only use aggregates? Select ALL that apply.',
+      question: 'Why does the classic ad-click design keep raw click events even though queries only use aggregates? Select ALL that apply.',
       options: [
         'To recalculate aggregates after a bug by replaying raw data (kappa-style)',
         'To reconcile real-time results against a batch recomputation for billing',

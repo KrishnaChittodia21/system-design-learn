@@ -681,7 +681,7 @@ it('creates an order and returns 201 with Location, pricing stubbed', async () =
         'Identify every breaking change in the 1.8 diff and rework the release so it is genuinely backward compatible (expand phase), with a path to eventually remove the old shapes.',
       starter: {
         language: 'typescript',
-        code: `// v1.7 response: { id: 42, givenName: 'Jim', surname: 'Gough', type: 'SPEAKER', ticketPrice: '199.00' }
+        code: `// v1.7 response: { id: 42, givenName: 'Jane', surname: 'Doe', type: 'SPEAKER', ticketPrice: '199.00' }
 
 // v1.8 DTOs (shipped as a minor release)
 export class CreateAttendeeDto {

@@ -39,7 +39,7 @@ const topic: Topic = {
 **What you build on it:**
 - **Leader election** — exactly one scheduler, one primary DB (Patroni), one Kafka controller (KRaft).
 - **Linearizable storage** of small critical data — config, feature flags, cluster membership, locks (etcd for Kubernetes, ZooKeeper for older Kafka/HBase).
-- **Atomic commit of replicated data** — CockroachDB/TiKV/Spanner run one consensus group per data range; Alex Xu's digital wallet (Vol 2 Ch 12) uses Raft to replicate the event log.
+- **Atomic commit of replicated data** — CockroachDB/TiKV/Spanner run one consensus group per data range; the classic digital wallet design uses Raft to replicate the event log.
 
 **Why it's hard:**
 - **FLP impossibility (1985):** in a fully asynchronous system with even one crash-faulty process, no deterministic algorithm can guarantee consensus terminates. Real protocols guarantee *safety always* and *liveness* only when the network is "timely enough" (timeouts, randomisation).
@@ -315,7 +315,7 @@ export async function runForLeader(podName: string, work: (token: string) => Pro
       heading: 'Leases and fencing tokens: making leader election actually safe',
       body: `**Intuition:** a lease is a parking permit with an expiry time. The problem: the driver might fall asleep in the car (a GC pause), wake up after the permit expired, and still think they're allowed to park — while someone else now holds a valid permit.
 
-**The failure (Kleppmann's canonical example):**
+**The failure (the canonical example):**
 1. Client 1 acquires a lock/lease (TTL 10 s) and starts writing a file.
 2. Client 1 pauses for 15 s (stop-the-world GC, VM live migration, SIGSTOP, disk stall, network delay of its request).
 3. The lease expires; client 2 acquires it and writes.

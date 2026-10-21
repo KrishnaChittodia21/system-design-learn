@@ -1188,7 +1188,7 @@ export class EventLogCounter {
     },
     {
       heading: 'More streaming & probabilistic structures: lossy counting and cuckoo filters',
-      body: `Two more structures that keep turning up in interview algorithm lists (ByteByteGo's "12 algorithms" and "6 data structures to save storage"). Each fixes a specific weakness of a structure taught earlier: **lossy counting** keeps the keys and errs downwards, while Count-Min errs upwards and stores no keys. A **cuckoo filter** supports deletes, which a Bloom filter cannot.
+      body: `Two more structures that keep turning up in interview algorithm lists (the popular "12 algorithms" and "6 data structures to save storage" lists). Each fixes a specific weakness of a structure taught earlier: **lossy counting** keeps the keys and errs downwards, while Count-Min errs upwards and stores no keys. A **cuckoo filter** supports deletes, which a Bloom filter cannot.
 
 ### Lossy counting (Manku & Motwani, VLDB 2002)
 
@@ -1708,7 +1708,7 @@ export async function placeBid(pool: Pool, cmd: { bidId: string; auctionId: stri
       id: 'design-more-iq-04',
       difficulty: 'hard',
       question: 'Design a service that shows the 100 most-played songs per country for "last 24 hours" (updated every minute), and also produces the official weekly chart that drives royalty payouts.',
-      context: 'Reported as a "Top-K system" question at Meta, Amazon and Microsoft (Hello Interview community reports, 2025). Assume 1.2M play events/s globally at peak, 80M distinct tracks, 60 countries.',
+      context: 'Reported as a "Top-K system" question at Meta, Amazon and Microsoft (community reports, 2025). Assume 1.2M play events/s globally at peak, 80M distinct tracks, 60 countries.',
       whatInterviewerLooksFor: [
         'Separates the approximate, fresh path from the exact, auditable path',
         'Keys the stream so local top-K lists merge correctly',
@@ -1960,7 +1960,7 @@ export async function placeBid(pool: Pool, cmd: { bidId: string; auctionId: stri
       id: 'design-more-iq-10',
       difficulty: 'hard',
       question: 'Design an online auction system like eBay. Bids must be strictly ordered and never lost, the UI must update in real time as bids come in, and auctions must stay fast as they approach their deadline with many bidders and watchers.',
-      context: 'Reported in a Meta senior software engineer onsite (Taro interview experience, Feb 2025), including real-time UI updates and how to shard data and processing near the deadline.',
+      context: 'Reported in a Meta senior software engineer onsite (candidate interview report, Feb 2025), including real-time UI updates and how to shard data and processing near the deadline.',
       whatInterviewerLooksFor: [
         'Strong consistency per auction with a clear serialization point',
         'Correct handling of the deadline using the authority\'s clock',

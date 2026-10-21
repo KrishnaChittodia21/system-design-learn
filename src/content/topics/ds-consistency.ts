@@ -461,10 +461,10 @@ export class PNCounter {
 
 | Feature | Model | Mechanism |
 |---|---|---|
-| Payment capture, wallet transfer | Serializable / strict | Single-leader SQL txn, idempotency keys; ledger reconciliation (Alex Xu Ch 11–12) |
+| Payment capture, wallet transfer | Serializable / strict | Single-leader SQL txn, idempotency keys; ledger reconciliation |
 | Inventory decrement at checkout | Linearizable on the SKU | Conditional update \`qty = qty - 1 WHERE qty > 0\` on the leader, or reservations |
 | Username / email uniqueness | Linearizable | Unique constraint on one leader, or CAS in etcd/DynamoDB conditional put |
-| Seat / hotel room booking | Serializable per resource | Row lock or optimistic version check (Alex Xu Ch 7) |
+| Seat / hotel room booking | Serializable per resource | Row lock or optimistic version check |
 | Profile edit | Read-your-writes | Read from leader for the editor for N seconds or LSN token |
 | Chat messages, comments | Causal + per-channel order | Single sequencer per channel/partition, client-side dependency |
 | Likes, views, follower counts | Eventual | CRDT/aggregated counters, cache |
@@ -969,7 +969,7 @@ On a single Postgres primary, SSI in practice reads the latest committed snapsho
 - **Cache**: either don't cache balances, or update/invalidate synchronously in the same code path after commit, with the LSN/version to avoid older overwrites.
 - **Displayed history** (list of transactions) may come from replicas with a "pending" state for just-submitted transfers.
 
-### Architecture note (Alex Xu Vol 2 Ch 12)
+### Architecture note (classic digital wallet design)
 At scale, wallets use event sourcing: the command is validated and appended to a log, the balance is a projection. Reads from the projection are eventually consistent; for the owner you read your own position (event sequence number) — the same token idea.`,
       followUps: [
         {
@@ -1012,7 +1012,7 @@ At scale, wallets use event sourcing: the command is validated and appended to a
 2M increments/s on one row/key is impossible, and cross-region coordination per increment adds 100+ ms. LWW would lose whole regions' increments.
 
 ### Exactness
-The real-time counter is approximate-but-monotonic; the authoritative number for payouts is recomputed in batch from the deduplicated event log (Alex Xu Ch 6 ad-click aggregation uses the same lambda/kappa reconciliation).`,
+The real-time counter is approximate-but-monotonic; the authoritative number for payouts is recomputed in batch from the deduplicated event log (classic ad-click aggregation uses the same lambda/kappa reconciliation).`,
       followUps: [
         {
           q: 'How do you avoid counting a retried event twice in the real-time path?',

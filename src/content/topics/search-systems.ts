@@ -392,7 +392,7 @@ export function bm25(index: InvertedIndex, query: string, topK = 10) {
 | Completion suggester | In-memory FST per segment of weighted inputs | 1–5 ms | Prefix only (plus fuzzy & contexts); no arbitrary filters; deleted docs linger until merges | Heap/off-heap memory |
 | Precomputed trie with top-k per node (query log based) | Offline job aggregates query log → trie; each node caches its k best completions | < 1 ms in-process / Redis | Suggests *queries people type*, not documents | Rebuild pipeline; staleness hours |
 
-**The top-k trie (Alex Xu Vol 1, Ch 13)** is what Google-style query suggestion uses: store the top k (e.g. 5–10) completions *at every node*, so a lookup is O(prefix length) and needs no subtree traversal. Build it offline (hourly/daily) from aggregated query frequencies, shard by prefix range, serve from memory or Redis, and cache prefix responses in the browser/CDN (short TTL). Trending queries are merged from a small real-time layer.
+**The top-k trie** is what Google-style query suggestion uses: store the top k (e.g. 5–10) completions *at every node*, so a lookup is O(prefix length) and needs no subtree traversal. Build it offline (hourly/daily) from aggregated query frequencies, shard by prefix range, serve from memory or Redis, and cache prefix responses in the browser/CDN (short TTL). Trending queries are merged from a small real-time layer.
 
 **Filter the suggestions**: blocklist offensive/PII queries, and only suggest queries that return results.`,
       code: [

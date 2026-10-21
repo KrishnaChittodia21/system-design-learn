@@ -548,7 +548,7 @@ Budget consumed = burn rate × (alert window ÷ SLO window). The SRE Workbook's 
 - The **short window** makes the alert **reset quickly** once you fix it (otherwise the 1-hour average keeps firing for an hour after recovery).
 - Low-traffic services: a handful of failures can blow the ratio — add a minimum request-count clause or use synthetic traffic.
 
-Cause-based alerts (CPU, disk 90%, pod restarts) become **tickets or dashboard annotations**, not pages. Every page must be actionable and linked to a runbook and a dashboard. Alex Xu's alerting design adds the plumbing: rules evaluated periodically, alert state stored, dedup/grouping/inhibition in Alertmanager, then fan-out to PagerDuty, Slack, email.`,
+Cause-based alerts (CPU, disk 90%, pod restarts) become **tickets or dashboard annotations**, not pages. Every page must be actionable and linked to a runbook and a dashboard. A full alerting design adds the plumbing: rules evaluated periodically, alert state stored, dedup/grouping/inhibition in Alertmanager, then fan-out to PagerDuty, Slack, email.`,
       code: [
         {
           language: 'yaml',
@@ -593,10 +593,10 @@ Cause-based alerts (CPU, disk 90%, pod restarts) become **tickets or dashboard a
       source: 'Google SRE Workbook — Ch 5 Alerting on SLOs; Alex Xu Vol 2 Ch 5 (alerting system)',
     },
     {
-      heading: 'Designing the metrics pipeline at scale (Alex Xu Ch 5)',
+      heading: 'Designing the metrics pipeline at scale',
       body: `**Intuition:** a metrics platform is a write-heavy database for numbers that are almost always read as "the last few hours, aggregated".
 
-Alex Xu's design for a large fleet: collection → transmission → storage → query → alerting/visualization.
+The classic design for a large fleet: collection → transmission → storage → query → alerting/visualization.
 
 **Pull vs push**
 

@@ -1462,7 +1462,7 @@ export async function answer(d: Deps, tenantId: string, userId: string, question
       difficulty: 'expert',
       question: 'Design the backend of a commission-free retail brokerage app like Robinhood: users fund accounts, watch live prices, and place market and limit orders for US stocks. The interviewer will break things on purpose.',
       context:
-        'Reported in Robinhood senior software engineer loops (candidate report on Exponent): "design a brokerage system", with the final round focused heavily on failure modes. Assume 25M funded accounts and that the market open is the peak.',
+        'Reported in Robinhood senior software engineer loops (candidate report): "design a brokerage system", with the final round focused heavily on failure modes. Assume 25M funded accounts and that the market open is the peak.',
       whatInterviewerLooksFor: [
         'States early that the broker routes orders and the exchange matches them, and scopes accordingly',
         'Atomic buying-power reservation, order + outbox in one transaction, idempotency keys',
@@ -1919,7 +1919,7 @@ export async function answer(d: Deps, tenantId: string, userId: string, question
       difficulty: 'expert',
       question: 'Design "Ask your workspace": employees ask natural-language questions and get cited answers drawn from Confluence, Jira and Google Drive, for 10,000 enterprise tenants with strict document permissions.',
       context:
-        'Reported in Hello Interview community question lists at Atlassian (staff, 2026: "design an ML-powered enterprise search system using RAG" and "design search for Confluence") and at Scale AI (2026).',
+        'Reported in community question lists at Atlassian (staff, 2026: "design an ML-powered enterprise search system using RAG" and "design search for Confluence") and at Scale AI (2026).',
       whatInterviewerLooksFor: [
         'Splits the system into an ingestion plane and a query plane, with numbers',
         'Chooses and sizes a vector index; uses hybrid retrieval and reranking',

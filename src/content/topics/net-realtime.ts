@@ -18,7 +18,7 @@ const topic: Topic = {
     'Decision: request/response → REST (public) or gRPC (internal, typed, streaming); server→client push only → SSE; bidirectional low-latency → WebSocket; must work everywhere with minimal infra → long polling.',
     'SSE = one long HTTP response of "id:/event:/data:" lines; browser auto-reconnects and sends Last-Event-ID, so the server must be able to REPLAY from that id (Redis Streams/Kafka), not just pub/sub.',
     'WebSocket = HTTP/1.1 Upgrade → 101 Switching Protocols → framed full-duplex TCP. Stateful: needs sticky routing, draining on deploy, and a pub/sub backplane to reach users on other nodes.',
-    'Alex Xu Nearby Friends: 10M concurrent × update/30s ≈ 334K updates/s; × 400 friends × 10% online ≈ 14M pushes/s → ~140 Redis pub/sub nodes (CPU-bound, not memory-bound at ~200GB).',
+    'Nearby Friends: 10M concurrent × update/30s ≈ 334K updates/s; × 400 friends × 10% online ≈ 14M pushes/s → ~140 Redis pub/sub nodes (CPU-bound, not memory-bound at ~200GB).',
     'Heartbeat interval must be shorter than the smallest idle timeout on the path (ALB and nginx default 60s) — 20–30s pings; terminate if no pong within one interval.',
     'Backpressure: check ws.bufferedAmount before send; conflate (latest-wins) or drop for slow consumers; disconnect past a hard cap. Unbounded buffers = OOM on the connection server.',
     'Reconnect storms: exponential backoff with FULL jitter, staggered draining (close 1012 + retry hint), resumption tokens so reconnects skip the full auth path.',
@@ -300,7 +300,7 @@ spec:
       heading: '6. Scaling WebSockets: connection servers + pub/sub fan-out',
       body: `**Intuition:** separate the switchboard (who is connected where) from the brains (business logic). Connection servers only hold sockets; a pub/sub backplane gets each message to whichever server holds the recipient.
 
-**Alex Xu's Nearby Friends design (Vol 2, Ch 2):**
+**The classic Nearby Friends design:**
 - 100M DAU, 10% concurrent = **10M live WebSocket connections**; each client reports location every 30s → **~334K updates/s**.
 - Each user has ~400 friends; assume ~10% online and nearby → each update fans out to ~40 friends → **~14M pushes/s**.
 - WebSocket servers are stateful and hold the connections; stateless API servers handle friends/profile CRUD behind the same LB.
@@ -570,7 +570,7 @@ cat /proc/sys/fs/file-nr                           # allocated / free / max FDs`
 2. Connection tier vs logic tier; how a message finds the right node (backplane or registry).
 3. Durability: what is persisted, sequence numbers, resume.
 4. Liveness: heartbeat interval vs idle timeouts; reconnect with jitter.
-5. Capacity: connections per node, fan-out rate, backplane throughput (Alex Xu's 14M/s → ~140 Redis nodes).
+5. Capacity: connections per node, fan-out rate, backplane throughput (Nearby Friends: 14M/s → ~140 Redis nodes).
 6. Operations: draining, backpressure, per-connection limits, auth at upgrade.`,
       keyPoints: [
         'Readiness-fail → staggered 1012 closes → jittered resume elsewhere.',
@@ -876,7 +876,7 @@ app.listen(3000);
         'Handles multi-device, offline users and pod churn',
       ],
       modelAnswer: `### Routing options
-1. **Per-user channels** (Alex Xu Nearby Friends style). Each pod SUBSCRIBEs to user:{id} for every user connected to it, and senders PUBLISH to user:bob. There is no registry and routing is automatic. The cost is 3M subscriptions and a subscribe/unsubscribe on every connect/disconnect.
+1. **Per-user channels** (Nearby Friends style). Each pod SUBSCRIBEs to user:{id} for every user connected to it, and senders PUBLISH to user:bob. There is no registry and routing is automatic. The cost is 3M subscriptions and a subscribe/unsubscribe on every connect/disconnect.
 2. **Registry + per-pod channel**. On connect, write presence: HSET conn:bob {device} pod-17 with a TTL refreshed by heartbeat. The sender looks Bob up and publishes to pod:17. That is only 30 channels, but the registry must be kept consistent (stale entries after crashes are fixed by TTL, and a missed delivery falls back to replay).
 
 At 3M users either works. I would start with per-user channels on **Redis 7 sharded pub/sub** (SSUBSCRIBE/SPUBLISH) or NATS, because classic PUBLISH in Redis Cluster is broadcast to every node and does not scale horizontally.
@@ -1156,7 +1156,7 @@ Voice mode, or collaborative editing, where the client streams audio or edits co
     {
       id: 'net-realtime-boe-1',
       question:
-        'Nearby Friends (Alex Xu Vol 2, Ch 2): size the Redis pub/sub cluster that fans out location updates.',
+        'Nearby Friends: size the Redis pub/sub cluster that fans out location updates.',
       assumptions: [
         '100M DAU, 10% concurrent → 10M active users',
         'Each active user sends a location update every 30s',

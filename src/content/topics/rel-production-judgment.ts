@@ -37,7 +37,7 @@ const topic: Topic = {
       heading: '1. The production-judgment lens: modes are where systems die',
       body: `**Intuition:** the code that runs a million times a day is the code you can trust. The code that runs once a year — the fallback, the "emergency mode", the backlog drain, the rollback — is the code that takes you down, because it runs for the first time on the worst day.
 
-Every topic in this chapter is one idea seen from five angles: **a system that behaves differently under stress than in steady state is a system you have never really tested.** The Amazon Builders' Library calls this *modal behaviour*; the metastable-failure paper calls the stressed mode a *metastable state*; queue engineers call it *bimodal latency*.
+Every topic in this chapter is one idea seen from five angles: **a system that behaves differently under stress than in steady state is a system you have never really tested.** This is called *modal behaviour*; the metastable-failure paper calls the stressed mode a *metastable state*; queue engineers call it *bimodal latency*.
 
 | Pattern | The hidden mode | The senior move |
 |---|---|---|
@@ -70,7 +70,7 @@ Every topic in this chapter is one idea seen from five angles: **a system that b
       heading: '2. Avoiding fallback: why the backup plan is usually the outage',
       body: `**Intuition:** a spare tyre you have never checked is flat precisely when you need it — and in a distributed system, every car's spare goes flat at the same moment.
 
-**Four ways to handle a failed call** (Builders' Library taxonomy):
+**Four ways to handle a failed call** (a standard taxonomy):
 
 | Strategy | Example | Exercised in steady state? |
 |---|---|---|
@@ -136,7 +136,7 @@ export class ShippingEstimateService {
       heading: '3. What to do instead of fallback: reliable primaries, pushed data, always-on failover',
       body: `**Intuition:** instead of keeping a spare tyre in the boot, drive on run-flat tyres (better primary), or on a car with two engines both always running (failover).
 
-**The Builders' Library alternatives, in order of preference:**
+**The alternatives, in order of preference:**
 
 1. **Make the primary path more reliable.** Choose dependencies that are inherently more available rather than stitching a fallback between two data stores (Amazon cites DynamoDB carrying amazon.com through Prime Day 2017). In our stack: Postgres with a synchronous standby and a tested failover is one path; "Postgres, else Mongo snapshot" is two half-tested paths.
 2. **Let the caller handle it.** Fail fast with a clear error and let the client's retry logic (with budget and jitter) work. AWS SDKs retry by design; retries are exercised constantly and their rate is alarmed on.
@@ -306,7 +306,7 @@ export class RoutingSnapshot {
 - If λ < μ, backlog stays near zero; latency ≈ processing time.
 - During an outage of length T, backlog B = λ × T.
 - After recovery, the backlog drains at the **spare** rate μ − λ, so drain time = B ÷ (μ − λ).
-- At μ = 2λ, drain time = λT ÷ λ = **T**: a one-hour outage needs another hour at double capacity. The Builders' Library example: a backlog 10× the consumer's scaled capacity takes ~300 minutes.
+- At μ = 2λ, drain time = λT ÷ λ = **T**: a one-hour outage needs another hour at double capacity. A worked example: a backlog 10× the consumer's scaled capacity takes ~300 minutes.
 - Add **detection time**: humans may take ~30 minutes to engage, during which producers keep enqueueing unthrottled.
 
 **Why FIFO makes it worse for real-time systems:** during a backlog, a FIFO queue serves the *oldest* (least useful) messages first, so *every* customer sees the full delay — including those whose request arrived a second ago. Customers usually prefer fresh work first.
@@ -363,7 +363,7 @@ export class RoutingSnapshot {
       heading: '7. Backlog-tolerant queue design: fresh-first, drop the superseded, isolate the noisy',
       body: `**Intuition:** when the post office is buried, deliver today's letters first, shred the flyers that are already out of date, and give the one customer who mailed 10,000 parcels their own counter.
 
-**Tactics from the Builders' Library, and when each fits:**
+**Tactics, and when each fits:**
 
 | Tactic | Mechanism | Fits when | Watch out for |
 |---|---|---|---|
@@ -375,7 +375,7 @@ export class RoutingSnapshot {
 | **Delay queue** | Re-enqueue a throttled workload with a delivery delay of minutes | Slowing one workload without dropping it | Adds latency to that workload by design |
 | **Backpressure** | Producers reject more as the workload's backlog grows (throttle ∝ 1/depth) | You can see per-workload depth | A shared SQS queue only reports total depth |
 
-**Ordering caveats.** The Builders' Library warns that SQS FIFO searches only a bounded window of unprocessed messages (~20,000 when the article was written; check today's quotas) for available message groups, so one group with a huge backlog can starve groups holding fresh messages. For Kafka, "sideline" means publishing to a \`*.backlog\` topic — keep a **per-key version** in the payload and make the consumer apply only if \`version > stored_version\`, so out-of-order arrival is harmless.
+**Ordering caveats.** Note that SQS FIFO searches only a bounded window of unprocessed messages (~20,000 when the article was written; check today's quotas) for available message groups, so one group with a huge backlog can starve groups holding fresh messages. For Kafka, "sideline" means publishing to a \`*.backlog\` topic — keep a **per-key version** in the payload and make the consumer apply only if \`version > stored_version\`, so out-of-order arrival is harmless.
 
 **When not to drop:** Amazon's own order pipeline prefers to *accept* orders during backlogs and prioritise urgent ones behind the scenes. Money-moving or legally required messages get prioritised, never TTL'd.
 
@@ -429,7 +429,7 @@ async function handle(msg: Message): Promise<void> {
 
 **Little's law sets the thread/connection count.** Concurrency = arrival rate × latency. 100 msgs/s at 100 ms needs ~10 concurrent workers; at 10 s latency the same rate needs ~1,000. Since latency balloons during incidents, unbounded concurrency means unbounded sockets and memory. Cap it **per workload** (semaphores or per-workload pools) so one slow tenant cannot take every slot.
 
-**Other consumer hygiene from the Builders' Library:**
+**Other consumer hygiene:**
 - **In-flight limits:** SQS caps in-flight messages per queue (120,000 for standard queues). Code that forgets to delete messages after errors keeps them in flight until the timeout, silently eating that budget. Move problem messages to another queue instead of letting them churn.
 - **Empty-poll ratio:** if *every* receive returns messages, pollers have no headroom for a burst. Track the share of empty receives; near 0% means add pollers.
 - **Protect every layer:** queued work bypasses front-door admission control, so each async component needs its own overload protection.
@@ -903,7 +903,7 @@ async function handle(msg: Message): Promise<void> {
   // and go to a DLQ after maxReceiveCount = 5 (redrive policy), which pages.
 }`,
       },
-      explanation: `**Fixes, mapped to the Builders' Library backlog guidance:**
+      explanation: `**Fixes, mapped to standard backlog guidance:**
 - **Heartbeated lease** (\`processWithLease\` extends visibility every 10 s, with a total cap and abort). The starter's 30 s timeout with 40 s gateway calls made every message reappear and run twice in parallel, the "fork bomb" that kept the gateway at 100%.
 - **Bounded concurrency by Little's law.** Fire-and-forget allowed unbounded in-flight calls. A semaphore caps gateway concurrency, and the poller receives only when it has capacity, so messages are not held invisible while waiting.
 - **Dropping superseded deltas.** State deltas are "latest wins". Anything produced before the last sweep's snapshot read, or with a version ≤ the stored one, is deleted unprocessed. This usually removes most of a backlog that is hours old.

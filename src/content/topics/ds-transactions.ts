@@ -22,7 +22,7 @@ const topic: Topic = {
     'A timeout is an UNKNOWN outcome, not a failure. Every retried operation must be idempotent, or retries create duplicates (double charges, double orders).',
     'API idempotency: client sends Idempotency-Key; server atomically inserts (key, request hash) FIRST, runs the operation, stores the response; replays return the stored response; same key + different body → 422; concurrent same key → 409.',
     'Consumer idempotency (inbox): record message_id in a processed table in the SAME transaction as the side effect; unique constraint dedups. Dedup window ≥ max redelivery/replay horizon.',
-    'Exactly-once delivery doesn\'t exist end-to-end; exactly-once EFFECT = at-least-once delivery + idempotent processing (Alex Xu Ch 11).',
+    'Exactly-once delivery doesn\'t exist end-to-end; exactly-once EFFECT = at-least-once delivery + idempotent processing.',
     '2PC: prepare (vote) → commit/abort. Atomic, but BLOCKING: if the coordinator dies after participants vote yes, they hold locks in-doubt until it recovers. OK inside one DB/vendor; poor across microservices.',
     'TC/C: Try reserves resources (business-level), Confirm/Cancel finalise. Each phase is a separate local txn; must handle idempotent confirm/cancel, empty rollback, and hanging (cancel before try).',
     'Saga: sequence of local transactions + compensating actions. No isolation (others see intermediate states) → use semantic locks (PENDING states), put the pivot step late, make compensations idempotent and retryable.',
@@ -288,12 +288,12 @@ ORDER BY prepared;`,
 - **Confirm:** turn the reservation into the real change (debit the frozen amount). Must succeed if Try succeeded — so it is retried until it does.
 - **Cancel:** release the reservation. Also retried until it succeeds.
 
-**TC/C vs 2PC:** both are two-phase, but 2PC's phases are at the *database* level (locks held, in-doubt state inside the DB), whereas TC/C phases are at the *application/business* level — each phase commits locally, so there are no long DB locks and no blocking of unrelated transactions. The price: every service must implement three operations, and the coordinator must persist progress to drive Confirm/Cancel after crashes (Alex Xu Ch 12 uses a phase status table).
+**TC/C vs 2PC:** both are two-phase, but 2PC's phases are at the *database* level (locks held, in-doubt state inside the DB), whereas TC/C phases are at the *application/business* level — each phase commits locally, so there are no long DB locks and no blocking of unrelated transactions. The price: every service must implement three operations, and the coordinator must persist progress to drive Confirm/Cancel after crashes (the classic wallet design uses a phase status table).
 
 **Three classic TC/C anomalies (must handle):**
 1. **Idempotent Confirm/Cancel:** the coordinator retries, so Confirm/Cancel will be called more than once.
 2. **Empty rollback:** Cancel arrives for a Try that never executed (the Try request was lost/timed out) → record "cancelled" and return success without releasing anything.
-3. **Hanging / out-of-order:** Cancel is processed *before* a delayed Try arrives → the late Try must be **rejected**, otherwise it reserves resources forever. Alex Xu describes this as the out-of-order execution problem, solved by recording the cancel first.
+3. **Hanging / out-of-order:** Cancel is processed *before* a delayed Try arrives → the late Try must be **rejected**, otherwise it reserves resources forever. This is the out-of-order execution problem, solved by recording the cancel first.
 
 The usual implementation: a per-participant \`tcc_branch(xid, state)\` table where states move TRYING → CONFIRMED | CANCELLED, updated with conditional transitions.`,
       code: [
@@ -580,7 +580,7 @@ export async function relayOnce(db: Pool, producer: Producer): Promise<number> {
 **Delivery semantics:**
 - **At-most-once:** send and forget (or commit offset before processing). Loses messages on failure.
 - **At-least-once:** retry until acked (commit offset after processing). Duplicates on failure.
-- **"Exactly-once":** in practice = **at-least-once delivery + idempotent/transactional processing** (Alex Xu Ch 11 states this explicitly for payments: retries give at-least-once, idempotency gives at-most-once, together exactly-once).
+- **"Exactly-once":** in practice = **at-least-once delivery + idempotent/transactional processing** (payment systems state this explicitly: retries give at-least-once, idempotency gives at-most-once, together exactly-once).
 
 **What Kafka's exactly-once (EOS) really covers:**
 - **Idempotent producer** (PID + per-partition sequence numbers) — no duplicates from producer retries.
@@ -609,7 +609,7 @@ Kafka transactions: exactly-once only for Kafka → Kafka pipelines`,
       heading: 'Reconciliation: the safety net for money',
       body: `**Intuition:** at the end of each day, a shop compares its till receipts with the bank statement. Whatever doesn't match gets investigated. Distributed payment systems do the same, automatically, because *something* always slips through retries, timeouts and bugs.
 
-**Why it's needed even with idempotency and sagas:** third parties (PSPs, banks, card networks) are asynchronous, send late webhooks, occasionally double-settle or miss one; internal bugs and manual fixes happen; outage recovery replays events. Alex Xu Ch 11 treats reconciliation as a core component of the payment system, not an afterthought.
+**Why it's needed even with idempotency and sagas:** third parties (PSPs, banks, card networks) are asynchronous, send late webhooks, occasionally double-settle or miss one; internal bugs and manual fixes happen; outage recovery replays events. A well-designed payment system treats reconciliation as a core component of the payment system, not an afterthought.
 
 **How it works:**
 1. **Sources of truth to compare:** internal **ledger** (double-entry: every movement is a debit and a credit that sum to zero), internal payment/order state, **PSP settlement files** (daily CSV/SFTP or API), bank statements, and wallet balances (Ch 12: balance must equal the sum of ledger entries).
@@ -1715,7 +1715,7 @@ UPDATE tcc_branch SET state = 'CONFIRMED' WHERE xid = $xid;`,
       ],
       correct: [2],
       explanation:
-        'Idempotency prevents duplicates from retries, but it cannot detect a missed webhook, a PSP double-settlement, a fee change, or a bug in your own state machine. Reconciliation compares independent records and is the last line of defence (Alex Xu Ch 11). Key expiry is a detail, and tax is not the primary driver.',
+        'Idempotency prevents duplicates from retries, but it cannot detect a missed webhook, a PSP double-settlement, a fee change, or a bug in your own state machine. Reconciliation compares independent records and is the last line of defence. Key expiry is a detail, and tax is not the primary driver.',
       followUps: [
         {
           "q": "Reconciliation finds your ledger has 1,240 captured payments for yesterday but the PSP settlement file has 1,238. Walk through what happens next.",
