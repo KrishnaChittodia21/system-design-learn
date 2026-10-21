@@ -51,7 +51,7 @@ const topic: Topic = {
 
 **Non-functional:** search p99 < ~100–200 ms, high availability, read-heavy with peak spikes in dense areas at lunch time, privacy (user location is sensitive — don't log it raw).
 
-**Estimation** (Alex Xu Vol 2): 100M DAU, 200M businesses, 5 searches/user/day → 100M × 5 ÷ 10^5 ≈ **5,000 QPS** (peak ~×3–5). Business writes are negligible.
+**Estimation:** 100M DAU, 200M businesses, 5 searches/user/day → 100M × 5 ÷ 10^5 ≈ **5,000 QPS** (peak ~×3–5). Business writes are negligible.
 
 **API:**
 - \`GET /v1/search/nearby?latitude=&longitude=&radius=5000\` → \`{total, businesses: [...] }\` (summary objects; paginate with a cursor)
@@ -190,7 +190,7 @@ export function searchCells(lat: number, lng: number, precision: number): string
 - **Business service**: CRUD for owners; writes to the primary DB. A **nightly job** (or CDC stream) rebuilds geo index/caches — acceptable because updates need not be real-time.
 - **DB cluster**: primary for writes, many replicas for reads.
 
-**Caching strategy (Alex Xu):**
+**Caching strategy:**
 1. **Geohash → [business_id]** in Redis, per precision (4, 5, 6): 200M businesses × 8 B × 3 precisions ≈ **~5 GB** → fits one Redis node; replicate it to every region for read scale.
 2. **business_id → business object** in Redis for hydration.
 
@@ -273,7 +273,7 @@ export async function nearby(redis: Redis, lat: number, lng: number, radius: num
 
 **Non-functional:** low latency (a few seconds end-to-end), reliability "good enough" (occasional lost update is fine — the next arrives in 30 s), **eventual consistency** for the location store, privacy (opt-in, don't leak exact positions to non-friends).
 
-**Estimation (Alex Xu Vol 2):**
+**Estimation:**
 - 1B users, 10% use the feature → **100M DAU**; 10% concurrently online → **10M concurrent users**.
 - Each reports location every **30 s** → 10M ÷ 30 ≈ **334K location updates/s**.
 - Average 400 friends; ~10% of them online and nearby → each update fans out to ~40 friends → 334K × 40 ≈ **14M forwarded updates/s**.
@@ -381,7 +381,7 @@ export async function onConnect(ws: WebSocket, me: string, friends: string[]) {
       heading: 'Nearby Friends (3/3): scaling the WebSocket and pub/sub tiers',
       body: `**Scaling WebSocket servers:** they're stateful, so autoscaling needs care. To remove a node, mark it **draining** at the load balancer (no new connections), let existing connections close or ask clients to reconnect gradually (jittered), then terminate. Deploys follow the same pattern — a rolling restart that drops 1M connections at once causes a **reconnect storm** (thundering herd on auth + friend-list loading). Clients should reconnect with exponential backoff + jitter.
 
-**Sizing the Redis pub/sub cluster (Alex Xu):**
+**Sizing the Redis pub/sub cluster:**
 - **Memory:** 100M channels (one per feature user) × 100 subscribers × ~20 B per subscriber pointer ≈ **200 GB** → a couple of large nodes by memory alone.
 - **CPU:** 14M pushes/s; assume a Redis node handles ~100K subscriber pushes/s → **~140 nodes**. CPU, not memory, is the bottleneck.
 - Distribute channels across nodes with **consistent hashing**; keep the hash ring in a service-discovery store (etcd/ZooKeeper). WebSocket servers cache the ring and subscribe/publish to the right node.
@@ -427,7 +427,7 @@ export async function onConnect(ws: WebSocket, me: string, friends: string[]) {
       heading: 'Google Maps (1/3): requirements, estimation & map tiles',
       body: `**Intuition:** Google Maps is three systems glued together — a **picture service** (map tiles, served like static images from a CDN), a **position service** (ingesting billions of GPS points), and a **routing brain** (shortest paths on a road graph adjusted by live traffic).
 
-**Functional (Alex Xu Vol 2 scope):** user location updates, navigation with ETA, map rendering. Out of scope: Street View, multi-stop, business search.
+**Functional (classic scope):** user location updates, navigation with ETA, map rendering. Out of scope: Street View, multi-stop, business search.
 **Non-functional:** accuracy (no wrong turns), smooth rendering, **low data and battery usage** on mobile, availability and scalability.
 
 **Estimation:**
@@ -435,7 +435,7 @@ export async function onConnect(ws: WebSocket, me: string, friends: string[]) {
 - **Location updates:** 1B DAU × 35 min navigation/week ≈ **5B minutes/day**. GPS every second → 5B × 60 ÷ 10^5 ≈ **3M QPS**; batch client-side every **15 s** → **~200K QPS**, peak ~5× ≈ **1M QPS**.
 - **Server throughput for tiles** is mostly CDN: a user at 30 km/h pans through a handful of 100-KB tiles per minute.
 
-**Map tiles:** the world is pre-rendered per zoom level into 256×256 px tiles addressed by (z, x, y) — the Web-Mercator "slippy map" scheme. Tiles are **static** → pre-generate, store in object storage, serve through a **CDN**; clients compute which tiles they need from lat/lng/zoom and fetch URLs directly (or a map-tile service maps location → tile URLs so the encoding can change without app updates — Alex Xu uses geohash-keyed tile URLs).
+**Map tiles:** the world is pre-rendered per zoom level into 256×256 px tiles addressed by (z, x, y) — the Web-Mercator "slippy map" scheme. Tiles are **static** → pre-generate, store in object storage, serve through a **CDN**; clients compute which tiles they need from lat/lng/zoom and fetch URLs directly (or a map-tile service maps location → tile URLs so the encoding can change without app updates — the classic design uses geohash-keyed tile URLs).
 
 **Vector tiles** (modern): send road/label geometry (e.g. Mapbox Vector Tile protobuf) and render on the device — much smaller over the wire, crisp at fractional zooms, rotatable, styleable. Raster tiles are simpler for the server and old clients.
 
@@ -484,7 +484,7 @@ export function tilesForViewport(
       heading: 'Google Maps (2/3): road graph, routing tiles, shortest path & ETA',
       body: `**Intuition:** the world's roads are a graph (intersections = nodes, road segments = edges weighted by travel time). You can't hold the whole planet's graph in one Dijkstra run, so you cut it into **tiles** and add **highway shortcuts** so long trips don't expand every side street.
 
-**Routing tiles (Alex Xu):** the road graph is partitioned into grid tiles; each tile is a small adjacency list serialized to binary and stored in **object storage** (S3), cached aggressively by the shortest-path service. Tiles reference neighbouring tiles at their edges, so the algorithm loads tiles lazily as the search expands.
+**Routing tiles:** the road graph is partitioned into grid tiles; each tile is a small adjacency list serialized to binary and stored in **object storage** (S3), cached aggressively by the shortest-path service. Tiles reference neighbouring tiles at their edges, so the algorithm loads tiles lazily as the search expands.
 
 **Hierarchy:** three levels —
 - **Local** tiles (small area, all roads),
@@ -562,7 +562,7 @@ Why HTTP for batched uploads rather than WebSocket? Updates are periodic, client
 **Adaptive ETA and rerouting (the hard deep dive):**
 - Track **active navigation users** and the routing tiles their route crosses.
 - When traffic changes in a tile, we need "which navigating users are affected?" — a naive scan of all users' tile lists is O(users × tiles).
-- Alex Xu's trick: for each user store the tile of their current location plus the chain of **increasingly larger (higher-level) tiles** containing it until the destination is included — e.g. user_1: r1 ⊂ super(r1) ⊂ super(super(r1)). A traffic incident in tile X affects a user if X lies within the user's largest tile that contains both current location and destination, making the check cheap.
+- A useful trick: for each user store the tile of their current location plus the chain of **increasingly larger (higher-level) tiles** containing it until the destination is included — e.g. user_1: r1 ⊂ super(r1) ⊂ super(super(r1)). A traffic incident in tile X affects a user if X lies within the user's largest tile that contains both current location and destination, making the check cheap.
 - Recompute ETA for affected users; if a significantly better route exists, **push** it via a WebSocket/long-lived connection (the book chooses WebSocket over mobile push notifications, which have payload limits and less control).
 
 **Delivery protocol choices:** mobile push notifications (limited payload ~4 KB, no web support), long polling, WebSocket (bidirectional, small footprint), SSE. WebSocket wins for navigation sessions.

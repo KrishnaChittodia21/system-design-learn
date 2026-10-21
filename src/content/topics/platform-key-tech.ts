@@ -34,7 +34,7 @@ const topic: Topic = {
   sections: [
     {
       heading: 'Using a key technology in an interview: ask, justify, bound, and have a neutral fallback',
-      body: `**Intuition:** naming a specific product is a bet. If you know it deeply, it makes your design concrete and lets you go deep fast. If you name it and cannot answer the follow-up ("what happens when that partition gets hot?"), it hurts you more than staying generic. Hello Interview's guidance for DynamoDB applies to every managed product: **ask whether it is allowed**. Some interviewers are happy with AWS services. Others want vendor-neutral, open-source designs.
+      body: `**Intuition:** naming a specific product is a bet. If you know it deeply, it makes your design concrete and lets you go deep fast. If you name it and cannot answer the follow-up ("what happens when that partition gets hot?"), it hurts you more than staying generic. The usual guidance for DynamoDB applies to every managed product: **ask whether it is allowed**. Some interviewers are happy with AWS services. Others want vendor-neutral, open-source designs.
 
 **A four-step script:**
 1. **Ask:** "Can I assume AWS, so DynamoDB is on the table, or should I stay vendor-neutral?"
@@ -75,7 +75,7 @@ const topic: Topic = {
 
 **Capacity math you should do out loud:** a 2.5 KB item costs ceil(2.5 / 1) = **3 WCU** per write. A 6 KB eventually consistent read costs ceil(6 / 4) × 0.5 = **1 RCU**. 5,000 writes/s of that item need 15,000 WCU, which means at least 15 partitions' worth of write capacity, and the PK must spread writes across all of them.
 
-**Choosing the partition key:** high cardinality, requests spread evenly over time, and it matches the main read pattern. User id and order id are good. Status, date and tenant (when one tenant is 40% of traffic) are bad. **Sort-key** design gives you free range queries: \`ORDER#2026-10-12T10:00:00Z#01J9…\`. Hello Interview recommends time-ordered unique ids (ULID, UUIDv7, Snowflake) over raw timestamps, so that two writes in the same millisecond do not collide.
+**Choosing the partition key:** high cardinality, requests spread evenly over time, and it matches the main read pattern. User id and order id are good. Status, date and tenant (when one tenant is 40% of traffic) are bad. **Sort-key** design gives you free range queries: \`ORDER#2026-10-12T10:00:00Z#01J9…\`. Prefer time-ordered unique ids (ULID, UUIDv7, Snowflake) over raw timestamps, so that two writes in the same millisecond do not collide.
 
 **Filter expressions do not save capacity.** A filter is applied *after* items are read, so you pay for everything the key condition matched (up to 1 MB per page). If you filter away 95% of the items, model a better key or a sparse index instead.`,
       code: [
@@ -135,7 +135,7 @@ export async function ordersForMonth(userId: string, month: string /* '2026-10' 
 | Customer by email (unique) | PK = \`EMAIL#a@b.com\` | Separate "uniqueness" item written in a transaction |
 
 **When single-table design hurts:**
-- **Evolving or unknown access patterns.** Every new pattern means a new GSI or a backfill migration. This is Hello Interview's warning sign: heavy dependence on many GSIs and LSIs means the data wants a relational database.
+- **Evolving or unknown access patterns.** Every new pattern means a new GSI or a backfill migration. This is the warning sign: heavy dependence on many GSIs and LSIs means the data wants a relational database.
 - **Analytics and ad-hoc queries.** Export to S3 (full or incremental export) and query with Athena or Redshift, or stream to OpenSearch.
 - **Team and debugging cost.** Overloaded keys are unreadable without documentation. Many teams use one table per bounded context (or service) rather than one table for the whole company.
 - **Item collections with LSIs** are capped at 10 GB, and adaptive capacity will not split an item collection across partitions when the table has an LSI.

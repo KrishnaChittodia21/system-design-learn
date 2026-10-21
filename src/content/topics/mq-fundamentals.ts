@@ -78,7 +78,7 @@ const topic: Topic = {
 
 **Hybrid reality:** Kafka gives pub/sub *across* consumer groups and queue semantics *within* a group. SNS → multiple SQS queues is the AWS fan-out pattern. RabbitMQ Streams and Pulsar blur the line further.
 
-**Push vs pull:** RabbitMQ pushes to consumers (bounded by prefetch); Kafka and SQS consumers **pull**. Pull lets slow consumers go at their own pace and enables efficient batching; the cost is polling (Kafka uses long polling with \`fetch.min.bytes\`/\`fetch.max.wait.ms\`; SQS long polling up to 20 s). Alex Xu's design chooses pull for the same reasons.
+**Push vs pull:** RabbitMQ pushes to consumers (bounded by prefetch); Kafka and SQS consumers **pull**. Pull lets slow consumers go at their own pace and enables efficient batching; the cost is polling (Kafka uses long polling with \`fetch.min.bytes\`/\`fetch.max.wait.ms\`; SQS long polling up to 20 s). The classic message-queue design chooses pull for the same reasons.
 
 **Choosing:** background jobs with per-message retries and no replay → queue. Many independent downstream systems, replay, event sourcing, stream processing → log.`,
       keyPoints: [
@@ -100,7 +100,7 @@ const topic: Topic = {
 - **Retention:** by time (\`retention.ms\`, default **7 days**) or size (\`retention.bytes\`), or **log compaction** (\`cleanup.policy=compact\`: keep the latest value per key — ideal for changelogs and "current state" topics; a null value is a tombstone).
 - **Controller:** manages partition leadership and cluster metadata (KRaft quorum, see next section).
 
-**Why Kafka is fast** (Alex Xu's WAL design, same ideas):
+**Why Kafka is fast** (the classic WAL design uses the same ideas):
 1. **Sequential I/O** only — appends and sequential reads; even HDDs do hundreds of MB/s sequentially.
 2. **OS page cache** instead of a JVM heap cache: recent data is served from RAM; brokers survive GC easily.
 3. **Zero-copy** (\`sendfile\`) from page cache to socket for consumers (not possible with TLS in-JVM encryption, which is why TLS costs CPU).

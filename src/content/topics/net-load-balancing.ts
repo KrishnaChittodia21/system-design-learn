@@ -123,7 +123,7 @@ export async function withBackend<T>(b: Backend, fn: () => Promise<T>): Promise<
 
 **Why not \`hash(key) % N\`?** Going from N=10 to N=11 remaps ~10/11 ≈ **91% of keys** — for a cache, that's a near-total miss storm on your database. With consistent hashing only ~**1/N** of keys move (~9% when adding the 11th node).
 
-**Virtual nodes.** With one point per server the arcs are wildly uneven (some servers get 2–3× the average). Place each server at *v* points (e.g. \`nodeA#0 … nodeA#199\`). Per Alex Xu Vol 1: **100 vnodes → ~10% standard deviation of load, 200 → ~5%**. Vnodes also let you weight servers (a 2× bigger box gets 2× vnodes) and spread a failed node's keys across *many* survivors instead of dumping them on one neighbour.
+**Virtual nodes.** With one point per server the arcs are wildly uneven (some servers get 2–3× the average). Place each server at *v* points (e.g. \`nodeA#0 … nodeA#199\`). Rule of thumb: **100 vnodes → ~10% standard deviation of load, 200 → ~5%**. Vnodes also let you weight servers (a 2× bigger box gets 2× vnodes) and spread a failed node's keys across *many* survivors instead of dumping them on one neighbour.
 
 **Variants you should name**
 

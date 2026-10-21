@@ -480,7 +480,7 @@ while (!stopping) {
 | Permanent | schema/deserialization error, validation failure, 400/404/422, business rule violated | **no retry** → DLQ immediately |
 | Unknown | unexpected exception | limited retries → DLQ |
 
-**The tiered retry design (Uber-style, also Alex Xu's payment retry queue):**
+**The tiered retry design (Uber-style, also the classic payment retry queue):**
 1. **In-place retry** 2–3 times with short backoff (100 ms–1 s) for blips.
 2. On continued failure, publish to **\`topic.retry.1m\`** with headers: original topic/partition/offset, attempt count, error, \`not-before\` timestamp. Commit the original offset — the main partition keeps flowing.
 3. Retry consumers **pause** until \`not-before\` (don't \`sleep\` inside the handler — it breaks poll/heartbeat deadlines), then reprocess; on failure forward to \`retry.10m\`, \`retry.1h\`.

@@ -78,7 +78,7 @@ const topic: Topic = {
 
 **LSM in one paragraph:** writes go to an in-memory memtable (plus WAL), are flushed as immutable sorted SSTables, and background compaction merges them. Writes are fast; a read may check the memtable and several SSTables (Bloom filters skip most). Trade-offs: **write amplification** from compaction (10–30× in leveled compaction), **read amplification**, and **space amplification** during compaction. B-trees update in place: better read predictability, worse random-write throughput.
 
-**Geo indexing** (Alex Xu Vol 2, Ch 1): geohash/S2/H3 cell ids in a B-tree turn "nearby" into a prefix/range scan; PostGIS uses GiST (R-tree-like); quadtrees are often in-memory structures.`,
+**Geo indexing** (as in a proximity service): geohash/S2/H3 cell ids in a B-tree turn "nearby" into a prefix/range scan; PostGIS uses GiST (R-tree-like); quadtrees are often in-memory structures.`,
       code: [
         {
           language: 'sql',

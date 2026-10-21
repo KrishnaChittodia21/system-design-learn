@@ -79,7 +79,7 @@ const topic: Topic = {
       heading: 'CAP — a per-operation choice you make during a partition',
       body: `**What it is:** when the network splits replicas, an operation either waits or fails (consistency) or answers with possibly stale or divergent data (availability). Partitions are not optional, so "CA" is not a real option for a distributed system.
 
-**How to use it in an interview:** in non-functional requirements, ask per operation: "does this read *have* to see the latest write?" Hello Interview's example is Ticketmaster: booking a seat must be consistent (never double-book), browsing event details can be stale. The same product has both CP and AP paths.
+**How to use it in an interview:** in non-functional requirements, ask per operation: "does this read *have* to see the latest write?" A classic example is Ticketmaster: booking a seat must be consistent (never double-book), browsing event details can be stale. The same product has both CP and AP paths.
 
 **What CAP does not tell you:**
 - It says nothing about latency when there is no partition — that is **PACELC** (else: latency vs consistency).
@@ -185,7 +185,7 @@ export function amLeader(): boolean {
     },
     {
       heading: 'Distributed locks — efficiency locks vs correctness locks',
-      body: `**What it is:** mutual exclusion across processes or machines, usually a key with a TTL in Redis, etcd, ZooKeeper or Postgres. Kleppmann's key distinction:
+      body: `**What it is:** mutual exclusion across processes or machines, usually a key with a TTL in Redis, etcd, ZooKeeper or Postgres. The key distinction:
 - **Efficiency lock:** stops duplicated work (two pods rebuilding the same cache entry). An occasional double run costs money, not correctness. A single Redis SET NX PX is fine.
 - **Correctness lock:** protects an invariant (ledger, file, inventory). A pause or failover *will* eventually let two holders overlap, so you need fencing or a design that needs no lock.
 
@@ -693,7 +693,7 @@ export class BookingSaga {
       ],
       modelAnswer: `**How I use it:** while writing non-functional requirements, I ask one question per operation: *"If replicas disagree, must this read see the latest write, or is a stale answer better than an error?"* The answer then drives the datastore, the replication mode and the error UX.
 
-**Example: ticketing (Hello Interview uses it too).**
+**Example: ticketing.**
 - **Seat hold / purchase — consistency.** Two users must never get the same seat. During a partition, the side that cannot reach the seat's primary or quorum returns "try again". I'd use a single-leader or consensus-backed store, with a conditional write on the seat row.
 - **Event page, artist bio, seat map (display only) — availability.** Serve from cache or replicas even if they are a minute stale, and show "availability may change".
 - **Search — availability.** Elasticsearch fed by CDC, seconds behind.

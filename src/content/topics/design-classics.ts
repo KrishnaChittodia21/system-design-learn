@@ -46,7 +46,7 @@ const topic: Topic = {
       heading: 'How to run a classic design in 45 minutes',
       body: `Think of the classics as **scales practice for a musician**: interviewers pick them because the problem is small enough to finish, so the signal comes entirely from *how* you structure it and *which* hard parts you volunteer.
 
-**The 4-step framework** (Alex Xu) applied to every design in this topic:
+**The 4-step framework** applied to every design in this topic:
 
 | Step | Time | Output you must produce |
 |---|---|---|
@@ -81,7 +81,7 @@ const topic: Topic = {
 
 **Non-functional**: redirect p99 < 50 ms at the edge, 99.99% availability for redirects (a dead link is a broken ad campaign), short codes must be **unguessable-ish** (not sequentially enumerable), durability — a created link must never disappear.
 
-**Estimation** (Alex Xu Vol 1 numbers):
+**Estimation** (standard interview numbers):
 - Writes: 100M new URLs/day ÷ 10^5 ≈ **1,160 WPS** (peak ~3K).
 - Reads at 10:1 ≈ **11,600 RPS** (peak ~30–50K; viral links are much spikier).
 - 10 years: 100M × 365 × 10 = **365 billion** records × ~100 bytes ≈ **36.5 TB** (plus indexes/replicas → ~100+ TB raw).
@@ -362,7 +362,7 @@ export async function createPaste(
       heading: 'Distributed KV Store (1/4): requirements, CAP choice, partitioning with consistent hashing',
       body: `**Intuition:** a Dynamo-style store is "a hash map spread over a ring of machines, where every key lives on N neighbours so any single machine can die."
 
-**Requirements** (Alex Xu Vol 1 Ch 6 / Dynamo): \`put(key, value)\` and \`get(key)\`; small values (< 10 KB); store huge data sets; **high availability** even during partitions; automatic scaling (add/remove nodes); **tunable consistency**; low latency (single-digit ms p99 in-DC).
+**Requirements** (Dynamo-style): \`put(key, value)\` and \`get(key)\`; small values (< 10 KB); store huge data sets; **high availability** even during partitions; automatic scaling (add/remove nodes); **tunable consistency**; low latency (single-digit ms p99 in-DC).
 
 **CAP choice:** in a network partition you must pick consistency or availability. A shopping-cart-style store picks **AP**: always accept writes, reconcile later (Dynamo, Cassandra, Riak). A config/lock store picks **CP** (etcd, ZooKeeper — covered in consensus topics). Say which you are building and why.
 
@@ -570,7 +570,7 @@ export function reconcile<T>(versions: { value: T; clock: VClock }[]) {
       heading: 'Unique ID Generator: Snowflake, UUIDv7, ticket servers & clock problems',
       body: `**Intuition:** you want IDs that are unique without a meeting — every machine stamps "time + who I am + a counter", so no two machines can ever produce the same stamp.
 
-**Requirements** (Alex Xu Vol 1 Ch 7): unique, numeric, fits in 64 bits, roughly ordered by time, ≥ 10,000 IDs/s across the fleet, highly available.
+**Requirements:** unique, numeric, fits in 64 bits, roughly ordered by time, ≥ 10,000 IDs/s across the fleet, highly available.
 
 | Option | Size | Sortable | Coordination | Notes |
 |---|---|---|---|---|
@@ -655,7 +655,7 @@ export const decode = (id: bigint) => ({
 
 **Non-functional:** soft real-time (transactional within seconds; marketing can lag minutes), **at-least-once** delivery with dedup (no double OTP SMS), never violate opt-out (legal: TCPA, CAN-SPAM, GDPR), horizontally scalable for campaign bursts, provider-failure tolerant.
 
-**Estimation** (Alex Xu Vol 1): 10M push + 1M SMS + 5M email/day ≈ 16M/day ≈ **185/s average** — trivial on average; the real load is **campaigns**: "send to 50M users in 10 minutes" ≈ **83K/s** burst. SMS costs money (~$0.0079 per US SMS on Twilio; far more internationally) → SMS paths need strict dedup and rate limits.
+**Estimation:** 10M push + 1M SMS + 5M email/day ≈ 16M/day ≈ **185/s average** — trivial on average; the real load is **campaigns**: "send to 50M users in 10 minutes" ≈ **83K/s** burst. SMS costs money (~$0.0079 per US SMS on Twilio; far more internationally) → SMS paths need strict dedup and rate limits.
 
 **Architecture:**
 1. **Notification API** (internal, authN via service identity): validates payload, resolves template, checks **preferences** and **dedup key**, writes a notification record, publishes to a **per-channel queue**.
@@ -780,7 +780,7 @@ export async function handleSms(
       heading: 'Short classics: rate limiter and parking lot (OOD) in five minutes each',
       body: `These sometimes appear as a 20-minute sub-question. (The full rate-limiting deep dive lives in the Reliability phase — here is the interview-shaped version.)
 
-**Rate limiter design (Alex Xu Vol 1 Ch 4) — the 4 steps compressed:**
+**Rate limiter design — the 4 steps compressed:**
 - *Scope:* server-side, per API key/user/IP, multiple rules ("100 req/min per user, 10 logins/min per IP"), distributed across N gateway pods, low added latency (< 1–2 ms), fail-open if the limiter store is down (usually).
 - *Algorithm:* **token bucket** (allows bursts, 2 numbers per key) or **sliding-window counter** (weighted previous + current window, ~0.003% error in Cloudflare's measurements). Fixed window allows 2× bursts at boundaries.
 - *Architecture:* middleware in the gateway → Redis with an **atomic Lua script** (read-modify-write in one round trip; INCR+EXPIRE separately races). Rules from config, cached locally. Response: **429** + \`Retry-After\`, \`X-RateLimit-Remaining\`.

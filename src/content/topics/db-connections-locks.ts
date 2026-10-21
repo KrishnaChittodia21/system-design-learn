@@ -478,7 +478,7 @@ export async function transfer(fromId: string, toId: string, cents: number, atte
       heading: 'Lock contention on hot rows',
       body: `**Intuition:** if every request must update the same row, they form a single-file queue no matter how many cores you have. Throughput ≈ 1 / (time each transaction holds the lock).
 
-**Where hot rows appear:** global counters (\`views\`), inventory for a flash-sale SKU, a merchant's balance receiving thousands of payments/s (Alex Xu's digital wallet), rate-limit rows, "last id" sequence tables, a tenant's settings row updated on every request.
+**Where hot rows appear:** global counters (\`views\`), inventory for a flash-sale SKU, a merchant's balance receiving thousands of payments/s (a digital wallet), rate-limit rows, "last id" sequence tables, a tenant's settings row updated on every request.
 
 **Math:** lock held from the UPDATE until COMMIT. If the transaction does the UPDATE first and then 3 more statements at ~0.7 ms each + commit ~1 ms, hold ≈ 3 ms → max **~330 tx/s** on that row. Queueing theory: as utilisation approaches 100%, wait time explodes, so trouble starts at ~70–80% of that.
 
@@ -1122,7 +1122,7 @@ Each payment transaction: insert payment, update merchant balance, insert ledger
 5. **Reconciliation:** periodic job verifies Σ ledger = materialised balances; alerts on drift.
 
 ### Result
-Payment insert path has no shared-row contention → p99 back to tens of ms at 3,000/s; the balance update path runs at a controlled rate. This mirrors the event-sourcing approach in Alex Xu's digital wallet chapter.`,
+Payment insert path has no shared-row contention → p99 back to tens of ms at 3,000/s; the balance update path runs at a controlled rate. This mirrors the event-sourcing approach of the classic digital wallet design.`,
       followUps: [
         {
           q: 'Why not just use Redis INCRBY for the balance?',

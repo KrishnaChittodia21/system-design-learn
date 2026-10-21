@@ -456,7 +456,7 @@ export class TenantLimitMiddleware implements NestMiddleware {
       question:
         'Design a regional Layer-4 load-balancer service similar to AWS Network Load Balancer: millions of flows per second, static IPs, no single box that can take down traffic, and backends that come and go.',
       context:
-        'Reported on Hello Interview as a system design question asked at Amazon ("Design a Load Balancer" — a service like AWS NLB). Focus on the data plane and control plane of the load balancer itself, not on the app behind it.',
+        'Reported as a system design question asked at Amazon ("Design a Load Balancer" — a service like AWS NLB). Focus on the data plane and control plane of the load balancer itself, not on the app behind it.',
       whatInterviewerLooksFor: [
         'Separates data plane (packet forwarding) from control plane (config, health, membership)',
         'Uses ECMP or anycast to spread flows across many LB nodes, removing the single box',
@@ -759,7 +759,7 @@ Config pushes are staged by cell/AZ with automatic rollback on error-rate regres
 **Service mesh (east-west):** service-to-service mTLS identities, retries with budgets, timeouts, circuit breaking and uniform telemetry — the traffic *between* services that never touches the edge.
 
 **Collapse when:**
-- A small system with one or two services: one managed gateway (or an ALB with auth rules) is both LB and gateway. Hello Interview's advice is to draw one box unless the design needs more.
+- A small system with one or two services: one managed gateway (or an ALB with auth rules) is both LB and gateway. The usual advice is to draw one box unless the design needs more.
 - No east-west complexity (few services, one language) → no mesh; use a shared HTTP client library with timeouts.
 
 **Keep separate when:** public APIs with plans and partners (gateway), dozens of services with zero-trust requirements (mesh), and very high edge traffic where an L4/L7 LB fleet fronts the gateway fleet.
@@ -827,7 +827,7 @@ Config pushes are staged by cell/AZ with automatic rollback on error-rate regres
       question:
         'You have implemented a token-bucket rate limiter. The interviewer asks: when is a per-client rate limit the wrong tool, and what would you use instead — a concurrency limiter or a load shedder?',
       context:
-        'Stripe candidates frequently report being asked to implement a rate limiter (Glassdoor, Hello Interview). This follow-up probes the difference between the limiters Stripe describes in its engineering blog.',
+        'Stripe candidates frequently report being asked to implement a rate limiter (candidate reports). This follow-up probes the difference between the limiters Stripe describes in its engineering blog.',
       whatInterviewerLooksFor: [
         'Rate limit counts arrivals; concurrency limit counts in-flight work',
         'Load shedding is global and priority-based, independent of per-client quotas',
@@ -1119,7 +1119,7 @@ Write downtime ≈ catch-up + propagation, typically 10–30 s. Clients retry on
       question:
         'Design resource management for a shared compute platform where many customers run jobs on the same pool of VMs, so that one customer\'s heavy workload cannot degrade others. Cover isolation, scheduling, quotas and detection.',
       context:
-        'Reported on Hello Interview as asked at Databricks ("Design a solution for the noisy neighbor problem": a cloud resource management system that isolates tenants sharing VMs and infrastructure).',
+        'Reported as asked at Databricks ("Design a solution for the noisy neighbor problem": a cloud resource management system that isolates tenants sharing VMs and infrastructure).',
       whatInterviewerLooksFor: [
         'Isolation per resource: CPU, memory, disk IO, network, shared services',
         'Admission control and quotas before scheduling, fair-share scheduling across tenants',

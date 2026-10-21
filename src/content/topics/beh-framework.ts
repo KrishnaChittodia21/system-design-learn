@@ -90,9 +90,9 @@ Different companies use different names for it, but they all look for the same t
     },
     {
       heading: '3. How behavioural answers set your level: SDE-2 vs Senior vs Staff',
-      body: `**Intuition:** the *same question* gets a different score depending on the scope of the story you choose. A Hello Interview guide puts it this way: a junior-level conflict is a debate about class structure in code review, while a staff-level conflict is disagreement about **the direction of two teams**.
+      body: `**Intuition:** the *same question* gets a different score depending on the scope of the story you choose. One common way to put it: a junior-level conflict is a debate about class structure in code review, while a staff-level conflict is disagreement about **the direction of two teams**.
 
-Interviewers make two separate decisions: **hire / no-hire** and **level**. Practitioner guides (Hello Interview, Taro) report that most down-levelling decisions come from the behavioural round, not from coding gaps.
+Interviewers make two separate decisions: **hire / no-hire** and **level**. Practitioner guides report that most down-levelling decisions come from the behavioural round, not from coding gaps.
 
 | Dimension | SDE-2 (approx. 2–5 yrs) | Senior (approx. 5‐9 yrs) | Staff (cross-org) |
 |---|---|---|---|
@@ -1309,7 +1309,7 @@ What I commit to: if anything changes in my situation, you'll hear it from me wi
       ],
       correct: [0, 2, 3],
       explanation:
-        'Staff signal comes from cross-team scope, org-level impact and problem-finding under ambiguity (sources such as Taro and Hello Interview describe this). Staff is an IC track and does not require people management. Behavioural and leadership conversations usually carry more weight at Staff, not less.',
+        'Staff signal comes from cross-team scope, org-level impact and problem-finding under ambiguity (as practitioner guides describe it). Staff is an IC track and does not require people management. Behavioural and leadership conversations usually carry more weight at Staff, not less.',
       followUps: [
         {
           q: 'Turn this Senior story into Staff framing: "I designed idempotent payment callbacks for my service."',

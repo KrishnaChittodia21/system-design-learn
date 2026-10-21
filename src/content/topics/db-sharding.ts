@@ -127,7 +127,7 @@ DROP TABLE orders_2025_09;`,
 | **Hash** | shard = H(key) → slot | Even writes, point lookups | Range scans (scatter), resharding if naive modulo | Cassandra, DynamoDB, Redis Cluster, Vitess hash vindex |
 | **Range** | key in [a, b) → shard | Range scans, time windows, ordered pagination | Monotonic keys: all inserts hit the last range | HBase, Bigtable, CockroachDB, TiDB, MongoDB ranged |
 | **Directory / lookup** | lookup table key → shard | Moving individual tenants, uneven tenant sizes | Extra hop, the directory is a hot SPOF (cache it) | Multi-tenant SaaS, Vitess lookup vindex, Slack/Notion style tenant maps |
-| **Geo** | region(key) → regional cluster | Latency, GDPR/data residency | Uneven sizes, users who travel/move | Uber cities, Tinder, Alex Xu's proximity service |
+| **Geo** | region(key) → regional cluster | Latency, GDPR/data residency | Uneven sizes, users who travel/move | Uber cities, Tinder, a proximity service |
 
 **Range sharding with auto-split** (Bigtable, CockroachDB ~512 MB ranges, TiDB ~96–256 MB regions depending on version) avoids manual rebalancing: ranges split when they grow and move to less loaded nodes. The classic failure is a **monotonic key** (timestamp, auto-increment): every insert goes to the last range → one hot node. Fix with hash-prefixed keys or UUIDv4/random-prefix for write-heavy tables — at the cost of range scans.
 
@@ -157,7 +157,7 @@ Score candidate keys against five criteria:
 4. **Transaction locality** — all rows touched by one business transaction share the key (an order and its line items and payments all keyed by \`customer_id\` or \`order_id\`).
 5. **Immutability** — changing a shard key value means moving the row between servers. Email, username, region: all mutable. Surrogate IDs: stable.
 
-**Common good choices:** \`tenant_id\` for B2B SaaS (natural isolation, but plan for whales), \`user_id\` for consumer apps, \`channel_id + time bucket\` for chat (Discord partitions messages by channel and a ~10-day bucket so one busy channel doesn't grow an unbounded partition), \`device_id\` for IoT, \`geohash prefix\` for location (Alex Xu Ch 1).
+**Common good choices:** \`tenant_id\` for B2B SaaS (natural isolation, but plan for whales), \`user_id\` for consumer apps, \`channel_id + time bucket\` for chat (Discord partitions messages by channel and a ~10-day bucket so one busy channel doesn't grow an unbounded partition), \`device_id\` for IoT, \`geohash prefix\` for location (proximity search).
 
 **The conflict you will always hit:** the same table needs two access paths. Orders are read by customer ("my orders") and by merchant ("orders for my store"). Pick the key for the dominant *OLTP* path and serve the other with a denormalized copy keyed differently, a global secondary index, or ship the data via CDC into an OLAP/search store.
 
@@ -231,7 +231,7 @@ Distinguish two failure shapes:
 
 **Fixes for a hot shard:** split the logical-shard range and move half to a new node; rebalance by *load*, not by row count; for range sharding, split at the hot boundary and add a hash prefix to monotonic keys.
 
-**Detect it:** per-shard QPS/CPU/p99 dashboards and a top-K key tracker (sample queries, count-min sketch) — averages across shards hide a single hot one. Alex Xu's leaderboard (Ch 10) and ad-click aggregation (Ch 6) both use key salting/partial aggregation for exactly this reason.`,
+**Detect it:** per-shard QPS/CPU/p99 dashboards and a top-K key tracker (sample queries, count-min sketch) — averages across shards hide a single hot one. The classic leaderboard and ad-click aggregation designs both use key salting/partial aggregation for exactly this reason.`,
       code: [
         {
           language: 'typescript',

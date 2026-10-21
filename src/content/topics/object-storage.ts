@@ -73,7 +73,7 @@ const topic: Topic = {
       heading: '2. S3 high-level architecture — separate metadata from data',
       body: `**Intuition:** a library has a card catalogue (small, frequently queried, needs indexes) and the stacks (huge, rarely reorganised). Object storage splits them the same way because they have opposite requirements.
 
-**Components (Alex Xu Ch 9)**
+**Components**
 
 1. **Load balancer + API service** — stateless; handles auth, request routing, orchestrates metadata and data calls. Scales horizontally.
 2. **IAM / identity service** — authenticates the request signature (SigV4) and authorises the bucket/object action.
@@ -962,7 +962,7 @@ export async function uploadBackup(path: string, bucket: string, key: string, re
       difficulty: 'expert',
       question:
         'Design an S3-like object store: 100 PB, six nines of durability, PUT/GET/DELETE/LIST, versioning. Walk me through the architecture and the write path.',
-      context: 'Classic Alex Xu Ch 9 prompt. The interviewer wants to see you split the problem before diving into disks.',
+      context: 'Classic object-storage prompt. The interviewer wants to see you split the problem before diving into disks.',
       whatInterviewerLooksFor: [
         'Separates metadata (name → object_id) from immutable data addressed by UUID',
         'Explains placement service, failure domains and the replication/ack trade-off',
@@ -1677,7 +1677,7 @@ if (head.ETag!.replace(/"/g, '') !== localMd5) {
       ],
       correct: [1],
       explanation:
-        'With billions of tiny files, inode/dentry metadata overwhelms the page cache, so each read or write costs extra seeks just to find the file, and small files waste partial blocks. Haystack and Alex Xu\'s data node design append many objects into multi-GB files and keep a compact (object_id → file, offset, size) index. Bandwidth is not the constraint at 40% utilisation, XFS has 64-bit inodes, and erasure-coding 6 KB files increases overhead.',
+        'With billions of tiny files, inode/dentry metadata overwhelms the page cache, so each read or write costs extra seeks just to find the file, and small files waste partial blocks. Haystack and the classic data node design append many objects into multi-GB files and keep a compact (object_id → file, offset, size) index. Bandwidth is not the constraint at 40% utilisation, XFS has 64-bit inodes, and erasure-coding 6 KB files increases overhead.',
       followUps: [
         {
           "q": "With objects packed into volume files, users delete 20% of photos each year. How do you reclaim space, and what can go wrong during compaction?",

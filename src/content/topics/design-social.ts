@@ -41,7 +41,7 @@ const topic: Topic = {
     'Offline sync: each device keeps last_seq per conversation (or a global inbox cursor); reconnect → "give me everything after cursor", paginated; multi-device via per-device cursors.',
     'Feed fan-out: on write (push to followers’ timelines; fast reads, write amplification) vs on read (pull at request; cheap writes, slow reads). Hybrid: push for normal users, pull + merge for celebrities (> ~10K–1M followers) and skip inactive followers.',
     'Timeline cache: Redis list/zset of ~800 post IDs per active user (Twitter-style), hydrate posts/users from separate caches; cursor pagination by (score, id), never OFFSET.',
-    'YouTube numbers (Alex Xu): 5M DAU × 5 views; 10% upload 1 × 300 MB → 150 TB/day raw; CDN at $0.02/GB ≈ $150K/day → CDN is the dominant cost.',
+    'YouTube numbers: 5M DAU × 5 views; 10% upload 1 × 300 MB → 150 TB/day raw; CDN at $0.02/GB ≈ $150K/day → CDN is the dominant cost.',
     'Video pipeline: resumable upload → split by GOP → transcoding DAG (video/audio/thumbnail/watermark tasks) in parallel → HLS/DASH renditions (e.g. 240p–4K, 2–6 s segments) → origin + CDN.',
     'Netflix Open Connect: appliances inside ISPs pre-filled off-peak with predicted-popular titles; control plane in AWS, bytes from the edge. View counts: Kafka → windowed aggregation → approximate, fraud-filtered counters.',
   ],
@@ -461,7 +461,7 @@ export async function runFanout(kafka: Kafka, redis: Redis, graph: {
 4. **Hydrate**: batch-get posts (post cache), authors (user cache), counters (counter cache), viewer state (liked?) — one MGET per type, DataLoader-style.
 5. Filter (deleted, blocked, muted), **rank**, return page + opaque cursor.
 
-**Caching layers (Alex Xu):** news-feed cache (IDs), content cache (hot posts), social-graph cache, action cache (liked/replied), counter cache. Separate caches because they have different sizes, TTLs and invalidation rules.
+**Caching layers:** news-feed cache (IDs), content cache (hot posts), social-graph cache, action cache (liked/replied), counter cache. Separate caches because they have different sizes, TTLs and invalidation rules.
 
 **Ranking:** reverse-chron is simple and predictable. Ranked feeds (Instagram since 2016, Facebook) use a two-stage pipeline: **candidate generation** (the ~500–1,000 posts from followees + recommendations) → **ML ranking** (predict P(like), P(comment), P(dwell), P(hide) → weighted score) → business rules (diversity, freshness, ads insertion). Ranking runs at read time, so candidate counts must stay bounded; heavy features are precomputed.
 
@@ -502,7 +502,7 @@ export async function runFanout(kafka: Kafka, redis: Redis, graph: {
 
 **Non-functional:** fast upload with resumability, **smooth streaming** (low start-up time < ~2 s, minimal rebuffering), high availability, global low latency, cost efficiency.
 
-**Estimation (Alex Xu Vol 1):**
+**Estimation:**
 - 5M DAU × 5 videos watched/day; 10% upload 1 video/day; avg video 300 MB.
 - Storage: 5M × 10% × 300 MB = **150 TB/day** of raw uploads (renditions multiply this by several ×).
 - CDN cost: 5M × 5 × 0.3 GB × $0.02/GB ≈ **$150,000/day** → ~$55M/year. CDN cost dominates.
@@ -532,7 +532,7 @@ export async function runFanout(kafka: Kafka, redis: Redis, graph: {
 
 **Why transcode:** raw uploads come in arbitrary containers/codecs/bitrates. Players need standard codecs at multiple resolutions/bitrates for **adaptive streaming**, and smaller files for mobile.
 
-**The DAG (Facebook SVE / Alex Xu):** a job is a **directed acyclic graph** of tasks configured per content type:
+**The DAG (Facebook SVE-style):** a job is a **directed acyclic graph** of tasks configured per content type:
 - *Preprocessor:* validate, probe (ffprobe), **split into GOP-aligned chunks** (Group of Pictures — independently decodable segments, a few seconds each) so chunks encode in parallel.
 - *Video tasks:* encode each chunk × each rendition ladder rung (e.g. 240p/360p/480p/720p/1080p/4K × codec H.264/VP9/AV1).
 - *Audio tasks:* encode AAC/Opus at a few bitrates.
@@ -677,7 +677,7 @@ seg_00001.ts
 - Serving: **candidate generation** (collaborative filtering / two-tower embeddings, ANN retrieval of a few hundred candidates) → **ranking** model (predict expected watch time) → re-ranking (diversity, freshness, policy).
 - Home feed and "up next" call the rec service with a latency budget (~100 ms); fall back to popular/trending lists on timeout.
 
-**Error handling (Alex Xu):** recoverable errors (a chunk encode fails) → retry the task; non-recoverable (corrupt file/unsupported format) → fail the job, notify user. Upload API failures → client retries with resumable offset. CDN/edge failures → player falls back to the next URL in the steering list.
+**Error handling:** recoverable errors (a chunk encode fails) → retry the task; non-recoverable (corrupt file/unsupported format) → fail the job, notify user. Upload API failures → client retries with resumable offset. CDN/edge failures → player falls back to the next URL in the steering list.
 
 **Wrap-up trade-offs:** cost vs quality (codec choice, ladder size), encode latency vs thoroughness (fast low-res first, HD later), pre-positioning (Netflix) vs cache-on-demand (YouTube), approximate vs exact counts.`,
       code: [

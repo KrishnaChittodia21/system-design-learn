@@ -16,7 +16,7 @@ const topic: Topic = {
   ],
   tags: ['interview-framework', 'requirements', 'nfr', 'slo', 'api-first', 'scoping', 'trade-offs'],
   cheatSheet: [
-    "4 steps (Alex Xu): 1) understand & scope (3-10 min) 2) high-level design + buy-in (10-15) 3) deep dive (10-25) 4) wrap-up (3-5).",
+    "4 steps: 1) understand & scope (3-10 min) 2) high-level design + buy-in (10-15) 3) deep dive (10-25) 4) wrap-up (3-5).",
     "Functional = verbs the user can do (post, follow, book). Pick 3-4 core ones and say out loud what is OUT of scope.",
     "Non-functional must be measurable: 'p99 read < 200ms at LB, 99.95% monthly availability, RPO 1 min' — never 'fast and scalable'.",
     "Nines per 30 days: 99.9% = 43.2 min, 99.95% = 21.6 min, 99.99% = 4.3 min, 99.999% = 26 s.",
@@ -65,7 +65,7 @@ The prompt ("Design Ticketmaster") is deliberately under-specified. Two candidat
       heading: 'The 4-step framework (and how to run it in 45 minutes)',
       body: `**Intuition:** the framework is a checklist that stops you from diving into sharding before you know what you are building.
 
-Every chapter of Alex Xu Vol 2 (Proximity Service, Nearby Friends, Hotel Reservation, Payment, Stock Exchange…) is structured the same way:
+Every classic design (Proximity Service, Nearby Friends, Hotel Reservation, Payment, Stock Exchange…) is structured the same way:
 
 | Step | Time | Output | Exit criterion |
 |---|---|---|---|
@@ -77,7 +77,7 @@ Every chapter of Alex Xu Vol 2 (Proximity Service, Nearby Friends, Hotel Reserva
 **Mechanics that matter:**
 - **Step 1 is a conversation, not a questionnaire.** Propose assumptions and let the interviewer correct them: "I'll assume 10M DAU and a 100:1 read:write ratio — does that sound right?" This is faster than asking open questions.
 - **Estimation belongs in step 1 only as far as it changes decisions.** "12K QPS peak" tells you a single Postgres primary will not take the writes; computing it to three significant figures does not.
-- **Step 2 must end with a check-in.** Buy-in is explicit in Alex Xu's framework for a reason: it is cheap to change direction at minute 15 and very expensive at minute 35.
+- **Step 2 must end with a check-in.** Buy-in is explicit in the framework for a reason: it is cheap to change direction at minute 15 and very expensive at minute 35.
 - **Step 3 is where seniority shows.** Choose the component that is hardest *given the NFRs* (seat contention for ticketing, fan-out for feeds, exactly-once for payments), or ask: "I'd like to go deep on X — or is there another area you'd prefer?"
 
 **In production terms:** this is exactly a design review — PRD → requirements and SLOs → RFC with API and architecture → deep review of risky parts → rollout, monitoring and open questions.`,
@@ -250,7 +250,7 @@ spec:
 
 **Step 1 — name the core entity and its hot row.**
 - Ticketing: **seat per event** (hot during on-sale).
-- Hotel reservation (Alex Xu Vol 2 Ch 7): **room_type_inventory(hotel_id, room_type_id, date)** — the row updated by concurrent reservations.
+- Hotel reservation: **room_type_inventory(hotel_id, room_type_id, date)** — the row updated by concurrent reservations.
 - Digital wallet / payments: **account balance**.
 - Feed: **post** is written once, but the **timeline** is the hot read structure.
 
@@ -1459,7 +1459,7 @@ async pay(@CurrentUser() user: User, @Body() dto: PayDto) {
         'The guest/user table, since each reservation references a guest',
       ],
       correct: [2],
-      explanation: 'Concurrent bookings for the same hotel, room type and night all update the same inventory counter row (Alex Xu Vol 2 Ch 7), so that is where locking/optimistic concurrency and the overbooking check live. Reservation inserts are independent rows with no contention. Metadata is read-heavy and cacheable. The guest table is read, not contended.',
+      explanation: 'Concurrent bookings for the same hotel, room type and night all update the same inventory counter row, so that is where locking/optimistic concurrency and the overbooking check live. Reservation inserts are independent rows with no contention. Metadata is read-heavy and cacheable. The guest table is read, not contended.',
       followUps: [
         {
           "q": "The hotel inventory row is (hotel, room type, date). A 3-night booking must reserve all three nights or none. How do you do it without deadlocks?",

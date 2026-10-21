@@ -556,7 +556,7 @@ export class ProductService {
 - **Chat messages (Discord/WhatsApp-scale):** Cassandra/ScyllaDB partitioned by \`(channel_id, bucket)\`; user/channel metadata in Postgres.
 - **Product catalog:** Postgres (source of truth, JSONB for attributes) → Elasticsearch for search → Redis/CDN for hot reads.
 - **Ride location pings:** Redis GEO for current positions (ephemeral), Kafka → Cassandra/S3 for history.
-- **Leaderboard:** Redis sorted sets, Postgres/DynamoDB for durable scores (Alex Xu Vol 2 Ch 10).
+- **Leaderboard:** Redis sorted sets, Postgres/DynamoDB for durable scores.
 
 **Say this in interviews:** "Source of truth in a store that enforces my invariants; derived, denormalised views in stores optimised for each read pattern, fed by CDC so they cannot drift silently."`,
       keyPoints: [
@@ -1073,7 +1073,7 @@ Add a retry wrapper for SQLSTATE 40001 (and 40P01) with jittered backoff, 3–5 
 
 ### Step 3: consider a cheaper correct mechanism
 - **Exclusion constraint** for interval bookings: \`EXCLUDE USING gist (room_id WITH =, daterange(check_in, check_out) WITH &&)\` (needs btree_gist) — the database rejects overlaps under any isolation level.
-- **Inventory counters** (Alex Xu's hotel design): \`UPDATE room_type_inventory SET reserved = reserved + 1 WHERE ... AND reserved < total\` — conditional atomic update, contention only per (hotel, room type, date).
+- **Inventory counters** (the classic hotel-reservation design): \`UPDATE room_type_inventory SET reserved = reserved + 1 WHERE ... AND reserved < total\` — conditional atomic update, contention only per (hotel, room type, date).
 - Targeted \`SELECT ... FOR UPDATE\` on the inventory rows.
 
 ### Outcome

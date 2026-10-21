@@ -464,7 +464,7 @@ cat /proc/net/sockstat`,
       heading: 'Listener and acceptor patterns: from one listener to SO_REUSEPORT socket sharding',
       body: `**Intuition:** a busy restaurant can have one host seating every guest (one listener), several hosts sharing one waiting line (many acceptors on one socket), or several doors each with its own line (SO_REUSEPORT). One shared line is fair to guests; separate lines spread work evenly but a slow host strands everyone in *their* line.
 
-Following the framing of Hussein Nasser's episode on threads and sockets, five patterns cover almost every server:
+Five patterns cover almost every server:
 
 | # | Pattern | Who listens / accepts / reads / processes | Examples |
 |---|---|---|---|

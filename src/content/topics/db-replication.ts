@@ -120,7 +120,7 @@ const topic: Topic = {
 
 **Cross-region:** sync replication to a region 200 ms away adds ≥200 ms to every commit — usually unacceptable. Common pattern: **sync to a replica in another AZ of the same region** (~1 ms), **async to the DR region**. Managed services mirror this: RDS Multi-AZ (sync standby), Aurora (storage quorum 4/6 across 3 AZs).
 
-**Kafka analogy** (Alex Xu Vol 2, Ch 4): \`acks=all\` + \`min.insync.replicas=2\` is sync-ish replication; \`acks=1\` is async.`,
+**Kafka analogy:** \`acks=all\` + \`min.insync.replicas=2\` is sync-ish replication; \`acks=1\` is async.`,
       code: [
         {
           language: 'sql',

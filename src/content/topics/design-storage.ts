@@ -125,7 +125,7 @@ CREATE TABLE journal (
     {
       heading: 'Dropbox / Google Drive (2/4): high-level architecture and the upload/download flow',
       body: `**Components:**
-- **Block servers / upload service:** tells clients which blocks are missing and issues presigned URLs. Clients (or block servers, in Xu's design) upload blocks to the **block store**: S3 or Dropbox's own Magic Pocket, which is erasure-coded and multi-region.
+- **Block servers / upload service:** tells clients which blocks are missing and issues presigned URLs. Clients (or block servers, in the classic design) upload blocks to the **block store**: S3 or Dropbox's own Magic Pocket, which is erasure-coded and multi-region.
 - **Metadata API + metadata DB:** file tree, versions, block lists, sharing ACLs. Strong consistency, so it's a relational DB sharded by namespace, with a cache in front.
 - **Notification service:** holds long-poll (or WebSocket) connections, one per device, and wakes devices when their namespace journal advances.
 - **Offline backup queue:** changes for devices that are offline are simply journal entries. When a device reconnects, it pulls \`/delta\` from its last cursor, so nothing extra is needed beyond retaining the journal.
