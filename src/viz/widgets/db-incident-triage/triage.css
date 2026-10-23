@@ -1,0 +1,21 @@
+/* db-incident-triage: the evidence console under the dashboard. Tokens only (code colours are dark in both themes). */
+.dbt-evidence {
+  margin: 10px 0 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--code-line);
+  background: var(--code-bg);
+  color: var(--code-ink);
+  font: 12.5px/1.6 var(--f-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-height: 7.2em;
+}
+.dbt-evidence-h {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--code-ink-3);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}

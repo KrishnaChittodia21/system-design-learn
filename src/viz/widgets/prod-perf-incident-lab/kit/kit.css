@@ -1,0 +1,160 @@
+/* Shared styles for the prod-* incident widgets (prefix .pil-). Tokens from tokens.css only. */
+.pil-toggles .chip {
+  gap: 6px;
+}
+.pil-check {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  font: 700 10px/1 var(--f-mono);
+  color: var(--ink-3);
+}
+.pil-toggles .chip.on .pil-check {
+  border-color: var(--cyan-b);
+  background: var(--cyan);
+  color: var(--on-accent);
+}
+.pil-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.pil-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  width: 100%;
+}
+
+/* live metric tiles */
+.pil-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 8px;
+  margin: 0 0 10px;
+}
+.pil-tile {
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+}
+.pil-tile dt {
+  font: 500 10px/1.3 var(--f-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pil-tile dd {
+  margin: 3px 0 0;
+  font: 700 17px/1.2 var(--f-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.pil-tile dd small {
+  display: block;
+  margin-top: 2px;
+  font: 500 11px/1.3 var(--f-body);
+  color: var(--ink-3);
+}
+.pil-tile.tone-good {
+  border-color: var(--cyan-b);
+}
+.pil-tile.tone-good dd {
+  color: var(--good);
+}
+.pil-tile.tone-warn {
+  border-color: var(--amber-b);
+  background: var(--warn-soft);
+}
+.pil-tile.tone-warn dd {
+  color: var(--warn);
+}
+.pil-tile.tone-bad {
+  border-color: var(--rose-b);
+  background: var(--bad-soft);
+}
+.pil-tile.tone-bad dd {
+  color: var(--bad);
+}
+
+/* legend lines */
+.pil-leg {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pil-line {
+  display: inline-block;
+  width: 18px;
+  border-top: 3px solid;
+}
+.pil-line.dash {
+  border-top-style: dashed;
+}
+.pil-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  vertical-align: -1px;
+  margin-right: 4px;
+}
+
+/* a labelled panel above / beside the drawing */
+.pil-note {
+  margin: 0 0 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+.pil-note strong {
+  color: var(--ink);
+}
+.pil-note.tone-bad {
+  border-color: var(--rose-b);
+  background: var(--bad-soft);
+}
+.pil-note.tone-good {
+  border-color: var(--cyan-b);
+  background: var(--good-soft);
+}
+.pil-note.tone-warn {
+  border-color: var(--amber-b);
+  background: var(--warn-soft);
+}
+.pil-kicker {
+  display: block;
+  margin-bottom: 2px;
+  font: 600 10.5px/1.4 var(--f-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.pil-chart text {
+  font-family: var(--f-body);
+}
+.pil-svg-mono {
+  font-family: var(--f-mono);
+}
+@media (max-width: 600px) {
+  .pil-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pil-tile dd {
+    font-size: 15px;
+  }
+}

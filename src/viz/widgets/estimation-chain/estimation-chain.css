@@ -1,0 +1,113 @@
+/* estimation-chain widget: HTML chain of back-of-envelope results. Tokens only. */
+.ec-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ec-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.ec-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+.ec-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  transition:
+    border-color 0.3s ease,
+    background-color 0.3s ease,
+    opacity 0.3s ease;
+}
+.ec-card.is-hidden {
+  opacity: 0.55;
+  border-style: dashed;
+  background: transparent;
+}
+.ec-card.is-now,
+.ec-input.is-now {
+  border-color: var(--cyan-b);
+  background: var(--cyan-s);
+  box-shadow: 0 0 0 2px var(--cyan-s);
+}
+.ec-card.is-warn {
+  border-color: var(--amber-b);
+}
+.ec-card.is-warn .ec-v {
+  color: var(--amber);
+}
+.ec-card.is-bad {
+  border-color: var(--rose-b);
+}
+.ec-card.is-bad .ec-v {
+  color: var(--rose);
+}
+.ec-k {
+  font: 500 10.5px/1.4 var(--f-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.ec-no {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 2px;
+  border-radius: 50%;
+  background: var(--tint-2);
+  color: var(--ink-2);
+  font-size: 9.5px;
+  letter-spacing: 0;
+}
+.ec-v {
+  font: 600 18px/1.25 var(--f-mono);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.ec-input .ec-v {
+  font-size: 14px;
+}
+.ec-f {
+  font: 400 11.5px/1.45 var(--f-mono);
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+.ec-summary {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.ec-summary strong {
+  font-family: var(--f-mono);
+  color: var(--ink);
+}
+@media (max-width: 420px) {
+  .ec-card {
+    padding: 8px 10px;
+  }
+  .ec-v {
+    font-size: 15.5px;
+  }
+  .ec-f {
+    font-size: 10.5px;
+  }
+}

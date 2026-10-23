@@ -1,0 +1,8 @@
+/* Architecture-evolution stepper (prefix .pae-). Tokens only. */
+.pae-facts {
+  margin: 0;
+  padding-left: 18px;
+}
+.pae-facts li + li {
+  margin-top: 2px;
+}

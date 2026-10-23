@@ -98,6 +98,8 @@
   min-height: 30px;
   padding: 0 12px;
   font-size: 12.5px;
+  /* show labels as written: the global .chip capitalize garbles "p99", "write() + fsync()", typed prefixes */
+  text-transform: none;
 }
 .viz-choice .chip.on {
   color: var(--cyan);

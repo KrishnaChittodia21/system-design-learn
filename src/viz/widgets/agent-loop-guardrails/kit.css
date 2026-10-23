@@ -1,0 +1,43 @@
+/* Motion for the request-flow kit (agent-loop-guardrails). Scoped by the alg- prefix; tokens only. */
+.alg-packet {
+  animation: alg-travel 0.75s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes alg-travel {
+  from {
+    transform: translate(var(--dx), var(--dy));
+    opacity: 0.35;
+  }
+  to {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+}
+.alg-flow {
+  animation: alg-march 0.9s linear infinite;
+}
+@keyframes alg-march {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+.alg-pop {
+  animation: alg-pop 0.35s ease-out both;
+}
+@keyframes alg-pop {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .alg-packet,
+  .alg-flow,
+  .alg-pop {
+    animation: none !important;
+  }
+}
+.viz-svg .alg-muted {
+  fill: var(--ink-2);
+}

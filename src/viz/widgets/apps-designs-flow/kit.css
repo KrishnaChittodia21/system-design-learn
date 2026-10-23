@@ -1,0 +1,43 @@
+/* Motion for the request-flow kit (apps-designs-flow). Scoped by the adf- prefix; tokens only. */
+.adf-packet {
+  animation: adf-travel 0.75s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes adf-travel {
+  from {
+    transform: translate(var(--dx), var(--dy));
+    opacity: 0.35;
+  }
+  to {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+}
+.adf-flow {
+  animation: adf-march 0.9s linear infinite;
+}
+@keyframes adf-march {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+.adf-pop {
+  animation: adf-pop 0.35s ease-out both;
+}
+@keyframes adf-pop {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .adf-packet,
+  .adf-flow,
+  .adf-pop {
+    animation: none !important;
+  }
+}
+.viz-svg .adf-muted {
+  fill: var(--ink-2);
+}

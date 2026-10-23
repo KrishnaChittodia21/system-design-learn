@@ -1,0 +1,43 @@
+/* Motion for the request-flow kit (classic-designs-flow). Scoped by the cdf- prefix; tokens only. */
+.cdf-packet {
+  animation: cdf-travel 0.75s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes cdf-travel {
+  from {
+    transform: translate(var(--dx), var(--dy));
+    opacity: 0.35;
+  }
+  to {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+}
+.cdf-flow {
+  animation: cdf-march 0.9s linear infinite;
+}
+@keyframes cdf-march {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+.cdf-pop {
+  animation: cdf-pop 0.35s ease-out both;
+}
+@keyframes cdf-pop {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cdf-packet,
+  .cdf-flow,
+  .cdf-pop {
+    animation: none !important;
+  }
+}
+.viz-svg .cdf-muted {
+  fill: var(--ink-2);
+}

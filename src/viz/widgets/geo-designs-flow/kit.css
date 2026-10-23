@@ -1,0 +1,43 @@
+/* Motion for the request-flow kit (geo-designs-flow). Scoped by the gdf- prefix; tokens only. */
+.gdf-packet {
+  animation: gdf-travel 0.75s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes gdf-travel {
+  from {
+    transform: translate(var(--dx), var(--dy));
+    opacity: 0.35;
+  }
+  to {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+}
+.gdf-flow {
+  animation: gdf-march 0.9s linear infinite;
+}
+@keyframes gdf-march {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+.gdf-pop {
+  animation: gdf-pop 0.35s ease-out both;
+}
+@keyframes gdf-pop {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gdf-packet,
+  .gdf-flow,
+  .gdf-pop {
+    animation: none !important;
+  }
+}
+.viz-svg .gdf-muted {
+  fill: var(--ink-2);
+}

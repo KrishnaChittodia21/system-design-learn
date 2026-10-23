@@ -1,0 +1,108 @@
+/* slo-error-budget-burn widget — scoped under .slo-*, tokens only */
+.slo-halo {
+  paint-order: stroke;
+  stroke: var(--surface-2);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.slo-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
+.slo-budget {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 75%, transparent);
+}
+.slo-budget-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font: 600 11px/1.5 var(--f-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.slo-budget-head strong {
+  font-size: 14px;
+  color: var(--good);
+}
+.slo-budget-head strong.is-warn {
+  color: var(--warn);
+}
+.slo-budget-head strong.is-bad {
+  color: var(--bad);
+}
+.slo-meter {
+  margin-top: 6px;
+  height: 10px;
+  border-radius: 99px;
+  background: var(--tint-2);
+  overflow: hidden;
+}
+.slo-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--grad-bar);
+  transition: width 0.35s ease;
+}
+.slo-rules {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.slo-rules th,
+.slo-rules td {
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--line-3);
+  text-align: left;
+}
+.slo-rules thead th {
+  font: 600 10.5px/1.4 var(--f-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  border-bottom-color: var(--line);
+}
+.slo-rules tbody th {
+  font-weight: 600;
+  color: var(--ink);
+}
+.slo-rules td {
+  font-family: var(--f-mono);
+  white-space: nowrap;
+}
+.slo-rules td.is-over {
+  color: var(--bad);
+  font-weight: 700;
+}
+.slo-rules tr.is-firing {
+  background: var(--bad-soft);
+}
+.slo-chip {
+  display: inline-block;
+  padding: 0 8px;
+  border-radius: 99px;
+  border: 1px solid var(--line-2);
+  font: 700 10.5px/1.7 var(--f-mono);
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+.slo-chip.is-firing {
+  border-color: var(--bad);
+  color: var(--bad);
+  background: var(--bad-soft);
+}
+.slo-note {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px dashed var(--warn);
+  background: var(--warn-soft);
+  font-size: 13px;
+  color: var(--ink-2);
+}

@@ -1,0 +1,43 @@
+/* hld-to-lld-zoom: rung strip. Tokens only. */
+.hz-rungs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 2px;
+}
+.hz-rung {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px 0 4px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: var(--tint);
+  color: var(--ink-2);
+  font: 600 12px/1 var(--f-body);
+  cursor: pointer;
+}
+.hz-n {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  font: 700 11px/1 var(--f-mono);
+}
+.hz-rung.done .hz-n {
+  border-color: var(--cyan-b);
+  color: var(--good);
+}
+.hz-rung.on {
+  border-color: var(--cyan-b);
+  background: var(--cyan-s);
+  color: var(--ink);
+}
+.hz-rung:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}

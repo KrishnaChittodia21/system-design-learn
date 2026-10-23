@@ -1,0 +1,43 @@
+/* Motion for the request-flow kit (platform-designs-flow). Scoped by the pdf- prefix; tokens only. */
+.pdf-packet {
+  animation: pdf-travel 0.75s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes pdf-travel {
+  from {
+    transform: translate(var(--dx), var(--dy));
+    opacity: 0.35;
+  }
+  to {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+}
+.pdf-flow {
+  animation: pdf-march 0.9s linear infinite;
+}
+@keyframes pdf-march {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+.pdf-pop {
+  animation: pdf-pop 0.35s ease-out both;
+}
+@keyframes pdf-pop {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pdf-packet,
+  .pdf-flow,
+  .pdf-pop {
+    animation: none !important;
+  }
+}
+.viz-svg .pdf-muted {
+  fill: var(--ink-2);
+}

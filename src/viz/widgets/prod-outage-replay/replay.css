@@ -1,0 +1,50 @@
+/* Timeline strip for the outage replayer (prefix .por-). Tokens only. */
+.por-strip {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 2px 2px 6px;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.por-step {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 92px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--por-c);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  color: var(--ink-3);
+  text-align: left;
+  cursor: pointer;
+}
+.por-step:hover {
+  border-color: var(--line-2);
+  border-top-color: var(--por-c);
+  color: var(--ink-2);
+}
+.por-step:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.por-step.past {
+  color: var(--ink-2);
+}
+.por-step.on {
+  background: color-mix(in srgb, var(--por-c) 14%, var(--surface));
+  border-color: var(--por-c);
+  color: var(--ink);
+}
+.por-time {
+  font: 600 11px/1.3 var(--f-mono);
+  white-space: nowrap;
+}
+.por-phase {
+  font: 500 11.5px/1.3 var(--f-body);
+  white-space: nowrap;
+}

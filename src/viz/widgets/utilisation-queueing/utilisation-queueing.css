@@ -1,0 +1,15 @@
+/* utilisation-queueing widget: chart and pool side by side, stacked on phones. Tokens only. */
+.uq-split {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 0;
+}
+.uq-chart {
+  flex: 334 1 300px;
+  min-width: 0;
+}
+.uq-pool {
+  flex: 260 1 240px;
+  min-width: 0;
+}
