@@ -11,11 +11,10 @@ const topic: Topic = {
   sources: [
     'Hello Interview — problem breakdowns: Tinder, Strava, News Aggregator (Google News), Price Tracking Service (CamelCamelCamel) (2025)',
     'Hello Interview community question reports — "Design a Price Drop Tracker like CamelCamelCamel" (asked at Meta); "Design a Dating App Like Tinder" (asked at Uber)',
-    'Tinder Engineering — Geosharded Recommendations (S2 cells, Elasticsearch per-shard indices); ByteByteGo — How Tinder recommends to 75 million users',
+    'Tinder Engineering — Geosharded Recommendations (S2 cells, Elasticsearch per-shard indices)',
     'Strava — US Patent 9,116,922 "Defining and matching segments" (R-tree of segment MBRs, loose/tight match thresholds, virtual start/finish lines); Strava Support — Segment matching issues',
     'Google — US Patent 8,832,105 "System for incrementally clustering news stories"; PracHub — Design a news aggregation system (Google News style)',
     'Software Engineering Daily — CamelCamelCamel: Amazon Price Tracker with Daniel Green (2019)',
-    'DesignGurus — Grokking the System Design Interview Vol II: Design a global news aggregator; AlgoMaster — Design a flash sale / news aggregator (2025)',
     'Flipkart Big Billion Days engineering write-ups (dev.to summary, 2025): 6–7× normal traffic, Kafka-queued order processing, NRT inventory store',
     'Redis documentation — EVAL/Lua atomicity, ZADD GT/LT flags, hash tags in Redis Cluster; PostgreSQL docs — SELECT … FOR UPDATE SKIP LOCKED',
     'Broder — On the resemblance and containment of documents (MinHash, 1997)',
@@ -437,7 +436,7 @@ return 'SEND'`,
         'Re-check the price before sending anything that waited in a backlog; stale deals destroy trust.',
         'Provider rate limits, not matching, bound how fast a hot-product burst drains.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 10 (notification system); Hello Interview — CamelCamelCamel',
+      source: 'Hello Interview — CamelCamelCamel',
     },
     // ------------------------------------------------------------ TINDER
     {
@@ -476,7 +475,7 @@ return 'SEND'`,
         'Keep only recent likes in Redis for match detection; older likes fall back to the durable log.',
         'Write matches for both users so each side reads their match list from one partition.',
       ],
-      source: 'Hello Interview — Tinder breakdown; ByteByteGo — How Tinder recommends to 75 million users',
+      source: 'Hello Interview — Tinder breakdown',
     },
     {
       heading: 'Tinder (2/3): swipes & exactly-once match detection',
@@ -584,7 +583,7 @@ export class SwipedFilter {
         'Filter on mutual preference and boost people who already liked you: the goal is matches, not views.',
         'A Bloom filter can only err towards hiding a profile, which is the safe direction for this product.',
       ],
-      source: 'Tinder Engineering — Geosharded Recommendations; ByteByteGo — How Tinder recommends to 75M users',
+      source: 'Tinder Engineering — Geosharded Recommendations',
     },
     // ------------------------------------------------------------ NEWS AGGREGATOR
     {

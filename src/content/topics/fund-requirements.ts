@@ -9,8 +9,6 @@ const topic: Topic = {
     'Turn a one-line prompt into scoped functional requirements, measurable SLO-style NFRs, an API contract and a 45-minute plan you actually control.',
   estimatedMinutes: 75,
   sources: [
-    'Alex Xu — System Design Interview Vol 1, Ch 3 (A Framework for System Design Interviews)',
-    'Alex Xu — System Design Interview Vol 2 (every chapter follows the 4-step framework)',
     'Mastering API Architecture — Ch 1 (Design, Build and Specify APIs)',
     'Google SRE Book — Ch 4 (Service Level Objectives)',
   ],
@@ -59,7 +57,6 @@ The prompt ("Design Ticketmaster") is deliberately under-specified. Two candidat
         "One high-leverage question (spikes? group size? consistency?) can change the whole design.",
         "Announce your plan and time budget up front — it signals seniority and lets the interviewer redirect early.",
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 3',
     },
     {
       heading: 'The 4-step framework (and how to run it in 45 minutes)',
@@ -97,7 +94,7 @@ Every classic design (Proximity Service, Nearby Friends, Hotel Reservation, Paym
         "Always ask for buy-in at the end of step 2.",
         "Choose the deep dive based on the NFRs, or offer the interviewer a choice.",
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 3; Vol 2, all chapters',
+      source: 'Vol 2, all chapters',
     },
     {
       heading: 'Functional requirements: verbs, core use-cases and explicit scope',
@@ -302,7 +299,6 @@ COMMIT;`,
         "Read path: latency and cost. Write path: correctness and idempotency.",
         "Never pay write-path costs (locks, primary reads) on the read path unless a requirement demands it.",
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 7 Hotel Reservation',
     },
     {
       heading: 'API-first thinking: the contract before the boxes',

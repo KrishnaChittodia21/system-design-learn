@@ -11,7 +11,6 @@ const topic: Topic = {
   sources: [
     'Hello Interview — System Design in a Hurry: Delivery framework and the Patterns list (Real-time Updates, Dealing with Contention, Multi-step Processes, Scaling Reads, Scaling Writes, Handling Large Blobs, Managing Long-Running Tasks) — hellointerview.com/learn/system-design/in-a-hurry/patterns',
     'Hello Interview — pattern pages: scaling-reads, scaling-writes, long-running-tasks (framing only; all text here is original)',
-    'Alex Xu — System Design Interview Vol 1 & 2 (the case studies the "See it applied" links point to)',
     'Martin Kleppmann — Designing Data-Intensive Applications, Ch 5–7, 11',
     'AWS S3 documentation — multipart upload limits and presigned URLs',
   ],

@@ -9,8 +9,6 @@ const topic: Topic = {
     'Why DB connections are expensive, sizing pools with Little\'s Law, the pods × pool explosion, PgBouncer modes, leaks and timeouts, backpressure, row/table locks, SKIP LOCKED, deadlocks and hot-row contention — plus the "connections exhausted" incident in depth.',
   estimatedMinutes: 105,
   sources: [
-    'Alex Xu — System Design Interview Vol 2, Ch 7 Hotel Reservation (concurrency, locking)',
-    'Alex Xu — System Design Interview Vol 2, Ch 12 Digital Wallet (hot accounts)',
     'PostgreSQL 16 docs — 13.3 Explicit Locking, 20.3 Connections, 20.11 Client Connection Defaults',
     'HikariCP wiki — About Pool Sizing; PgBouncer docs',
   ],
@@ -522,7 +520,6 @@ SELECT wait_event_type, wait_event, count(*)
         'Take the hot lock last and hold it briefly; prefer single atomic statements.',
         'Shard, batch or move counters to Redis; use append-only ledgers for balances.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 12 Digital Wallet',
     },
     {
       heading: 'Scenario deep dive: "remaining connection slots are reserved" — connections exhausted',

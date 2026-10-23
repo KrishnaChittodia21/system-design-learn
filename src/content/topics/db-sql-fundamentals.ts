@@ -9,7 +9,6 @@ const topic: Topic = {
     'Every join type on one tiny dataset, NULL traps, the logical order a SELECT is evaluated in, how Postgres actually executes it (nested loop / hash / merge), window functions, CTEs, 1NF→5NF on one evolving order sheet, deliberate denormalization, an interview-grade e-commerce schema and the classic SQL round problems.',
   estimatedMinutes: 120,
   sources: [
-    'ByteByteGo (2025 archive) — "The 4 Types of SQL Joins", "Visualizing a SQL query", "How SQL Query Executes In A Database", "5 Database Normal Forms Every Developer Should Know"',
     'PostgreSQL 17 docs — SQL Commands: SELECT (Description: the order clauses are processed in)',
     'PostgreSQL 17 docs — 7.2 Table Expressions (joined tables), 7.8 WITH Queries (CTE inlining, MATERIALIZED)',
     'PostgreSQL 17 docs — 3.5 Window Functions, 4.2.8 Window Function Calls (frame defaults), 9.23 Subquery Expressions (NOT IN and NULL)',
@@ -108,7 +107,7 @@ SELECT c.name, r.name AS referred_by
         'OUTER joins pad the unmatched side with NULL; FULL = LEFT ∪ RIGHT.',
         'Prefer explicit ON over NATURAL/USING; prefer LEFT over RIGHT.',
       ],
-      source: 'ByteByteGo — "The 4 Types of SQL Joins" (2025 archive); PostgreSQL 17 docs — 7.2.1.1 Joined Tables',
+      source: 'PostgreSQL 17 docs — 7.2.1.1 Joined Tables',
     },
     {
       heading: 'Semi-joins and anti-joins: EXISTS, IN, NOT EXISTS and the NOT IN null trap',
@@ -371,7 +370,7 @@ SET enable_nestloop = off;   -- then EXPLAIN again and compare estimated vs actu
         'Nested loop handles any condition; hash and merge need equality.',
         'Hash memory = work_mem × hash_mem_multiplier per node; beyond that it batches to disk.',
       ],
-      source: 'ByteByteGo — "Visualizing a SQL query" and "How SQL Query Executes In A Database" (2025 archive); PostgreSQL 17 docs — 51.5 Planner/Optimizer, 19.4 Resource Consumption, 19.7 Query Planning',
+      source: 'PostgreSQL 17 docs — 51.5 Planner/Optimizer, 19.4 Resource Consumption, 19.7 Query Planning',
     },
     {
       heading: 'Aggregation and window functions: GROUP BY vs OVER, ranking, running totals, top-N per group',
@@ -583,7 +582,7 @@ CREATE INDEX order_items_product_idx ON order_items (product_id);`,
         'Each step removes update, insert and delete anomalies for one kind of fact.',
         'Price charged on an order line is not redundant with the product list price.',
       ],
-      source: 'ByteByteGo — "5 Database Normal Forms Every Developer Should Know" (2025 archive); Silberschatz et al. — Database System Concepts, Ch 7',
+      source: 'Silberschatz et al. — Database System Concepts, Ch 7',
     },
     {
       heading: 'BCNF, 4NF and 5NF: overlapping keys, independent multi-valued facts and join dependencies',
@@ -646,7 +645,7 @@ CREATE TRIGGER order_pickers_bcnf BEFORE INSERT OR UPDATE ON order_pickers
         '4NF: independent multi-valued facts go in separate tables, but only if truly independent.',
         '5NF: decompose only when a business rule makes the triple derivable from pairs.',
       ],
-      source: 'ByteByteGo — "5 Database Normal Forms" (BCNF, 4NF); C. J. Date — Database Design and Relational Theory (5NF, join dependencies); Silberschatz et al. — Ch 7.3 (BCNF vs 3NF dependency preservation), 7.6 (4NF)',
+      source: 'C. J. Date — Database Design and Relational Theory (5NF, join dependencies); Silberschatz et al. — Ch 7.3 (BCNF vs 3NF dependency preservation), 7.6 (4NF)',
     },
     {
       heading: 'When to denormalize: read models, reporting and what it costs',
@@ -783,7 +782,7 @@ CREATE INDEX ON order_items (product_id);`,
         'bigint paise + currency; snapshots for price/title/address; idempotency key UNIQUE.',
         'Soft delete needs partial unique indexes and RESTRICT FKs; prefer it only where history needs it.',
       ],
-      source: 'PostgreSQL 17 docs — 5.4 Constraints, 11.8 Partial Indexes; Alex Xu — System Design Interview Vol 2, Ch 7 (schema discussion style)',
+      source: 'PostgreSQL 17 docs — 5.4 Constraints, 11.8 Partial Indexes',
     },
     {
       heading: 'Interview SQL classics: Nth highest, duplicates, gaps and islands',

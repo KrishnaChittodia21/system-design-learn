@@ -9,7 +9,6 @@ const topic: Topic = {
     'Keeping money and orders correct across services: idempotency keys on both sides of every hop, 2PC and why it blocks, TC/C, sagas with compensations, transactional outbox + CDC, inbox dedup, the exactly-once illusion, and reconciliation.',
   estimatedMinutes: 100,
   sources: [
-    'Alex Xu — System Design Interview Vol 2, Ch 11 (Payment System) & Ch 12 (Digital Wallet)',
     'Chris Richardson — Microservices Patterns (Saga, Transactional Outbox)',
     'Martin Kleppmann — Designing Data-Intensive Applications, Ch 9 & 11',
     'Garcia-Molina & Salem — Sagas (1987)',
@@ -67,7 +66,6 @@ Retries are unavoidable (clients, SDKs, gateways, service meshes, Kafka consumer
         'Idempotency makes N executions equal one.',
         'Prefer eliminating distributed transactions; then idempotency, outbox, sagas; 2PC last.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 11',
     },
     {
       heading: 'Idempotency keys on the API side',
@@ -152,7 +150,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
         'Same key + different body → 422; in-progress → 409; completed → replay stored response.',
         'Propagate derived keys downstream (PSP) so the whole chain is idempotent.',
       ],
-      source: 'Stripe API docs — Idempotent requests; Alex Xu Vol 2 Ch 11',
+      source: 'Stripe API docs — Idempotent requests',
     },
     {
       heading: 'Consumer-side idempotency: the inbox pattern and dedup windows',
@@ -277,7 +275,7 @@ ORDER BY prepared;`,
         'In-doubt participants hold locks; coordinator availability is critical.',
         'Good inside one distributed DB with replicated coordinators; poor across microservices and third parties.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 12; DDIA Ch 9',
+      source: 'DDIA Ch 9',
     },
     {
       heading: 'TC/C: Try-Confirm/Cancel',
@@ -355,7 +353,6 @@ export class WalletTcc {
         'Handle idempotent Confirm/Cancel, empty rollback, and hanging (late Try after Cancel).',
         'No DB locks across the network, but three operations per participant and a durable coordinator.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 12 (TC/C)',
     },
     {
       heading: 'Sagas: long-lived transactions with compensations',
@@ -416,7 +413,7 @@ A **saga** (Garcia-Molina & Salem, 1987) is a sequence of local transactions T1�
         'Compensatable → pivot → retriable; compensations are semantic, idempotent and retried forever.',
         'Orchestrate money flows; choreograph only short, simple ones.',
       ],
-      source: 'Garcia-Molina & Salem (1987); Richardson — Microservices Patterns; Alex Xu Vol 2 Ch 12',
+      source: 'Garcia-Molina & Salem (1987); Richardson — Microservices Patterns',
     },
     {
       heading: 'Implementing an orchestrated saga as a persisted state machine',
@@ -603,7 +600,7 @@ Kafka transactions: exactly-once only for Kafka → Kafka pipelines`,
         'Kafka EOS covers Kafka-to-Kafka read-process-write, not external side effects.',
         'Audit dedup key stability, atomicity with the effect, and window length.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 11; Kafka KIP-98',
+      source: 'Kafka KIP-98',
     },
     {
       heading: 'Reconciliation: the safety net for money',
@@ -666,7 +663,6 @@ HAVING sum(CASE direction WHEN 'DEBIT' THEN amount ELSE -amount END) <> 0;`,
         'Match on a shared reference; classify mismatches; auto-fix safe classes, queue the rest.',
         'Double-entry ledger invariants are cheap, powerful SQL checks.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 11 (Reconciliation) & Ch 12',
     },
     {
       heading: 'Scenario playbook: duplicate payments and duplicate orders',

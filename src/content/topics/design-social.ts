@@ -9,7 +9,6 @@ const topic: Topic = {
     'Real-time messaging with ordering and receipts, feeds that survive celebrities, and video pipelines that transcode, stream and count at planetary scale.',
   estimatedMinutes: 160,
   sources: [
-    'Alex Xu — System Design Interview Vol 1, Ch 11 (News Feed), Ch 12 (Chat System), Ch 14 (YouTube)',
     'Twitter Engineering — Timelines at Scale (Raffi Krikorian, QCon 2013)',
     'Discord Engineering — How Discord Stores Trillions of Messages (2023)',
     'Netflix Tech Blog — Open Connect; Per-Title/Per-Shot Encoding Optimization',
@@ -75,7 +74,6 @@ Use WebSocket (or MQTT) for real-time traffic, plain HTTPS for everything else (
         'Durability promise starts at the server ack (single tick).',
         'WebSocket/MQTT for real-time; HTTPS for the rest.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 12 (Design a Chat System)',
     },
     {
       heading: 'Chat (2/5): data model, message IDs & per-conversation ordering',
@@ -135,7 +133,7 @@ WHERE conv_id = ? AND bucket = ? AND seq < ? LIMIT 50;`,
         'Order per conversation via a single-owner sequence; no global order needed.',
         'client_msg_id makes retried sends idempotent.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 12; Discord Engineering (2017, 2023)',
+      source: 'Discord Engineering (2017, 2023)',
     },
     {
       heading: 'Chat (3/5): architecture — gateways, session registry, routing & offline push',
@@ -224,7 +222,6 @@ export class ChatService {
         'Persist, then ack (single tick); deliver, then device ack (double tick).',
         'Offline → push notification; history sync on reconnect.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 12',
     },
     {
       heading: 'Chat (4/5): receipts, offline sync, multi-device & group fan-out',
@@ -290,7 +287,7 @@ export async function syncOnReconnect(
         'Sync by cursor, persisted per page; multi-device = per-device cursors and keys.',
         'Large channels switch to fan-out on read; presence is subscribe-on-view.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 12; Signal protocol specs',
+      source: 'Signal protocol specs',
     },
     {
       heading: 'Chat (5/5): scaling, failure modes & wrap-up',
@@ -376,7 +373,7 @@ type Mutation {
         'Timelines store post IDs; posts/users/counters hydrated from separate caches.',
         'Fan-out cost scales with follower count — the celebrity problem.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 11 (Design a News Feed System); Twitter Timelines at Scale (2013)',
+      source: 'Twitter Timelines at Scale (2013)',
     },
     {
       heading: 'News Feed (2/3): fan-out on write vs read, and the hybrid for celebrities',
@@ -450,7 +447,7 @@ export async function runFanout(kafka: Kafka, redis: Redis, graph: {
         'Fan-out is async via Kafka; ZADD makes redelivery idempotent.',
         'Handle unfollow/delete/block at read time.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 11; Twitter Timelines at Scale (2013)',
+      source: 'Twitter Timelines at Scale (2013)',
     },
     {
       heading: 'News Feed (3/3): read path, ranking, caching layers & wrap-up',
@@ -492,7 +489,6 @@ export async function runFanout(kafka: Kafka, redis: Redis, graph: {
         'Cursor pagination; read-your-writes by merging own recent posts.',
         'Hot counters: sharded Redis counters with periodic persistence.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 11',
     },
     {
       heading: 'YouTube / Netflix (1/4): requirements, estimation & the cost model',
@@ -520,7 +516,6 @@ export async function runFanout(kafka: Kafka, redis: Redis, graph: {
         'Popular content on CDN, long tail on origin; codec upgrades cut bandwidth.',
         'Resumable upload + manifest-based playback APIs.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 14 (Design YouTube)',
     },
     {
       heading: 'YouTube / Netflix (2/4): upload & the transcoding DAG',
@@ -594,7 +589,7 @@ export function stages(tasks: Task[]): string[][] {
         'DAG scheduler + resource manager + worker pool; priorities per job.',
         'Per-title encoding (Netflix) tailors the bitrate ladder to content complexity.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 14; Netflix Tech Blog — Per-Title Encode Optimization',
+      source: 'Netflix Tech Blog — Per-Title Encode Optimization',
     },
     {
       heading: 'YouTube / Netflix (3/4): adaptive bitrate streaming, CDN & Netflix Open Connect',
@@ -718,7 +713,6 @@ setInterval(() => void flush().catch(() => {}), 1_000).unref();`,
         'Metadata in sharded MySQL (Vitess); thumbnails on CDN.',
         'Recs: log events → candidate generation → ranking → fallback to trending.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 14',
     },
     {
       heading: 'Bottlenecks, trade-offs & wrap-up across social & media designs',

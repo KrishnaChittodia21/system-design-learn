@@ -16,7 +16,6 @@ const topic: Topic = {
     'Atlassian P40 Bangalore interview experience (code design round: snake game / rate limiter) — leetcode.com/discuss/interview-experience/7196860',
     'DesignGurus — What is the Swiggy interview process like (round by round)',
     'Robert C. Martin — Clean Architecture (dependency rule, boundaries)',
-    'Alex Xu — System Design Interview Vol 1, Ch 8 Design a URL Shortener',
   ],
   tags: ['lld', 'machine-coding', 'hld-to-lld', 'class-diagram', 'interfaces', 'url-shortener', 'repository-pattern', 'interview-strategy', 'typescript'],
   cheatSheet: [
@@ -138,7 +137,6 @@ Indian product companies increasingly split these: Flipkart, Swiggy, PhonePe, Ra
     v         v            Analytics pipeline
  IdGenerator  LinkStore (KV, conditional put)
  (ranges)`,
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 8 Design a URL Shortener',
     },
     {
       heading: '5. Worked example (2/3): class diagram and interfaces',

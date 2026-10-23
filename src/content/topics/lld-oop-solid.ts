@@ -21,7 +21,6 @@ const topic: Topic = {
     'Alistair Cockburn — Hexagonal Architecture (Ports and Adapters), 2005',
     'Jeffrey Palermo — The Onion Architecture (2008)',
     'Robert C. Martin — The Clean Architecture (blog, 2012)',
-    'ByteByteGo — How Clean Architecture Works; Key Terms in Domain-Driven Design (2025)',
   ],
   tags: ['lld', 'oop', 'solid', 'composition', 'uml', 'value-objects', 'aggregates', 'ddd', 'dependency-injection', 'nestjs', 'typescript'],
   cheatSheet: [
@@ -861,7 +860,7 @@ export class HoldSeatsHandler {
         'A bounded context is where a word has exactly one meaning; the same noun can be three different classes.',
         'The downstream team owns the ACL, and every foreign code is mapped or rejected there.',
       ],
-      source: 'Eric Evans — Domain-Driven Design (2003), Parts II and IV; Vaughn Vernon — Implementing Domain-Driven Design (2013), Ch 2–3, 8, 10, 12; ByteByteGo — Key Terms in Domain-Driven Design (2025)',
+      source: 'Eric Evans — Domain-Driven Design (2003), Parts II and IV; Vaughn Vernon — Implementing Domain-Driven Design (2013), Ch 2–3, 8, 10, 12',
     },
     {
       heading: '13. Clean, Hexagonal and Onion architecture: dependency rule, ports & adapters, use cases',
@@ -984,7 +983,7 @@ export class InMemorySeatInventory implements SeatInventory {
         'It is overkill for CRUD; add ports where volatility, multiple drivers or testing pain exist.',
         'Enforce the dependency rule in CI (dependency-cruiser or eslint boundaries), or it decays.',
       ],
-      source: 'Alistair Cockburn — Hexagonal Architecture (2005); Jeffrey Palermo — The Onion Architecture (2008); Robert C. Martin — The Clean Architecture (2012) and Clean Architecture (2017); ByteByteGo — How Clean Architecture Works (2025)',
+      source: 'Alistair Cockburn — Hexagonal Architecture (2005); Jeffrey Palermo — The Onion Architecture (2008); Robert C. Martin — The Clean Architecture (2012) and Clean Architecture (2017)',
     },
   ],
   codeChallenges: [

@@ -9,7 +9,6 @@ const topic: Topic = {
     'Pick the right transport, then make it survive scale: connection servers, pub/sub fan-out, heartbeats, backpressure, reconnect storms and C1M capacity.',
   estimatedMinutes: 75,
   sources: [
-    'Alex Xu — System Design Interview Vol 2, Ch 2 Nearby Friends',
     'Mastering API Architecture — Ch 1 (REST, gRPC, GraphQL)',
     'RFC 6455 (WebSocket), WHATWG HTML Living Standard (Server-Sent Events), gRPC docs',
   ],
@@ -374,7 +373,6 @@ export const pushToUser = (userId: string, msg: object) =>
 declare function authenticateUpgrade(req: import('http').IncomingMessage): Promise<string | null>;`,
         },
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 2 Nearby Friends',
     },
     {
       heading: '7. Heartbeats, dead peers and reconnection',

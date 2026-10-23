@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "validate": "node --no-warnings scripts/validate-content.mjs",
+    "validate:challenges": "node --no-warnings scripts/validate-challenges.mjs",
     "prereqs": "node --no-warnings scripts/gen-prereqs.mjs",
     "project": "node --no-warnings scripts/run-project.mjs"
   },

@@ -9,9 +9,6 @@ const topic: Topic = {
     'Three case studies about keeping user bytes safe at petabyte scale: file sync with block-level dedup and delta sync, a Gmail-scale email service, and a GFS/HDFS-style distributed file system with leases and replication.',
   estimatedMinutes: 140,
   sources: [
-    'Alex Xu — System Design Interview Vol 1, Ch 15 Design Google Drive',
-    'Alex Xu & Sahn Lam — System Design Interview Vol 2, Ch 8 Distributed Email Service',
-    'Alex Xu & Sahn Lam — System Design Interview Vol 2, Ch 9 S3-like Object Storage (for comparison)',
     'Ghemawat, Gobioff, Leung — The Google File System (SOSP 2003)',
     'Apache Hadoop HDFS Architecture Guide',
     'Dropbox Tech Blog — Streaming file synchronization; Magic Pocket',
@@ -120,7 +117,6 @@ CREATE TABLE journal (
         'A file version is an ordered list of content hashes.',
         'The per-namespace journal seq is the sync cursor.',
       ],
-      source: 'Alex Xu Vol 1 — Ch 15 Design Google Drive',
     },
     {
       heading: 'Dropbox / Google Drive (2/4): high-level architecture and the upload/download flow',
@@ -292,7 +288,7 @@ export async function notify(req: Request, res: Response) {
         'Register the waiter, then check the cursor, to avoid a lost-wakeup race.',
         'Version retention + refcount/mark-sweep GC for blocks.',
       ],
-      source: 'Alex Xu Vol 1 — Ch 15; Dropbox Tech Blog',
+      source: 'Dropbox Tech Blog',
     },
     {
       heading: 'Distributed email (1/3): requirements, estimation and protocols',
@@ -321,7 +317,6 @@ export async function notify(req: Request, res: Response) {
         'SMTP between servers; IMAP/POP or HTTP APIs for clients.',
         'Maildir-style local storage does not scale or replicate.',
       ],
-      source: 'Alex Xu Vol 2 — Ch 8 Distributed Email Service',
     },
     {
       heading: 'Distributed email (2/3): architecture, send flow and receive flow',
@@ -361,7 +356,6 @@ Webmail ──HTTPS──► Web servers        Internet MTAs ──SMTP──�
         'Ack SMTP only after durable enqueue; dedupe on Message-ID + recipient.',
         'Real-time push via WebSocket; stateless web servers for APIs.',
       ],
-      source: 'Alex Xu Vol 2 — Ch 8 (high-level design, email sending/receiving flow)',
     },
     {
       heading: 'Distributed email (3/3): metadata data model, search, consistency and deliverability',
@@ -435,7 +429,6 @@ SELECT * FROM emails_by_folder
         'Search index partitioned by user; ES vs custom LSM trade-off.',
         'SPF + DKIM + DMARC + IP warm-up + bounce/complaint handling.',
       ],
-      source: 'Alex Xu Vol 2 — Ch 8 (metadata DB, search, deliverability)',
     },
     {
       heading: 'Distributed file system (1/3): GFS/HDFS architecture and master metadata',

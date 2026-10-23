@@ -18,7 +18,6 @@ const topic: Topic = {
     'Su et al. — RoFormer: Enhanced Transformer with Rotary Position Embedding (2021); Kusupati et al. — Matryoshka Representation Learning (NeurIPS 2022)',
     'Model Context Protocol specification — revisions 2025-06-18, 2025-11-25 and 2026-07-28 (stateless core, server/discover, tasks moved to an extension); modelcontextprotocol.io changelog',
     'Agent2Agent (A2A) Protocol specification v1.0 (a2a-protocol.org): Agent Card at /.well-known/agent-card.json, Task lifecycle states, Messages, Parts and Artifacts, JSON-RPC / gRPC / HTTP+JSON bindings, streaming and push notifications; Linux Foundation project (June 2025), moved to the Agentic AI Foundation (August 2026)',
-    'ByteByteGo newsletter archive 2025 — How Transformers Architecture Works; How LLMs Work; The LLM Glossary; Full Fine-Tuning vs LoRA vs RAG; RAG vs Fine-tuning; MCP vs A2A; Types of AI Agents; n8n vs LangGraph (used as a topic checklist, rewritten and verified against the primary sources above)',
     'Russell & Norvig — Artificial Intelligence: A Modern Approach (agent taxonomy: reflex, model-based, goal-based, utility-based, learning agents)',
   ],
   tags: ['llm', 'transformer', 'self-attention', 'tokenization', 'bpe', 'embeddings', 'cosine-similarity', 'sampling', 'context-window', 'fine-tuning', 'lora', 'qlora', 'rag', 'evaluation', 'hallucination', 'mcp', 'a2a', 'agent-frameworks', 'langgraph', 'n8n'],
@@ -98,7 +97,7 @@ export function inputAllowance(b: Budget, ...fixedParts: string[]): number {
         'Input tokens drive cost and time to first token; output tokens drive streaming duration almost linearly.',
         'Indic-script text commonly costs 2–5x the tokens of English on English-centric vocabularies: more cost, slower answers, smaller effective context.',
       ],
-      source: 'Sennrich et al. 2016 (BPE); Petrov et al., NeurIPS 2023 (tokenizer unfairness); ByteByteGo — How LLMs Work',
+      source: 'Sennrich et al. 2016 (BPE); Petrov et al., NeurIPS 2023 (tokenizer unfairness)',
     },
     {
       heading: 'Embeddings and vector similarity: cosine, dimensions, and what "semantic" really means',
@@ -161,7 +160,7 @@ export function topK(query: Float32Array, queryModel: string, rows: StoredVector
         'Normalise at write time; then cosine, dot product and L2 rank identically.',
         'Store the embedding model id with each vector; mixing spaces silently breaks retrieval.',
       ],
-      source: 'Kusupati et al. — Matryoshka Representation Learning (2022); ByteByteGo — LLM Glossary (embeddings, semantic search)',
+      source: 'Kusupati et al. — Matryoshka Representation Learning (2022)',
     },
     {
       heading: 'The Transformer in engineering terms: from token ids to next-token probabilities',
@@ -198,7 +197,7 @@ export function topK(query: Float32Array, queryModel: string, rows: StoredVector
         'Attention moves information between positions; the feed-forward layers transform each position and hold most of the parameters.',
         'Residual connections and normalisation are what make 32–100+ layers trainable.',
       ],
-      source: 'Vaswani et al. 2017 — Attention Is All You Need; Su et al. 2021 — RoFormer (RoPE); ByteByteGo — How Transformers Architecture Works',
+      source: 'Vaswani et al. 2017 — Attention Is All You Need; Su et al. 2021 — RoFormer (RoPE)',
     },
     {
       heading: 'Self-attention step by step: Q, K, V and a worked 3-token example with real numbers',
@@ -355,7 +354,7 @@ export function sampleNext(logits: number[], temperature: number, topP: number, 
         'Training needs gradients and optimiser state, so several times the memory of inference.',
         'Product teams own inference and occasionally adapters; pre-training is a lab-scale project.',
       ],
-      source: 'ByteByteGo — How LLMs Work; Rafailov et al. 2023 — Direct Preference Optimization; Ouyang et al. 2022 — InstructGPT (RLHF)',
+      source: 'Rafailov et al. 2023 — Direct Preference Optimization; Ouyang et al. 2022 — InstructGPT (RLHF)',
     },
     {
       heading: 'Prompt engineering vs RAG vs fine-tuning: a decision table for knowledge, behaviour, freshness and cost',
@@ -383,7 +382,6 @@ export function sampleNext(logits: number[], temperature: number, topP: number, 
         'Fine-tuned weights are stale, unauditable and have no access control.',
         'Always establish a prompted baseline with an eval set before choosing RAG or fine-tuning.',
       ],
-      source: 'ByteByteGo — RAG vs Fine-tuning: Which one should you use?; ByteByteGo — Full Fine-Tuning vs LoRA vs RAG',
     },
     {
       heading: 'Full fine-tuning vs LoRA vs QLoRA: low-rank adapters, parameter counts and GPU memory',
@@ -480,7 +478,7 @@ Trajectory and tool-call evals for agents, online metrics and regression gates a
         'Measure retrieval, groundedness and correctness separately; grounded-but-wrong points to retrieval.',
         'Golden set + calibrated LLM judge + CI gate; vibes are not a release criterion.',
       ],
-      source: 'ByteByteGo — LLM Glossary (hallucination, reranking); design-agents — Evals as a system',
+      source: 'design-agents — Evals as a system',
     },
     {
       heading: 'Agent protocols: MCP for tools and context, A2A for agent-to-agent delegation, and how they compose',
@@ -552,7 +550,7 @@ Trajectory and tool-call evals for agents, online metrics and regression gates a
         'A2A discovery via Agent Card; work via Tasks with states incl. INPUT_REQUIRED/AUTH_REQUIRED; outputs as Artifacts.',
         'Own it and it is a function → MCP tool; it reasons, asks back, runs long or is someone else\'s → A2A.',
       ],
-      source: 'A2A Protocol Specification v1.0 (a2a-protocol.org); MCP specification changelog 2026-07-28; ByteByteGo — MCP vs A2A',
+      source: 'A2A Protocol Specification v1.0 (a2a-protocol.org); MCP specification changelog 2026-07-28',
     },
     {
       heading: 'Agent types and frameworks: LangGraph, CrewAI, n8n-style workflows, and when a plain loop is better',
@@ -622,7 +620,7 @@ export async function runAgent(llm: Llm, tools: Map<string, Tool>, messages: unk
         'LangGraph for graph-shaped, checkpointed flows; CrewAI for quick multi-agent prototypes; n8n for SaaS automations owned by ops.',
         'A plain loop with budgets is often the right first version; adopt a framework when it replaces code you would write anyway.',
       ],
-      source: 'ByteByteGo — Types of AI Agents; ByteByteGo — n8n vs LangGraph; LangGraph docs (persistence, interrupts); Russell & Norvig — AIMA Ch. 2',
+      source: 'LangGraph docs (persistence, interrupts); Russell & Norvig — AIMA Ch. 2',
     },
     {
       heading: 'LLM glossary for system-design interviews: the 30 terms you should define in one breath',
@@ -665,7 +663,6 @@ export async function runAgent(llm: Llm, tools: Map<string, Tool>, messages: unk
         'Latency vocabulary: TTFT for prefill, TPOT for decode.',
         'Adaptation vocabulary: SFT, RLHF/DPO, LoRA/QLoRA, distillation, quantisation each solve a different problem.',
       ],
-      source: 'ByteByteGo — The Large-Language Model Glossary (categories: models, training, prompts, inference, RAG), extended and rewritten',
     },
   ],
   codeChallenges: [

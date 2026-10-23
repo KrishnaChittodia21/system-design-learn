@@ -9,7 +9,6 @@ const topic: Topic = {
     'Designing the systems other systems stand on — a Kafka-like log, a time-series monitoring stack, an exactly-once click pipeline, a distributed scheduler, and a log platform with tiered storage.',
   estimatedMinutes: 170,
   sources: [
-    'Alex Xu & Sahn Lam — System Design Interview Vol 2, Ch 4 (Distributed Message Queue), Ch 5 (Metrics Monitoring and Alerting System), Ch 6 (Ad Click Event Aggregation)',
     'Pelkonen et al. — Gorilla: A Fast, Scalable, In-Memory Time Series Database (VLDB 2015)',
     'Varghese & Lauck — Hashed and Hierarchical Timing Wheels (1987); Kafka purgatory design',
     'Apache Kafka documentation (replication, ISR, idempotent producer, transactions, KRaft)',
@@ -90,7 +89,6 @@ const topic: Topic = {
         'Partitions give parallelism and per-key ordering; one consumer per partition per group.',
         'Consumers pull in batches; metadata via KRaft (ZooKeeper removed in Kafka 4.0).',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 4 (Distributed Message Queue)',
     },
     {
       heading: 'Distributed Message Queue (2/3): the storage engine — segments, indexes, batching & zero-copy',
@@ -148,7 +146,7 @@ export function locate(segments: Segment[], offset: number) {
         'Batching, compression, page cache and zero-copy give the throughput.',
         'Retention deletes whole segments; compaction keeps the latest per key; tiered storage offloads to S3.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 4; Kafka docs (log, segments)',
+      source: 'Kafka docs (log, segments)',
     },
     {
       heading: 'Distributed Message Queue (3/3): replication, ISR, consumer rebalancing & delivery semantics',
@@ -221,7 +219,7 @@ export async function run(enrich: (v: Buffer) => Buffer) {
         'Rebalances: cooperative-sticky, static membership, KIP-848 to reduce stop-the-world.',
         'Exactly-once = idempotent producer + transactions (inside Kafka) or idempotent/transactional sinks outside.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 4; Kafka docs (replication, transactions)',
+      source: 'Kafka docs (replication, transactions)',
     },
     {
       heading: 'Metrics Monitoring (1/3): requirements, data model & time-series storage',
@@ -276,7 +274,7 @@ export async function metricsHandler(): Promise<{ body: string; contentType: str
         'TSDB with Gorilla compression ≈ 1.37 B/sample.',
         'Cardinality control (no user_id labels) is an operational must.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 5; Gorilla paper (VLDB 2015)',
+      source: 'Gorilla paper (VLDB 2015)',
     },
     {
       heading: 'Metrics Monitoring (2/3): collection — pull vs push, Kafka buffering & aggregation points',
@@ -327,7 +325,6 @@ Large companies use **both**: pull inside clusters, push for serverless/edge, un
         'Shard scrape targets with consistent hashing; buffer with Kafka.',
         'Aggregate at agent, pipeline or query time — precision vs cost.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 5',
     },
     {
       heading: 'Metrics Monitoring (3/3): query, storage tiers, alerting & visualization',
@@ -394,7 +391,7 @@ Large companies use **both**: pull inside clusters, push for serverless/edge, un
         'Alert manager: dedup, group, inhibit, silence, route; durable retries.',
         'Page on SLO burn rate; monitor the monitor (dead man’s switch).',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 5; Google SRE Workbook — Alerting on SLOs',
+      source: 'Google SRE Workbook — Alerting on SLOs',
     },
     {
       heading: 'Ad Click Aggregation (1/4): requirements, estimation & data model',
@@ -429,7 +426,6 @@ Large companies use **both**: pull inside clusters, push for serverless/edge, un
         'Keep raw (replay, reconciliation) and aggregated (queries) data.',
         'Pre-defined filter dimensions (star schema) keep queries fast.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 6 (Ad Click Event Aggregation)',
     },
     {
       heading: 'Ad Click Aggregation (2/4): architecture & the MapReduce-style aggregation DAG',
@@ -508,7 +504,6 @@ export function reduceTopK(perNode: [string, number][][], k: number) {
         'Second queue enables end-to-end exactly-once and decouples DB speed.',
         'Local top-K merge is exact only when each key lives on one node.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 6',
     },
     {
       heading: 'Ad Click Aggregation (3/4): event time, watermarks, windows & lambda vs kappa',
@@ -578,7 +573,7 @@ export class TumblingCounter {
         'Tumbling for per-minute counts, sliding for last-M-minutes top-K.',
         'Kappa: one streaming codebase + replay from raw storage for recalculation.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 6; Akidau et al. — Streaming Systems',
+      source: 'Akidau et al. — Streaming Systems',
     },
     {
       heading: 'Ad Click Aggregation (4/4): exactly-once, dedup, hot spots, fault tolerance & reconciliation',
@@ -636,7 +631,6 @@ COMMIT;
         'Dedup by click_id; filter fraud separately.',
         'Hot ads: key splitting / extra nodes; nightly batch reconciliation for billing.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 6',
     },
     {
       heading: 'Distributed Job Scheduler (1/2): requirements, architecture & claiming jobs safely',

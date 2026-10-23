@@ -10,7 +10,6 @@ const topic: Topic = {
   estimatedMinutes: 115,
   sources: [
     'Google SRE Book — Ch 21 Handling Overload & Ch 22 Addressing Cascading Failures',
-    'Alex Xu — System Design Interview Vol 2, Ch 4 Distributed Message Queue',
     'Michael Nygard — Release It! (Stability Patterns: Circuit Breaker, Bulkhead, Timeouts)',
     'AWS Architecture Blog — Exponential Backoff and Jitter; AWS Builders Library — Shuffle Sharding',
   ],
@@ -84,7 +83,6 @@ aws cloudwatch get-metric-statistics --namespace AWS/SQS \\
         'Even lag → capacity; skewed lag → hot key, stuck consumer or poison message.',
         'Consumers beyond partition count idle; the downstream is often the real bottleneck.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 4 Distributed Message Queue',
     },
     {
       heading: '2. Incident: consumer crashes during processing (and poison messages)',

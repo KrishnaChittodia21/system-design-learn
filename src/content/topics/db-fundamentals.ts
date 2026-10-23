@@ -9,8 +9,6 @@ const topic: Topic = {
     'Relational, document, key-value, wide-column, graph and time-series models; normalization trade-offs; transactions, ACID vs BASE; isolation levels, anomalies and MVCC; choosing a database.',
   estimatedMinutes: 110,
   sources: [
-    'Alex Xu — System Design Interview Vol 2, Ch 7 Hotel Reservation System (schema, concurrency)',
-    'Alex Xu — System Design Interview Vol 2, Ch 5 Metrics Monitoring (time-series data model)',
     'Martin Kleppmann — Designing Data-Intensive Applications, Ch 2 & 7',
     'PostgreSQL 16 docs — Transaction Isolation (13.2) and MVCC',
   ],
@@ -119,7 +117,6 @@ UPDATE room_type_inventory
         'Snapshot values that must not change retroactively (price at purchase).',
         'CHECK/UNIQUE/FK constraints hold regardless of isolation level.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 7 Hotel Reservation System',
     },
     {
       heading: 'Document databases: model the aggregate',
@@ -291,7 +288,6 @@ SELECT add_continuous_aggregate_policy('cpu_1m',
         'Time-series = append-only + compression + retention + downsampling; watch tag cardinality.',
         'Time partitioning makes retention a cheap chunk drop instead of a massive DELETE.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 5 Metrics Monitoring and Alerting System',
     },
     {
       heading: 'Transactions, ACID and BASE',
@@ -564,7 +560,6 @@ export class ProductService {
         'Source of truth + derived views via CDC is the standard polyglot pattern.',
         'Mention concrete numbers when defending a choice.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 7, 10, 11',
     },
   ],
   codeChallenges: [

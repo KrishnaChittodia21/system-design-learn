@@ -9,7 +9,6 @@ const topic: Topic = {
     'Split data without splitting your team: shard keys, hot shards, cross-shard queries, resharding with logical shards, and moving a live table with no downtime.',
   estimatedMinutes: 95,
   sources: [
-    'Alex Xu — System Design Interview Vol 2 (Ch 1 Proximity, Ch 6 Ad Click, Ch 10 Leaderboard)',
     'Martin Kleppmann — Designing Data-Intensive Applications, Ch 6 Partitioning',
     'PostgreSQL docs — Table Partitioning',
     'Vitess & Citus documentation',
@@ -271,7 +270,6 @@ export async function getLikes(postId: string): Promise<number> {
         'Hot key: cache, salt into K sub-keys, batch increments, isolate the whale.',
         'Monitor per-shard and per-key, never only cluster-wide averages.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 6 & Ch 10',
     },
     {
       heading: 'Cross-shard queries, joins and global secondary indexes',
@@ -579,7 +577,7 @@ export const snowflakeTime = (id: string) =>
         'Protect against clock rollback and duplicate worker IDs.',
         'Embed the logical shard ID in the ID (Instagram) to route by ID alone.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 7 (Unique ID generator); Instagram Engineering blog',
+      source: 'Instagram Engineering blog',
     },
   ],
   codeChallenges: [

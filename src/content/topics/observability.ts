@@ -10,7 +10,6 @@ const topic: Topic = {
   estimatedMinutes: 110,
   sources: [
     'Mastering API Architecture — Ch 5 Deploying and Releasing APIs (Observability, reading signals, header propagation)',
-    'Alex Xu — System Design Interview Vol 2, Ch 5 Metrics Monitoring and Alerting System',
     'Google SRE Workbook — Ch 5 Alerting on SLOs',
     'OpenTelemetry & W3C Trace Context specifications',
   ],
@@ -208,7 +207,6 @@ export function metricsMiddleware(req: Request, res: Response, next: NextFunctio
         'Summaries cannot be aggregated across instances; prefer histograms.',
         'Put the SLO threshold on an exact bucket boundary.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 5 (data model, metric types)',
     },
     {
       heading: 'RED, USE and the Golden Signals (with PromQL)',
@@ -590,7 +588,7 @@ Cause-based alerts (CPU, disk 90%, pod restarts) become **tickets or dashboard a
         '14.4× over 1h+5m and 6× over 6h+30m page; 1× over 3d is a ticket.',
         'Resource alerts become tickets; pages must be actionable with runbooks.',
       ],
-      source: 'Google SRE Workbook — Ch 5 Alerting on SLOs; Alex Xu Vol 2 Ch 5 (alerting system)',
+      source: 'Google SRE Workbook — Ch 5 Alerting on SLOs',
     },
     {
       heading: 'Designing the metrics pipeline at scale',
@@ -630,7 +628,6 @@ Buy vs build: most companies should buy or run the OSS stack; building a TSDB is
         'Kafka buffers ingestion; recent data hot, old data downsampled on object storage.',
         'Most queries are about the last day — design storage tiers around it.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 5 Metrics Monitoring and Alerting System',
     },
     {
       heading: 'Controlling log volume and cost (Grafana Loki and friends)',

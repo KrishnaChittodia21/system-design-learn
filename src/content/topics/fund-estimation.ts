@@ -9,8 +9,6 @@ const topic: Topic = {
     'Back-of-the-envelope maths that drives real design decisions: DAU → QPS → peak, storage over 5 years with replication, ingress/egress, cache memory, and server counts.',
   estimatedMinutes: 90,
   sources: [
-    'Alex Xu — System Design Interview Vol 1, Ch 2 (Back-of-the-envelope Estimation)',
-    'Alex Xu — System Design Interview Vol 2 (estimation sections of Ch 1, 2, 6, 10)',
     'Jeff Dean / Peter Norvig — Latency Numbers Every Programmer Should Know',
   ],
   tags: ['estimation', 'capacity-planning', 'qps', 'storage', 'bandwidth', 'latency-numbers', 'interview'],
@@ -55,7 +53,7 @@ const topic: Topic = {
         'Write assumptions down, label units, split read vs write.',
         'Every number must end in a design decision.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 2; Vol 2 Ch 1 (Proximity Service estimation)',
+      source: 'Vol 2 Ch 1 (Proximity Service estimation)',
     },
     {
       heading: 'Estimation arithmetic toolkit — doing the maths in your head',
@@ -155,7 +153,6 @@ console.log(human(bytesPerSec * 8, 'bps'));        // "4.6Gbps"
         'Day ≈ 10^5 s, month ≈ 2.5 × 10^6 s, year ≈ π × 10^7 s.',
         'Sanity-check against anchors: Postgres ~10^3–10^4 writes/s, Redis ~10^5 ops/s, 10 Gbps NIC ~10^9 B/s.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 2 (Back-of-the-envelope estimation)',
     },
     {
       heading: 'Powers of two, data sizes and ID-space limits',
@@ -267,7 +264,7 @@ console.log(daysUntilOverflow(2_147_483_647, 0, 50_000_000).toFixed(0)); // "43"
         'Budget latency by counting sequential hops, not services.',
         'Cross-region RTT (~70–150 ms) is physics; fix it with data placement.',
       ],
-      source: 'Jeff Dean — Latency Numbers Every Programmer Should Know; Alex Xu Vol 1 Ch 2',
+      source: 'Jeff Dean — Latency Numbers Every Programmer Should Know',
     },
     {
       heading: 'DAU → average QPS → peak QPS',
@@ -337,7 +334,6 @@ console.log(concurrentUsers(20e6, 30)); // ~416,667 concurrent, not 20M`,
         'Pick a peak factor with a reason: 2–3× diurnal, 10×+ for events.',
         'Concurrent users come from Little\'s Law, not from DAU.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 1, 2, 6, 10 (estimation sections)',
     },
     {
       heading: 'Storage growth over 5 years — replication, overhead, compounding',
@@ -543,7 +539,6 @@ console.log(redisShards({
         'Shard count = max(memory, ops/s, network) — memory is often not the binding one.',
         'Tiny values: overhead dominates; use hash bucketing or compact encodings.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 2 (cache 20% of daily reads)',
     },
     {
       heading: 'Server count, cores and connections (Little\'s Law in practice)',
@@ -641,7 +636,6 @@ console.log(fleet({ peakQps: 70_000, cpuMsPerRequest: 10, dbMsPerRequest: 3,
         'Sanity-check against known scale (Twitter, single Postgres limits).',
         'Name the 10×-swing assumptions and how you would validate them.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 2 & Ch 3 (4-step framework)',
     },
   ],
   codeChallenges: [

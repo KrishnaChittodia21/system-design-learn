@@ -9,12 +9,10 @@ const topic: Topic = {
     'Queues vs pub/sub vs logs, Kafka partitions, replication, ISR and acks, consumer groups, offsets, ordering and exactly-once — plus when RabbitMQ or SQS is the better tool.',
   estimatedMinutes: 120,
   sources: [
-    'Alex Xu — System Design Interview Vol 2, Ch 4 Distributed Message Queue',
     'Apache Kafka documentation (3.x / 4.x)',
     'Kafka: The Definitive Guide, 2nd ed.',
     'RabbitMQ and Amazon SQS documentation',
     'AWS documentation — Amazon SQS message quotas, Amazon SNS quotas and FIFO topics, Amazon EventBridge quotas and archive/replay, Kinesis Data Streams quotas (2026)',
-    'ByteByteGo — SQS vs SNS vs EventBridge vs Kinesis (2025)',
   ],
   tags: ['kafka', 'rabbitmq', 'sqs', 'pub-sub', 'partitions', 'isr', 'acks', 'consumer-groups', 'offsets', 'exactly-once', 'kraft', 'event-driven', 'kafkajs'],
   cheatSheet: [
@@ -86,7 +84,6 @@ const topic: Topic = {
         'Kafka = pub/sub across groups, queue within a group.',
         'Pull enables batching and consumer-paced flow; push needs prefetch limits.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 4 (queue vs pub/sub, pull vs push)',
     },
     {
       heading: 'Kafka architecture: brokers, topics, partitions and segments',
@@ -147,7 +144,6 @@ kafka-topics.sh --bootstrap-server kafka-0:9092 --describe --topic orders.v1`,
         'Retention deletes whole segments; compaction keeps the latest value per key.',
         'Speed = sequential I/O + page cache + zero-copy + batching/compression + partitioning.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 4 (WAL, segments, batching)',
     },
     {
       heading: 'Replication, ISR, acks and leader election (and KRaft)',
@@ -200,7 +196,6 @@ node.id: 4`,
         'Unclean leader election trades acked-data loss for availability — keep it off for important data.',
         'KRaft replaces ZooKeeper; ZK removed in Kafka 4.0.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 4 (replication, ISR, ACK settings)',
     },
     {
       heading: 'Producers: keys, partitioning, batching and the idempotent producer',
@@ -324,7 +319,6 @@ consumer.on(consumer.events.CRASH, (e) =>
         'Rebalances from deploys, missed heartbeats, or slow processing (max.poll.interval.ms).',
         'Cooperative sticky + static membership avoid stop-the-world rebalances; KIP-848 moves assignment to the broker.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 4 (consumer groups, rebalancing, coordinator)',
     },
     {
       heading: 'Offsets and commit strategies',
@@ -480,7 +474,6 @@ await consumer.run({
         'Kafka transactions commit outputs and consumer offsets atomically; epochs fence zombies.',
         'Side effects outside Kafka need idempotent sinks.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 4 (delivery semantics)',
     },
     {
       heading: 'Kafka vs RabbitMQ vs SQS: picking the right broker',
@@ -604,7 +597,7 @@ message LineItem {
         'Schema registry + compatibility rules make events a safe public API.',
         'Never dual-write DB + broker; use an outbox or CDC.',
       ],
-      source: 'Confluent Schema Registry docs; Alex Xu — System Design Interview Vol 2, Ch 4',
+      source: 'Confluent Schema Registry docs',
     },
     {
       heading: 'AWS messaging compared: SQS vs SNS vs EventBridge vs Kinesis',
@@ -710,7 +703,7 @@ console.log('failed records', out.FailedRecordCount); // also per record: resend
         'Kinesis ≈ Kafka with small partitions: 1 MB/s or 1,000 records/s in per shard, retention up to 365 days, no compaction.',
         'Every option is at-least-once by default, so consumers stay idempotent; batch APIs fail per entry.',
       ],
-      source: 'AWS docs: SQS message quotas, SNS quotas and FIFO topics, EventBridge quotas and archive/replay, Kinesis Data Streams quotas (2026); ByteByteGo — SQS vs SNS vs EventBridge vs Kinesis (2025)',
+      source: 'AWS docs: SQS message quotas, SNS quotas and FIFO topics, EventBridge quotas and archive/replay, Kinesis Data Streams quotas (2026)',
     },
   ],
   codeChallenges: [

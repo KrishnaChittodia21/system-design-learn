@@ -24,7 +24,6 @@ const topic: Topic = {
     'Business Today / Inc42 (2025–2026) — Zomato & Swiggy rain surge fee for subscribers, long-distance fee beyond 4 km, platform-fee changes',
     'ZenML LLMOps/MLOps database — Zomato ML runtime platform (Flink/Spark features, Redis + DynamoDB feature store, food-prep-time model)',
     'PracHub — DoorDash system design question reports (2025–2026): refund workflow as a DAG with timeout refunds, Dasher payment reliability, restaurant search',
-    'Alex Xu — System Design Interview Vol 1, Ch 11 (News Feed) and Vol 2, Ch 1 (Proximity Service)',
   ],
   tags: [
     'instagram',
@@ -298,7 +297,7 @@ export async function getFeedPage(userId: string, rawCursor?: string): Promise<F
         'Snapshot the ranked list per session; the cursor is a signed (session, offset).',
         'Ads are blended after organic ranking with spacing rules and a per-slot auction.',
       ],
-      source: 'Meta Engineering — Instagram ranking/Explore posts; Alex Xu Vol 1 Ch 11',
+      source: 'Meta Engineering — Instagram ranking/Explore posts',
     },
     {
       heading: 'Instagram (5/7): Stories — 24-hour TTL, tray ordering & viewer lists',

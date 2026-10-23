@@ -1,0 +1,453 @@
+import type { ChallengeSet } from '../types';
+
+const set: ChallengeSet = {
+  topic: 'misc-traffic-edge',
+  puzzles: [
+    {
+      mode: 'flow',
+      id: 'saas-edge-path',
+      tab: 'SaaS request path',
+      title: 'From anycast IP to the right tenant cell',
+      brief:
+        'A B2B API serves REST calls and long-lived gRPC streams for 20,000 tenants split into cells. Wire the path so floods are absorbed at the edge, gRPC streams spread evenly, each tenant gets its quota and lands in its own cell.',
+      cols: 4,
+      rows: 4,
+      nodes: [
+        { id: 'client', label: 'Clients', sub: 'REST + gRPC streams', kind: 'terminal', col: 0, row: 0 },
+        { id: 'l4', answer: 'nlb', hint: 'Static anycast IPs, soaks up floods', col: 1.5, row: 0 },
+        { id: 'l7', answer: 'envoy', hint: 'Balances each HTTP/2 stream', col: 3, row: 0 },
+        { id: 'gw', answer: 'gateway', hint: 'Who are you, and how much?', col: 3, row: 1.7 },
+        { id: 'dir', answer: 'directory', hint: 'Knows where each tenant lives', col: 1.5, row: 1.7 },
+        { id: 'cell1', label: 'Cell 1', sub: 'pool · ~300 tenants', col: 0, row: 1.7 },
+        { id: 'cell2', label: 'Cell 2', sub: 'enterprise silo', col: 0.75, row: 3 },
+      ],
+      edges: [
+        ['client', 'l4', 'TCP'],
+        ['l4', 'l7', 'flows'],
+        ['l7', 'gw'],
+        ['gw', 'dir', 'tenant id'],
+        ['dir', 'cell1'],
+        ['dir', 'cell2'],
+      ],
+      options: [
+        {
+          id: 'nlb',
+          label: 'L4 load balancer',
+          sub: 'NLB / Maglev',
+          is: 'a connection-level balancer with static IPs that forwards millions of packets per second and absorbs volume',
+        },
+        {
+          id: 'envoy',
+          label: 'L7 proxy',
+          sub: 'Envoy · terminates TLS',
+          is: 'a proxy that parses HTTP and gRPC and balances per request and per HTTP/2 stream',
+        },
+        {
+          id: 'gateway',
+          label: 'API gateway',
+          sub: 'JWT + per-tenant quota',
+          is: 'the policy layer: cheap rejections, local JWT verification, then per-consumer quotas and routing',
+        },
+        {
+          id: 'directory',
+          label: 'Tenant directory',
+          sub: 'tenant → cell, cached',
+          is: 'a cached lookup that routes each tenant to the cell that holds it, so tenants can move between cells',
+        },
+        {
+          id: 'header',
+          label: 'Tenant from X-Tenant header',
+          sub: 'client sets it',
+          decoy: true,
+          is: 'the classic cross-tenant IDOR: the tenant must come from the verified token, not a header the client controls',
+        },
+        {
+          id: 'modn',
+          label: 'Cell = hash(tenant) % N',
+          sub: 'no lookup table',
+          decoy: true,
+          is: 'modulo placement, which moves nearly every tenant when a cell is added and cannot pin an enterprise tenant to its silo',
+        },
+        {
+          id: 'l4only',
+          label: 'L4 all the way down',
+          sub: 'fastest, µs added',
+          decoy: true,
+          is: 'per-connection balancing, which pins each multiplexed gRPC connection to one pod while new pods sit idle',
+        },
+      ],
+      why: [
+        'Common production shape: L4 at the very edge for static anycast IPs and flood absorption, then an L7 tier for smart routing.',
+        'L7 balances each HTTP/2 stream; L4 would pin a whole gRPC connection to one backend.',
+        'The gateway is a policy layer (authentication, quotas, routing), not a place for business logic.',
+        'A tenant directory routes tenant → cell and tenant identity comes from the verified token, never from a client header.',
+      ],
+    },
+    {
+      mode: 'fault',
+      id: 'edge-cache-incident',
+      tab: 'Edge incident',
+      title: 'Edge incident: leaks, long outages, one hot pod',
+      brief:
+        'A stranger received another user\'s account settings page from the CDN, a 10-second origin blip turned into a 10-minute outage for everyone, and one broken pod is absorbing most of the traffic. Find the three bad settings and swap in the fix.',
+      cols: 5,
+      rows: 3,
+      nodes: [
+        { id: 'users', label: 'Users', sub: 'logged-in sessions', kind: 'terminal', col: 0, row: 1 },
+        {
+          id: 'edge',
+          label: 'CDN rule: *.css → cache',
+          sub: 'ignore origin headers',
+          col: 1,
+          row: 1,
+          fault: {
+            answer: 'honor',
+            clue: 'Let the origin decide what is cacheable',
+            why: 'Web cache deception: /account/settings/x.css returns the private settings page, and the edge caches it because the path looks static.',
+          },
+        },
+        {
+          id: 'shield',
+          label: 'Origin shield',
+          sub: '5xx/404 cached 10 min',
+          col: 2,
+          row: 1,
+          fault: {
+            answer: 'negttl',
+            clue: 'Do not remember failures for long',
+            why: 'Errors are cached with the default TTL, so a 10-second origin blip is replayed to every user for 10 minutes.',
+          },
+        },
+        {
+          id: 'lb',
+          label: 'L7 LB: least-request',
+          sub: 'no outlier detection',
+          col: 3,
+          row: 1,
+          fault: {
+            answer: 'outlier',
+            clue: 'Fast errors are not spare capacity',
+            why: 'A pod returning 500s in 1 ms has almost no requests in flight, so least-request keeps choosing it and sends it most of the traffic.',
+          },
+        },
+        {
+          id: 'pods',
+          label: 'app pods ×9',
+          sub: 'healthy',
+          col: 4,
+          row: 0,
+          fine: 'These pods are healthy and mostly idle; they are not getting their share of traffic.',
+        },
+        {
+          id: 'pod7',
+          label: 'pod-7',
+          sub: '500s in 1 ms',
+          col: 4,
+          row: 2,
+          fine: 'pod-7 has a broken disk, and pods will always break. The design must route around it; the fault is in how traffic keeps finding it.',
+        },
+      ],
+      edges: [
+        ['users', 'edge'],
+        ['edge', 'shield', 'miss'],
+        ['shield', 'lb', 'miss'],
+        ['lb', 'pods'],
+        ['lb', 'pod7'],
+      ],
+      options: [
+        {
+          id: 'honor',
+          label: 'Cache what origin marks',
+          sub: '+ 404 odd suffixes',
+          is: 'caching only responses the origin marks cacheable, with the origin rejecting unknown path suffixes',
+        },
+        {
+          id: 'negttl',
+          label: 'Errors cached for seconds',
+          sub: '+ stale-if-error',
+          is: 'second-long TTLs on errors, plus serving the last good copy while the origin is failing',
+        },
+        {
+          id: 'outlier',
+          label: 'P2C + outlier detection',
+          sub: 'eject after N 5xx',
+          is: 'picking the less loaded of two random backends and ejecting a host after consecutive 5xx responses',
+        },
+        {
+          id: 'purge',
+          label: 'Purge the CDN every hour',
+          sub: 'invalidate everything',
+          decoy: true,
+          is: 'cleaning up after a leak instead of preventing it, while emptying the cache for every user',
+        },
+        {
+          id: 'rr',
+          label: 'Plain round robin',
+          sub: 'no health signal',
+          decoy: true,
+          is: 'an algorithm that assumes identical servers and still sends the broken pod its full share',
+        },
+      ],
+      metrics: [
+        { label: 'Private pages cached', bad: 120, good: 0, unit: '/h', fixedBy: ['edge'] },
+        { label: 'Outage per 10 s blip', bad: 600, good: 10, unit: ' s', fixedBy: ['shield'] },
+        { label: 'Traffic to pod-7', bad: 60, good: 0, unit: '%', fixedBy: ['lb'] },
+      ],
+      why: [
+        'Correctness at the edge is decided by the cache key and Cache-Control: cache only what the origin marks cacheable.',
+        'Give errors seconds-long TTLs and use stale-if-error, so a blip at the origin stays a blip.',
+        'Load-aware balancing needs outlier detection, because a fast-failing backend looks like the least loaded one.',
+      ],
+    },
+    {
+      mode: 'match',
+      id: 'traffic-symptom-fixes',
+      tab: 'Symptoms → fixes',
+      title: 'Traffic on-call: match each page to its fix',
+      brief:
+        'One week of pages from a SaaS platform’s traffic layer: deploys, caches, rate limits and a noisy tenant. Patch each symptom to the change that actually fixes it.',
+      leftTitle: 'Symptom',
+      rightTitle: 'Fix',
+      instruction: 'Patch each symptom to the fix',
+      left: [
+        {
+          id: 'shutdown',
+          label: 'Every rolling deploy drops a few requests at pod shutdown',
+          answer: 'prestop',
+          because: 'SIGTERM and removal from Endpoints propagate asynchronously, so load balancers keep sending traffic for a few seconds. A preStop sleep (or failing readiness first) covers that gap before the pod stops accepting work.',
+        },
+        {
+          id: 'websocket',
+          label: 'WebSocket pods drain for 300 s, then drop everyone at once',
+          answer: 'reconnect',
+          because: 'A WebSocket never finishes, so a long drain only delays the cut. Asking clients to reconnect with jittered backoff spreads the reconnections over the window.',
+        },
+        {
+          id: 'celebrity',
+          label: 'One celebrity key overloads one cache node despite the ring',
+          answer: 'hotkey',
+          because: 'Consistent hashing balances key counts, not traffic: one hot key still lands on one node. Replicate or split the hot key, or put a local cache in front.',
+        },
+        {
+          id: 'graphql',
+          label: 'A GraphQL query costing a million loads counts as one call',
+          answer: 'cost',
+          because: 'A request-count limit cannot see query cost. Estimate the cost statically (depth × breadth), reject over-budget queries and charge the actual cost afterwards.',
+        },
+        {
+          id: 'import',
+          label: 'A tenant’s 2M-job import blocks everyone else’s jobs',
+          answer: 'drr',
+          because: 'One FIFO lets a bulk import sit in front of every other tenant. Per-tenant sub-queues served round-robin or with deficit round robin keep everyone’s jobs moving.',
+        },
+        {
+          id: 'remap',
+          label: 'Adding one cache node remaps nearly every key',
+          answer: 'ring',
+          because: 'hash % N changes almost every key’s node when N changes. A consistent-hash ring with virtual nodes moves only about 1/N of the keys.',
+        },
+      ],
+      right: [
+        { id: 'prestop', label: 'preStop sleep 5–15 s', sub: 'then drain in-flight', is: 'a short pause before shutdown that lets endpoint removal reach every load balancer' },
+        { id: 'reconnect', label: 'Ask clients to reconnect', sub: 'jittered backoff', is: 'telling long-lived connections to move (GOAWAY or a reconnect message) and spreading the reconnects with jitter' },
+        { id: 'hotkey', label: 'Replicate the hot key', sub: 'or split / local cache', is: 'spreading one key’s traffic over several copies, or absorbing it in a local cache' },
+        { id: 'cost', label: 'Cost-based query budget', sub: 'points per window', is: 'a limit that charges each request its estimated and actual cost instead of counting it as one' },
+        { id: 'drr', label: 'Per-tenant fair queues', sub: 'round robin / DRR', is: 'fair scheduling: a sub-queue per tenant, served in turn, so one tenant cannot monopolise the workers' },
+        { id: 'ring', label: 'Ring with virtual nodes', sub: 'consistent hashing', is: 'a key-to-node mapping where adding or removing one of N nodes moves only ~1/N of the keys' },
+        {
+          id: 'autoscale',
+          label: 'Autoscale the shared tier',
+          sub: 'more pods for everyone',
+          decoy: true,
+          is: 'paying to amplify the problem: it adds capacity for the noisy tenant too and does nothing for a saturated shared database',
+        },
+        {
+          id: 'longdrain',
+          label: 'Raise drain to 600 s',
+          sub: 'deregistration delay',
+          decoy: true,
+          is: 'a longer wait that makes every deploy slower: drain should be about p99.9 request time plus propagation delay',
+        },
+      ],
+      why: [
+        'Draining needs a preStop gap for endpoint propagation; long-lived connections need client reconnects, not longer drains.',
+        'Consistent hashing moves ~1/N keys on membership changes but does not fix hot keys.',
+        'Limit what a request costs (rate, concurrency or cost points), not just how many requests arrive.',
+        'Noisy neighbours need per-tenant limits and fair queues; autoscaling alone amplifies them.',
+      ],
+    },
+    {
+      mode: 'route',
+      id: 'edge-request-routing',
+      tab: 'Route the requests',
+      title: 'CDN in front of a SaaS app: where does each request go?',
+      brief:
+        'A SaaS app sits behind a CDN with an origin shield, and uploads can go straight to object storage. A deploy just purged the CDN. Steer each request so nothing private is cached, the origin is not stampeded and large uploads do not choke the gateway.',
+      cols: 5.3,
+      rows: 3.4,
+      nodes: [
+        { id: 'users', label: 'Browser', sub: 'logged-in user', kind: 'terminal', col: 0, row: 1.35 },
+        { id: 'cdn', label: 'CDN edge PoP', sub: '200 PoPs · cache key', col: 1.5, row: 1.35 },
+        { id: 's3', label: 'Object storage', sub: 'pre-signed PUT URL', col: 1.5, row: 2.6 },
+        { id: 'cache', label: 'Edge copy (hit)', sub: 'served from the PoP', col: 3, row: 0.15 },
+        { id: 'shield', label: 'Origin shield', sub: 'collapses misses', col: 3, row: 1.35 },
+        { id: 'origin', label: 'Gateway → app', sub: 'buffers bodies', col: 4.4, row: 2.6 },
+      ],
+      edges: [
+        ['users', 'cdn'],
+        ['users', 's3', 'direct'],
+        ['cdn', 'cache', 'hit'],
+        ['cdn', 'shield', 'miss'],
+        ['cdn', 'origin', 'bypass'],
+        ['shield', 'origin'],
+      ],
+      packets: [
+        {
+          id: 'asset',
+          label: 'GET /assets/app.3f9a.js',
+          sub: 'immutable · fetched once after the purge',
+          from: 'users',
+          paths: [['users', 'cdn', 'cache']],
+          wrong: {
+            'users>s3':
+              'Object storage behind a pre-signed URL is for this user’s uploads. Static assets are served from the CDN edge close to the user.',
+            'cdn>shield':
+              'This asset is already back in the PoP since the first request after the purge, and it is immutable: a fresh edge copy needs no trip to the shield.',
+            'cdn>origin':
+              'Bypassing the cache for a public, versioned file sends every request across the world to the origin for no reason.',
+          },
+          done: 'A versioned, immutable asset is the ideal edge hit: served from the PoP with no origin traffic at all.',
+        },
+        {
+          id: 'product',
+          label: 'GET /p/42 (public product page)',
+          sub: 'just purged in all 200 PoPs',
+          from: 'users',
+          paths: [['users', 'cdn', 'shield', 'origin']],
+          wrong: {
+            'users>s3':
+              'A product page is rendered by the app, not stored as a user upload.',
+            'cdn>cache':
+              'The deploy purged it: there is no edge copy to serve, so this is a miss.',
+            'cdn>origin':
+              'If every PoP misses straight to the origin, 200 PoPs fetch the same page at once. That stampede is what the shield tier is for.',
+          },
+          done: 'The miss goes through the origin shield, which collapses concurrent misses from all PoPs into one origin fetch and caches the result for the rest.',
+        },
+        {
+          id: 'private',
+          label: 'GET /account/settings/x.css',
+          sub: 'has Authorization + Set-Cookie',
+          from: 'users',
+          paths: [['users', 'cdn', 'origin']],
+          wrong: {
+            'users>s3':
+              'Account settings are a private page rendered by the app; object storage has nothing for this URL.',
+            'cdn>cache':
+              'This is web cache deception: the path looks static, but the origin returns the private settings page. Caching it hands this user’s page to whoever fetches the URL next.',
+            'cdn>shield':
+              'The shield is a shared cache too. A response to a request with Authorization, carrying Set-Cookie, must not be stored in any shared cache.',
+          },
+          done: 'Cache only what the origin marks cacheable: this response is private, so it passes through uncached, and the origin should 404 unknown path suffixes like x.css.',
+        },
+        {
+          id: 'upload',
+          label: 'Upload a 2 GB screen recording',
+          sub: 'app already issued a pre-signed URL',
+          from: 'users',
+          paths: [['users', 's3']],
+          wrong: {
+            'users>cdn':
+              'Through the CDN and gateway the 2 GB body would be buffered by the gateway, which breaks large uploads. Send it straight to object storage with the pre-signed URL.',
+          },
+          done: 'The browser PUTs the file directly to object storage with the pre-signed URL; the gateway and app only handle the small metadata calls.',
+        },
+      ],
+      why: [
+        'Correctness at the edge is the cache key plus Cache-Control: cache only what the origin marks cacheable.',
+        'A shared cache must not reuse responses to requests with Authorization, and Set-Cookie responses must never be cached for others.',
+        'An origin shield with request collapsing stops hundreds of PoPs missing to the origin at the same moment.',
+        'Gateways buffer bodies: large uploads go straight to object storage with pre-signed URLs.',
+      ],
+    },
+    {
+      mode: 'spike',
+      id: 'noisy-tenant-spike',
+      tab: 'Survive the spike',
+      title: 'One tenant’s launch day hurts every other tenant',
+      brief:
+        'In a pooled cell, tenant 42 launches: its API calls lift the cell from 8K to 14K RPS, and at second 20 it starts a 2M-job import into the shared worker queue (scenario numbers). You can make two changes. Keep p99 ≤ 150 ms and errors ≤ 1% for the other tenants.',
+      cols: 4,
+      rows: 2.1,
+      nodes: [
+        { id: 'tenants', label: 'All tenants', sub: 'tenant 42 ramps up', kind: 'terminal', col: 0, row: 0.5 },
+        { id: 'gw', label: 'API gateway', sub: 'JWT → tenant_id', col: 1.3, row: 0.5, share: 1, ms: 2 },
+        { id: 'api', label: 'Pooled API cell', sub: 'shared by ~300 tenants', col: 2.9, row: 0, share: 1, capacity: 12000, unit: 'rps', ms: 20, timeoutMs: 2000 },
+        { id: 'jobs', label: 'Shared job workers', sub: 'one FIFO queue', col: 2.9, row: 1.15, share: 0.1, capacity: 1500, unit: 'jobs/s' },
+      ],
+      edges: [
+        ['tenants', 'gw'],
+        ['gw', 'api'],
+        ['api', 'jobs', 'enqueue'],
+      ],
+      duration: 60,
+      step: 2,
+      traffic: [
+        [0, 8000],
+        [4, 8000],
+        [12, 14000],
+        [60, 14000],
+      ],
+      bursts: [{ node: 'jobs', from: 20, to: 50, add: 3000, label: '2M-job import' }],
+      maxCards: 2,
+      cards: [
+        {
+          id: 'quota',
+          label: 'Per-tenant quota at edge',
+          sub: '429 + Retry-After',
+          node: 'gw',
+          effects: [{ shed: 0.35 }],
+          is: 'a per-tenant rate limit: tenant 42’s calls beyond its plan are rejected at the gateway, so the pooled cell keeps serving everyone else',
+        },
+        {
+          id: 'drr',
+          label: 'Per-tenant fair queues',
+          sub: 'deficit round robin',
+          node: 'jobs',
+          effects: [{ node: 'jobs', load: 0.35 }],
+          is: 'fair scheduling: each tenant gets its own sub-queue and its fair share of worker slots per round, so the import waits its turn instead of blocking every other tenant',
+        },
+        {
+          id: 'autoscale',
+          label: 'Autoscale the cell +20%',
+          sub: 'HPA on CPU',
+          node: 'api',
+          decoy: true,
+          effects: [{ node: 'api', capacity: 1.2 }],
+          is: 'paying to amplify the problem: the new pods serve tenant 42 too, the cell still runs near saturation, and the shared job queue gets nothing',
+        },
+        {
+          id: 'bigqueue',
+          label: 'Bigger FIFO queue',
+          sub: 'max length 10M',
+          node: 'jobs',
+          decoy: true,
+          effects: [],
+          is: 'more room to wait in the same line: other tenants’ jobs still sit behind 2M import jobs',
+        },
+      ],
+      goals: [
+        { metric: 'p99', max: 150, label: 'p99 ≤ 150 ms', fail: 'The pooled cell is near saturation, so every tenant’s requests queue behind tenant 42’s.' },
+        { metric: 'errors', max: 1, label: 'Errors ≤ 1%', fail: 'A shared resource is past capacity, and requests and jobs beyond it fail for every tenant.' },
+      ],
+      why: [
+        'Noisy neighbours are contained per shared resource: quotas at the edge, fair queues for workers, bulkheads and timeouts below.',
+        'Per-tenant rate limits are contractual and per caller; they keep one tenant inside its plan.',
+        'Fair scheduling (per-tenant sub-queues, deficit round robin) stops one bulk import from blocking everyone’s jobs.',
+        'Autoscaling adds capacity for the noisy tenant too and does nothing for a saturated shared resource.',
+      ],
+    },
+  ],
+};
+
+export default set;

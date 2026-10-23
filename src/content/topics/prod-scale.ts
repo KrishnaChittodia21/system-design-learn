@@ -9,7 +9,6 @@ const topic: Topic = {
     'Traffic 10× and 100×, hot servers and hot shards, read/write saturation, replication lag, sharding and zero-downtime migrations, global latency, static content, big uploads and millions of jobs',
   estimatedMinutes: 110,
   sources: [
-    'Alex Xu — System Design Interview Vol 1, Ch 1 Scale from Zero to Millions & Ch 5 Consistent Hashing',
     'Designing Data-Intensive Applications — Ch 5 Replication & Ch 6 Partitioning',
     'Production war stories and SRE practice (Google SRE Book — Handling Overload)',
   ],
@@ -427,7 +426,6 @@ export async function getOrders(tenantId: string, limit = 50) {
         'Shard only the few tables that need it, by the dominant query key.',
         'Many logical shards → few physical nodes makes resharding a bucket move.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 5 Consistent Hashing',
     },
     {
       heading: '8. Incident: one shard is overloaded (bad shard key / hot tenant)',

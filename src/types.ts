@@ -35,7 +35,7 @@ export interface Section {
   /** optional ASCII diagram rendered in monospace */
   diagram?: string;
   keyPoints?: string[];
-  /** e.g. "Alex Xu Vol 2 — Ch 4 Distributed Message Queue" */
+  /** e.g. "Kafka docs — Replication (ISR, acks)" */
   source?: string;
 }
 

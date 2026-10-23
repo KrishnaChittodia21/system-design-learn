@@ -11,7 +11,6 @@ const topic: Topic = {
   sources: [
     'PostgreSQL docs — Monitoring Database Activity, pg_stat_statements, Hot Standby',
     'MySQL 8.0 Reference Manual — Performance Schema, sys schema, Replication',
-    'Alex Xu — System Design Interview Vol 2 (Ch 5 Metrics Monitoring)',
     'Brendan Gregg — USE Method',
   ],
   tags: ['incident-response', 'postgres', 'mysql', 'pg_stat_statements', 'connections', 'replication-lag', 'performance', 'on-call'],
