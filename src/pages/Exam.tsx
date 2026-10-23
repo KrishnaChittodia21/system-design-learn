@@ -231,7 +231,7 @@ export function Exam({ title, questions, recordTopicId, backHref }: ExamProps) {
         <Link to={backHref} className="ex-back">
           <ArrowLeft size={15} aria-hidden /> Back
         </Link>
-        <header className="ex-setup-head rise">
+        <header className="ex-setup-head">
           <div className="eyebrow ex-eyebrow">{kind} · setup</div>
           <h1>{title}</h1>
           <p className="lead">
@@ -242,7 +242,7 @@ export function Exam({ title, questions, recordTopicId, backHref }: ExamProps) {
         </header>
 
         <div className="ex-setup-grid">
-          <section className="card ex-setup-form rise d1" aria-label="Exam options">
+          <section className="card ex-setup-form" aria-label="Exam options">
             <div className="ex-field">
               <div className="ex-field-head">
                 <label htmlFor="ex-minutes" className="eyebrow">
@@ -319,7 +319,7 @@ export function Exam({ title, questions, recordTopicId, backHref }: ExamProps) {
             </label>
           </section>
 
-          <aside className="gborder ex-setup-side rise d2">
+          <aside className="gborder ex-setup-side">
             <div className="in">
               <div className="eyebrow">This attempt</div>
               <dl className="ex-stats">
@@ -393,7 +393,7 @@ export function Exam({ title, questions, recordTopicId, backHref }: ExamProps) {
     };
     return (
       <div className="page ex-page ex-run">
-        <header className="ex-hud glass rise">
+        <header className="ex-hud glass">
           <div className="ex-hud-title">
             <div className="eyebrow ex-eyebrow">
               {kind} · {shuffleOn ? 'shuffled' : 'in order'}
@@ -435,7 +435,7 @@ export function Exam({ title, questions, recordTopicId, backHref }: ExamProps) {
         </header>
 
         <div className="ex-grid">
-          <section className="ex-qcard glass rise d1" aria-labelledby="ex-qtext">
+          <section className="ex-qcard glass" aria-labelledby="ex-qtext">
             <div className="ex-qcard-glow" aria-hidden />
             <div className="ex-qcard-body">
               <div className="ex-qmeta">
@@ -557,7 +557,7 @@ export function Exam({ title, questions, recordTopicId, backHref }: ExamProps) {
             </div>
           </section>
 
-          <aside className="ex-nav glass-flat rise d2" aria-label="Question navigator">
+          <aside className="ex-nav glass-flat" aria-label="Question navigator">
             <div className="ex-nav-head">
               <div className="eyebrow">Navigator</div>
               <span className="mono ex-hint">

@@ -19,7 +19,7 @@ import { CompanyTrackCard, StreakCard, WeakSpotCard } from '../components/TodayC
 import { DashboardMetrics } from '../components/DashboardMetrics';
 import { AchievementsSummary } from '../components/achievements/AchievementsSummary';
 import { CountUp } from '../components/CountUp';
-import { gsap, MOTION_OK, revealOnScroll, useGSAP } from '../lib/gsap';
+import { gsap, heroIn, MOTION_OK, revealOnScroll, useGSAP } from '../lib/gsap';
 
 const TAB_LABELS: Record<string, string> = {
   learn: 'Learn',
@@ -72,8 +72,9 @@ function whatFollows(steps: TopicStep[], current: StepId | undefined) {
 export default function Home() {
   const p = useProgress();
   const root = useRef<HTMLDivElement>(null);
-  // GSAP: scroll reveals for the sections below the hero (the hero uses the CSS .rise sequence) and a magnetic
-  // primary button for fine pointers. Nothing runs with reduced motion; everything is reverted on unmount.
+  // GSAP: the hero copy enters as one group on mount, the ring as media; the tiles and every section below reveal
+  // as they scroll into view; a magnetic primary button for fine pointers. Nothing runs with reduced motion;
+  // everything is reverted on unmount.
   useGSAP(
     () => {
       const el = root.current;
@@ -81,7 +82,9 @@ export default function Home() {
       const q = gsap.utils.selector(el);
       const mm = gsap.matchMedia();
       mm.add(MOTION_OK, () => {
-        revealOnScroll(q('.td-reveal'));
+        heroIn(q('.td-mission-in, .td-mini'));
+        heroIn(q('.td-ringcol'), { media: true });
+        revealOnScroll(q('.td-tiles, .td-reveal'));
       });
       mm.add(`${MOTION_OK} and (pointer: fine)`, () => {
         const btn = q('.td-cta')[0] as HTMLElement | undefined;
@@ -263,14 +266,14 @@ export default function Home() {
       <section className="td-hero" aria-labelledby="today-title">
         <div className="td-mission">
           <div className="td-mission-in">
-            <p className="nb-chip amber td-eyebrow rise d1">
+            <p className="nb-chip amber td-eyebrow">
               <span className="dot pulse-a td-key-amber" aria-hidden />
               {eyebrow}
             </p>
-            <h1 id="today-title" className="td-title rise d2">
+            <h1 id="today-title" className="td-title">
               <span className="gtext">{heading}</span>
             </h1>
-            <p className="lede td-lede rise d3">{lede}</p>
+            <p className="lede td-lede">{lede}</p>
             {topic && <p className="td-mobile-only td-lede-s">{step.kind === 'read' || fresh ? (fresh ? `§1 ${topic.sections[0]?.heading ?? ''}` : step.title.replace(/^Read /, '')) : step.title}</p>}
             {learn && (step.kind === 'read' || fresh) && (
               <div className="td-mobile-only td-mission-meter">
@@ -282,7 +285,7 @@ export default function Home() {
                 </div>
               </div>
             )}
-            <div className="td-actions rise d4">
+            <div className="td-actions">
               <Link className="btn btn-primary btn-lg td-cta" to={step.href}>
                 {ctaLabel[step.kind]} <ArrowRight size={18} aria-hidden />
               </Link>
@@ -297,14 +300,14 @@ export default function Home() {
               )}
             </div>
             {resume && (
-              <Link to={resume.href} className="td-resume rise d5">
+              <Link to={resume.href} className="td-resume">
                 <span className="eyebrow">Where you left off</span>
                 <span className="td-resume-target">{resume.label}</span>
                 <ArrowRight size={14} aria-hidden />
               </Link>
             )}
             {topic && steps.length > 0 && (
-              <nav className="td-steps rise d5" aria-label={`Study path for ${topic.title}`}>
+              <nav className="td-steps" aria-label={`Study path for ${topic.title}`}>
                 {steps.map((s, i) => {
                   const now = s.id === currentStep;
                   return (
@@ -326,13 +329,13 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="td-ringcol td-desktop-only rise d2">
+        <div className="td-ringcol td-desktop-only">
           <HeroDiagram f={ringFigures} />
         </div>
       </section>
 
       {/* phone: the compact ring with the key figures (Mobile mockup) */}
-      <section className="glass td-mini td-mobile-only rise d2" aria-label="Overall progress">
+      <section className="glass td-mini td-mobile-only" aria-label="Overall progress">
         <HeroDiagram f={ringFigures} compact />
         <dl className="td-kv">
           <div>
@@ -354,8 +357,8 @@ export default function Home() {
       </section>
 
       <section className="td-tiles" aria-label="Practice figures">
-        {tiles.map((t, i) => (
-          <div key={t.id} className={`glass td-tile td-tile-${t.id} rise d${i + 1}`}>
+        {tiles.map((t) => (
+          <div key={t.id} className={`glass td-tile td-tile-${t.id}`}>
             <div className="eyebrow">
               {'short' in t ? (
                 <>
