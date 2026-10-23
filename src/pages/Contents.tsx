@@ -475,7 +475,7 @@ function Blueprint({ infos, onJump }: { infos: PhaseInfo[]; onJump: (id: string)
       </g>
       {/* edges: solid cyan with packets out of a passed phase, blue between started phases, dashed ahead */}
       <g aria-hidden>
-        {edges.map(([a, b]) => {
+        {edges.map(([a, b], idx) => {
           const from = lay.get(a)!;
           const to = lay.get(b)!;
           const x1 = COL_X(from.col) + NODE_W;
@@ -501,7 +501,17 @@ function Blueprint({ infos, onJump }: { infos: PhaseInfo[]; onJump: (id: string)
             );
           }
           if (sa !== 'ahead' && sb !== 'ahead') return <path key={`${a}-${b}`} d={d} className="st-blue flow" fill="none" strokeWidth="1.6" opacity=".8" />;
-          return <path key={`${a}-${b}`} d={d} className="st-line" fill="none" strokeWidth="1.4" strokeDasharray="3 6" />;
+          // dotted path ahead: a dot walks it to show the way to go (amber out of the phase being studied)
+          return (
+            <g key={`${a}-${b}`}>
+              <path d={d} className="st-line" fill="none" strokeWidth="1.4" strokeDasharray="3 6" />
+              <circle
+                r="3.5"
+                className={`pkt ${sa === 'studying' ? 'sv-amber' : 'sv-ink3'} ct-dot`}
+                style={{ offsetPath: `path('${d}')`, ['--dur' as string]: '3.6s', ['--dl' as string]: `${(idx * 0.45) % 3.6}s` }}
+              />
+            </g>
+          );
         })}
       </g>
       {/* phase nodes: links that unfold and jump to the phase row */}

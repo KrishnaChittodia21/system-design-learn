@@ -144,7 +144,7 @@ export function SystemMap({ phases, currentPhaseId }: { phases: PhaseProgress[];
     .filter(Boolean)
     .join('. ');
 
-  const edges = EDGES.filter(([a, b]) => a <= phases.length && b <= phases.length).map(([a, b]) => {
+  const edges = EDGES.filter(([a, b]) => a <= phases.length && b <= phases.length).map(([a, b], idx) => {
     const [x1, y1] = pos(a - 1);
     const [x2, y2] = pos(b - 1);
     const sx = x1 + NW / 2;
@@ -171,8 +171,19 @@ export function SystemMap({ phases, currentPhaseId }: { phases: PhaseProgress[];
       );
     }
     if (sa !== 'todo' && sb !== 'todo' && sa !== 'done') return <path key={key} d={d} className="st-blue flow" fill="none" strokeWidth={1.6} opacity={0.8} />;
-    if (sa === 'done') return <path key={key} d={d} className="st-cyan" fill="none" strokeWidth={1.4} opacity={0.4} strokeDasharray="3 6" />;
-    return <path key={key} d={d} className="st-line" fill="none" strokeWidth={1.4} strokeDasharray="3 6" />;
+    // dotted path ahead: a dot walks it to show the way to go (amber out of the phase being studied)
+    const ahead = sa === 'done';
+    const tone = ahead ? 'sv-cyan' : sa === 'now' ? 'sv-amber' : 'sv-ink3';
+    return (
+      <g key={key}>
+        <path d={d} className={ahead ? 'st-cyan' : 'st-line'} fill="none" strokeWidth={1.4} opacity={ahead ? 0.4 : 1} strokeDasharray="3 6" />
+        <circle
+          r={3.5}
+          className={`pkt td-ptr ${tone}`}
+          style={{ offsetPath: `path('${d}')`, '--dur': '3.6s', '--dl': `${(idx * 0.45) % 3.6}s` } as CSSProperties}
+        />
+      </g>
+    );
   });
 
   return (

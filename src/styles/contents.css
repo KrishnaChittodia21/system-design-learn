@@ -147,6 +147,10 @@
 .ct-pkt {
   filter: drop-shadow(0 0 6px var(--cyan-g));
 }
+/* dot walking a dotted path ahead */
+.ct-dot.sv-amber {
+  filter: drop-shadow(0 0 5px var(--amber-g));
+}
 .ct-tblock {
   display: grid;
   grid-template-columns: repeat(4, auto) 1fr;
