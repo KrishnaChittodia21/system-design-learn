@@ -432,6 +432,13 @@
 .td-pkt.sv-amber {
   filter: drop-shadow(0 0 6px var(--amber-g));
 }
+/* dot walking a dotted path ahead */
+.td-ptr.sv-cyan {
+  filter: drop-shadow(0 0 5px var(--cyan-g));
+}
+.td-ptr.sv-amber {
+  filter: drop-shadow(0 0 5px var(--amber-g));
+}
 .td-map-legend {
   margin-top: 6px;
 }
