@@ -1,0 +1,59 @@
+/* scaling-journey widget: trigger / change / new-risk panel under the architecture. Tokens only. */
+.sj-panel {
+  margin: 8px 0 0;
+  display: grid;
+  gap: 6px;
+}
+.sj-row {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.sj-row dt {
+  font: 600 10.5px/1.5 var(--f-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.sj-row dd {
+  margin: 0;
+  min-width: 0;
+}
+.sj-row strong {
+  color: var(--ink);
+}
+.sj-row.is-bad {
+  border-color: var(--rose-b);
+}
+.sj-row.is-bad dt {
+  color: var(--rose);
+}
+.sj-row.is-fix {
+  border-color: var(--cyan-b);
+  background: var(--cyan-s);
+}
+.sj-row.is-fix dt {
+  color: var(--cyan);
+}
+.sj-row.is-warn dt {
+  color: var(--amber);
+}
+.sj-row.is-pending {
+  border-style: dashed;
+  background: transparent;
+  color: var(--ink-4);
+}
+@media (max-width: 600px) {
+  .sj-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}

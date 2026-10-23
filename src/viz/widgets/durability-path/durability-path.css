@@ -1,0 +1,192 @@
+/* durability-path widget: where one record lives on its way to NAND. Tokens only. */
+.dp-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dp-event {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.dp-call {
+  padding: 3px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--cyan-b);
+  background: var(--cyan-s);
+  color: var(--cyan);
+  font: 600 13px/1.4 var(--f-mono);
+}
+.dp-cost {
+  font: 500 12px/1.4 var(--f-mono);
+  color: var(--ink-3);
+}
+.dp-ack {
+  margin-left: auto;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px dashed var(--line-2);
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.dp-ack.is-acked {
+  border-style: solid;
+  border-color: var(--green-b);
+  background: var(--green-s);
+  color: var(--ink);
+  font-weight: 700;
+}
+.dp-pipe {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 22px;
+}
+.dp-stop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  transition:
+    border-color 0.3s ease,
+    background-color 0.3s ease;
+}
+.dp-stop + .dp-stop::before {
+  content: '→';
+  position: absolute;
+  left: -18px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink-4);
+  font-weight: 700;
+}
+.dp-stop.is-to {
+  border-color: var(--cyan-b);
+  box-shadow: 0 0 0 2px var(--cyan-s);
+}
+.dp-stop.is-from {
+  border-style: dashed;
+  border-color: var(--cyan-b);
+}
+.dp-stop.is-wiped {
+  border-color: var(--rose-b);
+  background: var(--rose-s);
+}
+.dp-name {
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.dp-vol {
+  font: 400 11px/1.4 var(--f-mono);
+  color: var(--ink-3);
+}
+.dp-slot {
+  margin-top: 4px;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+}
+.dp-rec {
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: 700 12px/1.3 var(--f-mono);
+}
+.dp-rec.is-dirty {
+  background: var(--warn);
+  color: var(--on-accent);
+}
+.dp-rec.is-lost {
+  background: transparent;
+  color: var(--rose);
+  border: 1px solid var(--rose-b);
+  text-decoration: line-through;
+}
+.dp-empty {
+  color: var(--ink-4);
+}
+.dp-verdict {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 6px 0;
+  table-layout: fixed;
+  font-size: 13px;
+}
+.dp-verdict caption {
+  text-align: left;
+  padding: 0 6px 6px;
+  font: 500 10.5px/1.4 var(--f-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.dp-verdict th {
+  padding: 4px 8px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--ink-2);
+}
+.dp-verdict td {
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.dp-verdict td.is-ok {
+  background: var(--green-s);
+  border-color: var(--green-b);
+  color: var(--ink);
+}
+.dp-verdict td.is-lost {
+  background: var(--amber-s);
+  border-color: var(--amber-b);
+  color: var(--ink);
+}
+.dp-verdict td.is-bad {
+  background: var(--rose-s);
+  border-color: var(--rose-b);
+  color: var(--rose);
+}
+.dp-verdict td.is-picked {
+  outline: 2px solid var(--ink-3);
+  outline-offset: 1px;
+}
+.dp-verdict th.is-picked {
+  color: var(--ink);
+  text-decoration: underline 2px;
+  text-underline-offset: 4px;
+}
+@media (max-width: 720px) {
+  .dp-pipe {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .dp-stop + .dp-stop::before {
+    content: none;
+  }
+  .dp-ack {
+    margin-left: 0;
+  }
+  .dp-verdict {
+    font-size: 12px;
+    border-spacing: 4px 0;
+  }
+}
+/* keep syscall names exactly as written (the shared .chip capitalises) */
+.dp-ctl {
+  display: contents;
+}
+.dp-ctl .chip {
+  text-transform: none;
+}

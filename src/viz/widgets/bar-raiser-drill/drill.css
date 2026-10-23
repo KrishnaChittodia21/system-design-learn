@@ -1,0 +1,222 @@
+/* bar-raiser-drill. Scoped under .brd; tokens only. */
+.brd {
+  display: grid;
+  gap: 12px;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.brd h4 {
+  margin: 0 0 6px;
+  font: 600 11px/1.4 var(--f-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.brd-ladder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.brd-rung {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: var(--tint);
+  color: var(--ink-2);
+  font: 600 12px/1 var(--f-body);
+  cursor: pointer;
+}
+.brd-rung.k-strong {
+  color: var(--good);
+}
+.brd-rung.k-rehearsed {
+  color: var(--warn);
+}
+.brd-rung.k-flag {
+  color: var(--bad);
+}
+.brd-rung.on {
+  border-color: var(--cyan-b);
+  background: var(--cyan-s);
+}
+.brd-rung:focus-visible,
+.brd-ans:focus-visible,
+.brd-reset:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+.brd-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 14px;
+}
+@media (max-width: 760px) {
+  .brd-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.brd-q,
+.brd-side {
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+}
+.brd-asks {
+  margin-left: 6px;
+  color: var(--amber);
+}
+.brd-question {
+  margin: 0 0 10px;
+  font: 600 15px/1.45 var(--f-body);
+  color: var(--ink);
+}
+.brd-answers {
+  display: grid;
+  gap: 8px;
+}
+.brd-ans {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+  font: 500 13px/1.5 var(--f-body);
+  text-align: left;
+  cursor: pointer;
+}
+.brd-ans:hover {
+  border-color: var(--cyan-b);
+}
+.brd-ans.on.k-strong {
+  border-color: var(--good);
+  background: var(--good-soft);
+}
+.brd-ans.on.k-rehearsed {
+  border-color: var(--warn);
+  background: var(--warn-soft);
+}
+.brd-ans.on.k-flag {
+  border-color: var(--bad);
+  background: var(--bad-soft);
+}
+.brd-tag {
+  justify-self: start;
+  font: 700 10.5px/1.6 var(--f-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.brd-standing {
+  position: relative;
+  height: 16px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  background: var(--tint);
+  overflow: hidden;
+}
+.brd-standing i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  transition: width 0.35s ease;
+}
+.brd-standing i.good {
+  background: var(--good);
+}
+.brd-standing i.warn {
+  background: var(--warn);
+}
+.brd-standing i.bad {
+  background: var(--bad);
+}
+.brd-standing span {
+  position: absolute;
+  right: 8px;
+  top: 0;
+  font: 700 11px/16px var(--f-mono);
+  color: var(--ink);
+}
+.brd-ev,
+.brd-votes {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+}
+.brd-ev li,
+.brd-votes li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.brd-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+.brd-dots i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--line-2);
+}
+.brd-dots i.pos {
+  background: var(--good);
+}
+.brd-dots i.neg {
+  background: var(--bad);
+}
+.brd-notes {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  font-size: 12.5px;
+  font-family: var(--f-mono);
+  color: var(--ink-2);
+}
+.brd-notes .empty {
+  list-style: none;
+  margin-left: -18px;
+  color: var(--ink-3);
+}
+.v-Stronglyinclined {
+  color: var(--good);
+}
+.v-Inclined {
+  color: var(--warn);
+}
+.v-Notinclined {
+  color: var(--bad);
+}
+.v-Notenoughdata {
+  color: var(--ink-3);
+}
+.brd-overall {
+  margin: 0 0 10px;
+  font-size: 15px;
+  color: var(--ink);
+}
+.brd-reset {
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line-2);
+  background: var(--tint);
+  color: var(--ink);
+  font: 600 13px var(--f-body);
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: reduce) {
+  .brd-standing i {
+    transition: none;
+  }
+}

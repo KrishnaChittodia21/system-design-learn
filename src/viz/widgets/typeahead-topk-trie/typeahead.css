@@ -1,0 +1,4 @@
+/* typeahead-topk-trie: show typed prefixes exactly as typed (chips are title-cased by default) */
+.tkt-raw-chips .chip {
+  text-transform: none;
+}

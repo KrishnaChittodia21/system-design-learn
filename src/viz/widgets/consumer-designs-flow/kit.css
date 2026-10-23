@@ -1,0 +1,43 @@
+/* Motion for the request-flow kit (consumer-designs-flow). Scoped by the csf- prefix; tokens only. */
+.csf-packet {
+  animation: csf-travel 0.75s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes csf-travel {
+  from {
+    transform: translate(var(--dx), var(--dy));
+    opacity: 0.35;
+  }
+  to {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+}
+.csf-flow {
+  animation: csf-march 0.9s linear infinite;
+}
+@keyframes csf-march {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+.csf-pop {
+  animation: csf-pop 0.35s ease-out both;
+}
+@keyframes csf-pop {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .csf-packet,
+  .csf-flow,
+  .csf-pop {
+    animation: none !important;
+  }
+}
+.viz-svg .csf-muted {
+  fill: var(--ink-2);
+}

@@ -1,0 +1,226 @@
+/* search-inverted-index widget — scoped under .sii, tokens only */
+.sii {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.sii-wide {
+  grid-column: 1 / -1;
+}
+.sii-panel {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 75%, transparent);
+}
+.sii-h {
+  margin: 0 0 8px;
+  font: 600 11px/1.4 var(--f-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.sii-h code {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+.sii-sub {
+  font: 500 11px/1.4 var(--f-mono);
+  color: var(--ink-3);
+  text-transform: none;
+  letter-spacing: 0;
+  caption-side: top;
+  text-align: left;
+  padding-bottom: 4px;
+}
+.sii-empty {
+  margin: 0;
+  color: var(--ink-3);
+}
+.sii-docs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.sii-doc {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 5px 6px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition:
+    background 0.3s ease,
+    border-color 0.3s ease;
+}
+.sii-doc.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.sii-doc.is-cand {
+  border-color: var(--good);
+  background: var(--good-soft);
+}
+.sii-doc.is-pending {
+  opacity: 0.55;
+}
+.sii-id {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--tint-2);
+  font: 700 11px/1 var(--f-mono);
+  color: var(--ink);
+}
+.sii-text {
+  min-width: 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.sii-tok {
+  display: inline-block;
+  margin: 0 4px 3px 0;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  font: 500 12px/1.6 var(--f-mono);
+  color: var(--ink);
+}
+.sii-tok.is-stop {
+  color: var(--ink-3);
+  text-decoration: line-through;
+  border-style: dashed;
+}
+.sii-arrow {
+  color: var(--accent);
+  font-weight: 700;
+}
+.sii-index {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 3px;
+}
+.sii-index li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 2px 6px;
+  border-radius: 8px;
+  transition: background 0.3s ease;
+}
+.sii-index li.is-hot {
+  background: var(--accent-soft);
+}
+.sii-index li.is-hot .sii-term {
+  color: var(--accent);
+  font-weight: 700;
+}
+.sii-term {
+  flex: 0 0 76px;
+  font: 500 12px/1.6 var(--f-mono);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.sii-plist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.sii-post {
+  padding: 0 5px;
+  border-radius: 5px;
+  border: 1px solid var(--line-2);
+  font: 500 11.5px/1.6 var(--f-mono);
+  color: var(--ink-2);
+}
+.sii-post.is-cand {
+  border-color: var(--good);
+  background: var(--good-soft);
+  color: var(--ink);
+}
+.sii-qtoks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.sii-cands {
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--good);
+  background: var(--good-soft);
+  font: 600 12px/1.6 var(--f-mono);
+  color: var(--ink);
+}
+.sii-scores {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.sii-scores th {
+  text-align: left;
+  font: 600 10.5px/1.4 var(--f-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.sii-scores td {
+  padding: 5px 4px;
+  border-bottom: 1px solid var(--line-3);
+  vertical-align: middle;
+}
+.sii-scores tr.is-top td {
+  background: var(--good-soft);
+}
+.sii-num {
+  font-family: var(--f-mono);
+  white-space: nowrap;
+  position: relative;
+}
+.sii-num strong {
+  position: relative;
+  color: var(--ink);
+}
+.sii-bar {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  max-width: 100%;
+  transition: width 0.35s ease;
+}
+.sii-part {
+  display: inline-block;
+  margin: 1px 4px 1px 0;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: var(--tint);
+  font: 500 11.5px/1.6 var(--f-mono);
+  color: var(--ink-2);
+}
+@media (max-width: 640px) {
+  .sii {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sii-term {
+    flex-basis: 64px;
+  }
+}

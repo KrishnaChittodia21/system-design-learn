@@ -1,0 +1,70 @@
+/* machine-coding-clock: rubric table + plan comparison. Tokens only. */
+.mcc-rubric {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.mcc-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) 54px minmax(0, 2fr);
+  gap: 8px;
+  align-items: baseline;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+.mcc-name {
+  font-weight: 700;
+  color: var(--ink);
+}
+.mcc-score {
+  font: 700 12px var(--f-mono);
+}
+.mcc-s2 {
+  color: var(--good);
+}
+.mcc-s1 {
+  color: var(--warn);
+}
+.mcc-s0 {
+  color: var(--bad);
+}
+.mcc-why {
+  overflow-wrap: anywhere;
+}
+.mcc-compare {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.mcc-plan {
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: var(--tint);
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.mcc-plan.on {
+  border-color: var(--cyan-b);
+  background: var(--cyan-s);
+}
+.mcc-plan strong {
+  font: 700 13px var(--f-mono);
+  color: var(--ink);
+}
+@media (max-width: 520px) {
+  .mcc-row {
+    grid-template-columns: minmax(0, 1fr) 48px;
+  }
+  .mcc-why {
+    grid-column: 1 / -1;
+  }
+}
