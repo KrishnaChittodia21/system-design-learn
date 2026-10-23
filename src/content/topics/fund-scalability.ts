@@ -9,8 +9,6 @@ const topic: Topic = {
     'The vocabulary of scale: how systems grow, how they fail, how to do availability math, and why p99 (not the average) decides your architecture.',
   estimatedMinutes: 75,
   sources: [
-    'Alex Xu — System Design Interview Vol 1, Ch 1 Scale from Zero to Millions of Users',
-    'Alex Xu — System Design Interview Vol 2 (NFR framing used across all chapters)',
     'Dean & Barroso — The Tail at Scale (CACM 2013)',
     'Neil Gunther — Universal Scalability Law',
     'Google SRE Book — Ch 3 Embracing Risk, Ch 4 Service Level Objectives',
@@ -84,7 +82,6 @@ const topic: Topic = {
         'Scale the stateless tier out first; state is what makes scaling hard.',
         'Name the axis: clone (X), functional split (Y), data partition (Z).',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 1',
     },
     {
       heading: 'Stateless vs stateful services and session externalization',

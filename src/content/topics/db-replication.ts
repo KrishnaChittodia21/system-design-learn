@@ -9,8 +9,6 @@ const topic: Topic = {
     'Single-leader, multi-leader and leaderless replication; sync vs async vs semi-sync; WAL streaming vs logical replication; read replicas and routing; read-your-writes and monotonic reads; failover, split brain; lag causes and fixes; why replicas do not scale writes.',
   estimatedMinutes: 105,
   sources: [
-    'Alex Xu — System Design Interview Vol 2, Ch 7 Hotel Reservation (database replication & failover)',
-    'Alex Xu — System Design Interview Vol 2, Ch 4 Distributed Message Queue (ISR / replication ack levels)',
     'Martin Kleppmann — Designing Data-Intensive Applications, Ch 5 Replication',
     'PostgreSQL 16 docs — Ch 27 High Availability, Load Balancing, and Replication; Ch 31 Logical Replication',
   ],
@@ -70,7 +68,6 @@ const topic: Topic = {
         'Replicas scale reads and availability, never writes.',
         'Replication lag is the price: design reads around it.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 7 Hotel Reservation System',
     },
     {
       heading: 'Topologies: single-leader vs multi-leader vs leaderless',

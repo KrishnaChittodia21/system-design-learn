@@ -9,7 +9,6 @@ const topic: Topic = {
     'The warm-up designs every interviewer reaches for — walked end-to-end with the 4-step framework, real numbers, and the deep dives that separate senior from mid-level.',
   estimatedMinutes: 150,
   sources: [
-    'Alex Xu — System Design Interview Vol 1, Ch 6 (Key-Value Store), Ch 7 (Unique ID Generator), Ch 8 (URL Shortener), Ch 10 (Notification System)',
     'DeCandia et al. — Dynamo: Amazon’s Highly Available Key-value Store (SOSP 2007)',
     'RFC 9562 — Universally Unique IDentifiers (UUIDv7)',
     'Twitter Engineering — Announcing Snowflake (2010); Flickr — Ticket Servers (2010)',
@@ -67,7 +66,6 @@ const topic: Topic = {
         'Draw a naive but complete design first; then deepen it.',
         'Volunteer the hard parts; do not wait to be asked about failure modes.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 3 (A Framework for System Design Interviews)',
     },
     {
       heading: 'URL Shortener (1/3): requirements, estimation, API & data model',
@@ -132,7 +130,6 @@ CREATE TABLE click_rollup_daily (
         'Single-key access pattern → KV store or sharded RDBMS keyed by code.',
         'Never write analytics synchronously on the redirect path.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 8 (Design a URL Shortener)',
     },
     {
       heading: 'URL Shortener (2/3): generating the short code — base62 vs hash + collision',
@@ -202,7 +199,6 @@ function modInverse(a: bigint, m: bigint): bigint {
         'Hashing needs a unique constraint + retry; Bloom filters only reduce lookups.',
         'Custom aliases use the same unique constraint — never check-then-insert.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 8',
     },
     {
       heading: 'URL Shortener (3/3): architecture, 301 vs 302, caching, analytics & wrap-up',
@@ -287,7 +283,6 @@ export class RedirectController {
         '301 saves load but blinds analytics; 302 (or short max-age) keeps it.',
         'Negative caching and per-IP limits protect the DB from scanners.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 8',
     },
     {
       heading: 'Pastebin: object storage + metadata, expiry and read scaling',
@@ -356,7 +351,7 @@ export async function createPaste(
         'Write blob before (or confirm blob before exposing) metadata.',
         'Expiry = lazy read check + sweeper + S3 lifecycle; CDN TTL ≤ remaining life.',
       ],
-      source: 'Grokking the System Design Interview — Pastebin; AWS S3 docs (lifecycle, presigned URLs)',
+      source: 'AWS S3 docs (lifecycle, presigned URLs)',
     },
     {
       heading: 'Distributed KV Store (1/4): requirements, CAP choice, partitioning with consistent hashing',
@@ -420,7 +415,7 @@ export class HashRing {
         'Consistent hashing moves ~1/N keys on membership change; vnodes smooth load.',
         'Preference list = first N distinct physical nodes, rack/AZ-aware.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 5 & 6; Dynamo paper §4.2–4.3',
+      source: 'Dynamo paper §4.2–4.3',
     },
     {
       heading: 'Distributed KV Store (2/4): quorum reads/writes and vector-clock conflict resolution',
@@ -486,7 +481,7 @@ export function reconcile<T>(versions: { value: T; clock: VClock }[]) {
         'LWW silently drops concurrent writes; vector clocks surface them as siblings.',
         'Client (or CRDT) merges siblings and writes back a dominating clock.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 6; Dynamo paper §4.4',
+      source: 'Dynamo paper §4.4',
     },
     {
       heading: 'Distributed KV Store (3/4): failure detection with gossip, hinted handoff & Merkle-tree anti-entropy',
@@ -517,7 +512,7 @@ export function reconcile<T>(versions: { value: T; clock: VClock }[]) {
         'Hinted handoff keeps writes available but breaks strict quorum overlap.',
         'Merkle trees make repair cost proportional to divergence; repair within gc_grace to avoid zombie data.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 6; Dynamo paper §4.6–4.8; Cassandra docs',
+      source: 'Dynamo paper §4.6–4.8; Cassandra docs',
     },
     {
       heading: 'Distributed KV Store (4/4): the storage engine — LSM write path, read path & compaction',
@@ -564,7 +559,7 @@ export function reconcile<T>(versions: { value: T; clock: VClock }[]) {
         'Read = memtable → Bloom filters → sparse index → block; merge by timestamp.',
         'Pick compaction by workload: STCS write-heavy, LCS read-heavy, TWCS time-series.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 6; Kleppmann — DDIA Ch 3',
+      source: 'Kleppmann — DDIA Ch 3',
     },
     {
       heading: 'Unique ID Generator: Snowflake, UUIDv7, ticket servers & clock problems',
@@ -645,7 +640,7 @@ export const decode = (id: bigint) => ({
         'Lease worker IDs dynamically in k8s; never reuse one concurrently.',
         'UUIDv7 = sortable, coordination-free, 128-bit; UUIDv4 hurts B-tree locality.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 7; RFC 9562; Twitter Snowflake',
+      source: 'RFC 9562; Twitter Snowflake',
     },
     {
       heading: 'Notification Service (1/2): requirements, estimation & architecture',
@@ -687,7 +682,6 @@ export const decode = (id: bigint) => ({
         'Per-channel + per-priority queues isolate failures and protect OTPs.',
         'Prune invalid tokens and hard bounces from provider feedback.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 10 (Design a Notification System)',
     },
     {
       heading: 'Notification Service (2/2): dedup, retries, rate limits, preferences & templates',
@@ -756,7 +750,6 @@ export async function handleSms(
         'Classify errors: never retry 4xx-invalid; backoff+jitter on 429/5xx; DLQ after N.',
         'Three rate limits: per-user caps, per-provider throughput, quiet hours.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 10',
     },
     {
       heading: 'File Upload Service (brief): presigned multipart, resumable uploads & post-processing',
@@ -849,7 +842,6 @@ export class ParkingLot {
         'Parking lot: entities, Strategy for pricing, atomic spot allocation.',
         'OOD rounds reward extensibility and concurrency awareness, not scale.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 4 (Rate Limiter)',
     },
     {
       heading: 'Bottlenecks, trade-offs & wrap-up across the classics',

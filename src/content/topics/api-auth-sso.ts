@@ -21,7 +21,6 @@ const topic: Topic = {
     'AWS Signature Version 4 documentation (canonical request, string to sign, derived signing key)',
     'OWASP Session Management, CSRF Prevention and Multifactor Authentication Cheat Sheets',
     'RBI — Authentication Mechanisms for Digital Payment Transactions Directions, 2025 (press release 25 Sept 2025)',
-    'ByteByteGo — How does SSO work; Session/Cookie/JWT/Token/SSO/OAuth in one diagram; How 2FA works; JWT vs PASETO; Tokens vs API keys; 5 REST API authentication methods (2025 archive, used as a topic map only)',
   ],
   tags: ['sessions', 'cookies', 'sso', 'saml', 'oidc', 'totp', 'mfa', 'passkeys', 'webauthn', 'paseto', 'api-keys', 'hmac-signing', 'sigv4', 'token-exchange'],
   cheatSheet: [

@@ -9,7 +9,6 @@ const topic: Topic = {
     'Why and where to cache, read/write patterns, eviction policies (with an LRU implementation), Redis data structures, persistence and Cluster, Memcached, and multi-level caches.',
   estimatedMinutes: 85,
   sources: [
-    'Alex Xu — System Design Interview Vol 1 (caching tier) and Vol 2 Ch 10 Gaming Leaderboard (Redis sorted sets)',
     'Redis documentation (data types, persistence, cluster spec, eviction)',
     'Memcached documentation',
   ],
@@ -356,7 +355,6 @@ tcp-keepalive 60`,
         'Single-threaded execution: one O(N) command stalls everyone.',
         'Persistence choice depends on whether Redis is a cache or a source of truth.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 10 (Redis sorted sets for leaderboards)',
     },
     {
       heading: 'Redis Cluster, replication and hash tags',

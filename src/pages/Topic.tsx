@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { usePageMotion } from '../lib/usePageMotion';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { PHASES, TOPICS, TOPIC_BY_ID } from '../content';
@@ -33,6 +33,8 @@ import {
   ListChecks,
   Lock,
   Mic,
+  Puzzle,
+  Star,
   Target,
   TriangleAlert,
   Zap,
@@ -42,6 +44,12 @@ import { projectsForTopic } from '../content/projects';
 import { CapstoneTab } from '../components/Capstone';
 import { vizForSection } from '../viz/registry';
 import { currentlyWrong, weakSections } from '../lib/weak';
+import { hasChallenges, puzzleKey, useChallengeSet } from '../challenges/registry';
+import { MODE_INFO } from '../challenges/ui/run';
+import type { ChallengeSet } from '../challenges/types';
+
+// the challenge engine and its puzzle data load only when the Challenge tab opens
+const ChallengeTab = lazy(() => import('../challenges/ui/ChallengeTab'));
 
 const STATUS = {
   new: { text: 'Not started', tone: '' },
@@ -51,7 +59,7 @@ const STATUS = {
 
 const DIFF_TONE: Record<Difficulty, string> = { medium: 'blue', hard: 'amber', expert: 'rose' };
 
-const TAB_IDS: TabId[] = ['learn', 'code', 'interview', 'envelope', 'cheat', 'capstone', 'exam'];
+const TAB_IDS: TabId[] = ['learn', 'code', 'interview', 'envelope', 'cheat', 'capstone', 'exam', 'challenge'];
 
 /** First-time tips, one per tab type (Settings → "Show coach tips"). */
 const TIPS: Record<TabId, { title: string; text: string }> = {
@@ -76,6 +84,10 @@ const TIPS: Record<TabId, { title: string; text: string }> = {
     title: 'Capstones:',
     text: 'build the project in your editor, run its judge command, and the test results appear here automatically.',
   },
+  challenge: {
+    title: 'The challenge:',
+    text: 'hands-on puzzles built from this topic. Drag (or tap, or use the keyboard) to fix flows, order steps, hunt faults, patch cables, tune knobs, route packets or survive traffic spikes. Fewer misses and hints earn more stars; your best is saved.',
+  },
   exam: {
     title: 'About the exam:',
     text: 'timed and shuffled. Only full-length attempts at or above the pass mark count. Questions you miss show up in Weak Areas.',
@@ -89,6 +101,7 @@ export default function TopicPage() {
   const [params, setParams] = useSearchParams();
   const topic = TOPIC_BY_ID.get(id);
   const p = useProgress();
+  const challengeSet = useChallengeSet(id);
   const tabParam = params.get('tab');
   // GSAP: the topic header staggers in once; each tab's cards reveal as they scroll into view
   const root = useRef<HTMLDivElement>(null);
@@ -103,7 +116,8 @@ export default function TopicPage() {
       </div>
     );
   }
-  const tab = (TAB_IDS.find((t) => t === params.get('tab')) ?? 'learn') as TabId;
+  const withChallenge = hasChallenges(topic.id);
+  const tab = (TAB_IDS.find((t) => t === params.get('tab') && (t !== 'challenge' || withChallenge)) ?? 'learn') as TabId;
   const phase = PHASES.find((ph) => ph.id === topic.phase);
   const idx = TOPICS.findIndex((t) => t.id === topic.id);
   const prev = TOPICS[idx - 1];
@@ -124,8 +138,12 @@ export default function TopicPage() {
   const selectTab = (t: TabId) => setParams({ tab: t }, { replace: true });
   // "Next up" target after the current tab: the following study-path step, else the next topic
   const stepIds = steps.map((s) => s.id as TabId);
-  const after = tab === 'cheat' ? (stepIds.includes('exam') ? 'exam' : undefined) : stepIds[stepIds.indexOf(tab) + 1];
-  const afterLabel = steps.find((s) => s.id === after)?.label;
+  const stepAfter: TabId | undefined =
+    tab === 'challenge' ? undefined : tab === 'cheat' ? (stepIds.includes('exam') ? 'exam' : undefined) : stepIds[stepIds.indexOf(tab) + 1];
+  // the end-of-topic challenge comes after the last study-path step
+  const after: TabId | undefined = stepAfter ?? (withChallenge && tab !== 'challenge' && tab !== 'learn' ? 'challenge' : undefined);
+  const afterLabel = after === 'challenge' ? 'Challenge' : steps.find((s) => s.id === after)?.label;
+  const challengeSummary = withChallenge ? challengeProgress(p.challenges, topic.id, challengeSet) : null;
   const nextUp = after ? (
     <NextUp
       lead={
@@ -233,13 +251,24 @@ export default function TopicPage() {
         locks={locks}
         onSelect={selectTab}
         counts={{ exam: topic.test.length, capstone: capstones.length }}
+        challenge={challengeSummary}
       />
 
       <CoachTip id={`tab-${tab}`} title={TIPS[tab].title}>
         {TIPS[tab].text}
       </CoachTip>
 
-      {tab === 'learn' && <LearnTab topic={topic} capstones={capstones} />}
+      {tab === 'learn' && (
+        <LearnTab
+          topic={topic}
+          capstones={capstones}
+          challenge={withChallenge ? { set: challengeSet, solved: challengeSummary?.solved ?? 0 } : null}
+          onChallenge={() => {
+            selectTab('challenge');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      )}
       {tab === 'code' && (
         <div className="tp-stack">
           {topic.codeChallenges.map((c, i) => (
@@ -252,6 +281,11 @@ export default function TopicPage() {
       {tab === 'cheat' && <CheatSheet topic={topic} />}
       {tab === 'capstone' && <CapstoneTab projects={capstones} />}
       {tab === 'exam' && (locks.exam ? <StudyLock topic={topic} what="exam" /> : <ExamIntro topic={topic} />)}
+      {tab === 'challenge' && (
+        <Suspense fallback={<div className="tp-panel tp-card muted">Loading the challenge…</div>}>
+          <ChallengeTab key={topic.id} topicId={topic.id} topicTitle={topic.title} />
+        </Suspense>
+      )}
       {!(tab === 'interview' && locks.interview) && !(tab === 'exam' && locks.exam) && nextUp}
 
       <nav className="tp-pager" aria-label="Previous and next topic">
@@ -283,7 +317,59 @@ function splitIntuition(body: string): { intuition?: string; rest: string } {
   return { intuition: m[1].trim(), rest: (m[2] ?? '').trim() };
 }
 
-function LearnTab({ topic, capstones }: { topic: Topic; capstones: CapstoneProject[] }) {
+/** solved / total puzzles of a topic's challenge (total 0 until the puzzle data has loaded) */
+function challengeProgress(records: Record<string, unknown> | undefined, topicId: string, set: ChallengeSet | null) {
+  const puzzles = set?.topic === topicId ? set.puzzles : [];
+  return { solved: puzzles.filter((x) => records?.[puzzleKey(topicId, x.id)]).length, total: puzzles.length };
+}
+
+/** "Ready for the challenge?" card at the end of the Learn tab */
+function ChallengeCta({ set, solved, onStart }: { set: ChallengeSet | null; solved: number; onStart: () => void }) {
+  const p = useProgress();
+  const puzzles = set?.puzzles ?? [];
+  const stars = puzzles.reduce((n, x) => n + (p.challenges?.[puzzleKey(set!.topic, x.id)]?.stars ?? 0), 0);
+  const modes = [...new Set(puzzles.map((x) => MODE_INFO[x.mode].name))];
+  const all = puzzles.length > 0 && solved >= puzzles.length;
+  return (
+    <section className="tp-panel tp-chal-cta glass-flat" aria-labelledby="chal-cta-h">
+      <span className="tp-chal-ic" aria-hidden>
+        <Puzzle size={22} />
+      </span>
+      <div className="tp-chal-text">
+        <div className="eyebrow tp-eb-amber">End-of-topic challenge</div>
+        <h2 id="chal-cta-h">{all ? 'Challenge complete' : solved ? 'Back to the challenge?' : 'Ready for the challenge?'}</h2>
+        <p>
+          {puzzles.length > 0 ? (
+            <>
+              {puzzles.length} hands-on puzzle{puzzles.length === 1 ? '' : 's'}: {modes.join(' · ')}.{' '}
+            </>
+          ) : null}
+          Put what you just read to work and earn up to three stars per puzzle.
+        </p>
+        {puzzles.length > 0 && (
+          <p className="tp-chal-stars mono">
+            <Star size={13} aria-hidden /> {stars}/{puzzles.length * 3} stars · {solved}/{puzzles.length} solved
+          </p>
+        )}
+      </div>
+      <button className={`btn ${all ? '' : 'btn-primary'}`} type="button" onClick={onStart}>
+        {all ? 'Play again' : solved ? 'Continue the challenge' : 'Start the challenge'} <ArrowRight size={16} aria-hidden />
+      </button>
+    </section>
+  );
+}
+
+function LearnTab({
+  topic,
+  capstones,
+  challenge,
+  onChallenge,
+}: {
+  topic: Topic;
+  capstones: CapstoneProject[];
+  challenge: { set: ChallengeSet | null; solved: number } | null;
+  onChallenge: () => void;
+}) {
   const p = useProgress();
   const read = new Set(p.sections[topic.id] ?? []);
   const readCount = topic.sections.filter((_, i) => read.has(i)).length;
@@ -466,6 +552,7 @@ function LearnTab({ topic, capstones }: { topic: Topic; capstones: CapstoneProje
             </button>
           </div>
         )}
+        {challenge && <ChallengeCta set={challenge.set} solved={challenge.solved} onStart={onChallenge} />}
       </div>
     </div>
   );

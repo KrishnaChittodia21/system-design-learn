@@ -14,7 +14,6 @@ const topic: Topic = {
     'AWS Builders\' Library — Static stability using Availability Zones; Shuffle sharding',
     'Google SRE Book — Ch 26 Data Integrity',
     'Principles of Chaos Engineering (principlesofchaos.org)',
-    'Alex Xu — System Design Interview Vol 2, Ch 7 (Hotel Reservation) & Ch 11 (Payment) for multi-DC notes',
   ],
   tags: ['disaster-recovery', 'rpo', 'rto', 'multi-region', 'active-active', 'failover', 'backups', 'cells', 'chaos-engineering', 'blast-radius'],
   cheatSheet: [

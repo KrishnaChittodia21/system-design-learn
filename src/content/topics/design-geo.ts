@@ -9,7 +9,6 @@ const topic: Topic = {
     'Geospatial indexing, real-time location fan-out, map tiles and routing, and ride-hailing dispatch — the designs where "where is it?" meets "how fast can I answer?".',
   estimatedMinutes: 160,
   sources: [
-    'Alex Xu & Sahn Lam — System Design Interview Vol 2, Ch 1 (Proximity Service), Ch 2 (Nearby Friends), Ch 3 (Google Maps)',
     'Uber Engineering — H3: Uber’s Hexagonal Hierarchical Spatial Index (2018)',
     'Uber Engineering — Scaling Uber’s Real-time Market Platform / Ringpop talks',
     'Geiger et al. — Contraction Hierarchies (2008); OpenStreetMap slippy map tile spec',
@@ -100,7 +99,6 @@ WHERE precision = 5
         'Turn 2-D proximity into 1-D keys (geohash/quadtree/S2) that a B-tree can range-scan.',
         'Geo index is small: replicate for read scale instead of sharding.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 1 (Proximity Service)',
     },
     {
       heading: 'Proximity Service (2/3): geospatial indexes — grid, geohash, quadtree, S2 & H3',
@@ -181,7 +179,7 @@ export function searchCells(lat: number, lng: number, precision: number): string
         'Always query cell + 8 neighbours, then filter by true distance.',
         'Quadtree adapts to density (~1.7 GB for 200M); S2 excels at region covering; H3 at uniform neighbourhoods.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 1; Uber H3 docs; Google S2 docs',
+      source: 'Uber H3 docs; Google S2 docs',
     },
     {
       heading: 'Proximity Service (3/3): architecture, scaling, caching & wrap-up',
@@ -263,7 +261,6 @@ export async function nearby(redis: Redis, lat: number, lng: number, radius: num
         '~5 GB geohash cache replicated per region; business objects cached separately.',
         'Exact-distance filter after the 9-cell fetch; nightly/CDC index refresh.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 1',
     },
     {
       heading: 'Nearby Friends (1/3): requirements & the fan-out math',
@@ -286,7 +283,6 @@ The 14M/s fan-out, not the 334K writes, drives the design. Friends distance filt
         'Occasional loss is acceptable — the next update supersedes it.',
         'Persistent bidirectional connections (WebSocket) for the real-time path.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 2 (Nearby Friends)',
     },
     {
       heading: 'Nearby Friends (2/3): architecture — WebSocket servers, location cache & Redis pub/sub',
@@ -375,7 +371,6 @@ export async function onConnect(ws: WebSocket, me: string, friends: string[]) {
         'Location cache with TTL = automatic inactivity; history in Cassandra.',
         'Per-user Redis pub/sub channels; distance filter at the subscriber.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 2',
     },
     {
       heading: 'Nearby Friends (3/3): scaling the WebSocket and pub/sub tiers',
@@ -421,7 +416,6 @@ export async function onConnect(ws: WebSocket, me: string, friends: string[]) {
         'Pub/sub tier is CPU-bound (~14M pushes/s → ~140 nodes), not memory-bound (~200 GB).',
         'Consistent-hash channels with the ring in etcd/ZooKeeper; Redis 7 sharded pub/sub for Cluster.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 2',
     },
     {
       heading: 'Google Maps (1/3): requirements, estimation & map tiles',
@@ -478,7 +472,6 @@ export function tilesForViewport(
         'Location updates batched every ~15 s: ~200K QPS avg, ~1M peak.',
         'Vector tiles cut bandwidth and render client-side; clients prefetch along route.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 3 (Google Maps)',
     },
     {
       heading: 'Google Maps (2/3): road graph, routing tiles, shortest path & ETA',
@@ -551,7 +544,6 @@ declare function unwind(prev: Map<string, string>, end: string): string[];`,
         'Three-level hierarchy (local/arterial/highway) keeps long searches small.',
         'Shortest path on static graph → ETA via ML on live+historical traffic → ranker.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 3',
     },
     {
       heading: 'Google Maps (3/3): location ingestion, adaptive ETA & rerouting, wrap-up',
@@ -590,7 +582,6 @@ Why HTTP for batched uploads rather than WebSocket? Updates are periodic, client
         'Adaptive ETA: index active navigations by tile hierarchy; push reroutes via WebSocket.',
         'Cost drivers: tile egress (CDN, vector tiles) and ETA recomputation.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 3',
     },
     {
       heading: 'Uber (1/3): requirements, estimation & driver location ingestion',

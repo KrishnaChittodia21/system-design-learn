@@ -14,7 +14,6 @@ const topic: Topic = {
     'Argo Rollouts documentation — Canary & Analysis',
     'Kubernetes documentation — Cluster components, Pod lifecycle, Init and sidecar containers, Vertical Pod Autoscaling, In-place resize (v1.33–v1.37)',
     'KEDA documentation — ScaledObject, ScaledJob, Kafka scaler; Karpenter documentation — NodePools and disruption',
-    'ByteByteGo — How Kubernetes Works, Top Kubernetes Scaling Strategies, The Lifecycle of a Kubernetes Pod, Kubernetes cheatsheet (2025)',
   ],
   tags: ['kubernetes', 'docker', 'canary', 'blue-green', 'hpa', 'probes', 'feature-flags', 'graceful-shutdown', 'migrations', 'rollback'],
   cheatSheet: [
@@ -921,7 +920,7 @@ kubectl get events --field-selector involvedObject.name=orders-api-5f7c-abc,reas
         'Readiness removes the pod from endpoints without a restart; liveness restarts the container.',
         'Native sidecars (init containers with restartPolicy Always) start first and stop last.',
       ],
-      source: 'Kubernetes docs — Cluster components, Pod lifecycle, Init containers, Sidecar containers (v1.33–v1.37); ByteByteGo — How Kubernetes Works, The Lifecycle of a Kubernetes Pod, Kubernetes cheatsheet (2025)',
+      source: 'Kubernetes docs — Cluster components, Pod lifecycle, Init containers, Sidecar containers (v1.33–v1.37)',
     },
     {
       heading: '14. Kubernetes scaling strategies: HPA, VPA, Cluster Autoscaler/Karpenter and KEDA',
@@ -1012,7 +1011,7 @@ spec:
         'KEDA does 0 ↔ 1 itself and hands 1 ↔ N to an HPA; the first event after idle pays the cold start.',
         'Replica ceilings come from partitions and DB connections, not from the autoscaler.',
       ],
-      source: 'Kubernetes docs — Autoscaling workloads, Vertical Pod Autoscaling, In-place resize (v1.35+); KEDA docs — ScaledObject, Kafka scaler; Karpenter docs — NodePools and disruption; ByteByteGo — Top Kubernetes Scaling Strategies (2025)',
+      source: 'Kubernetes docs — Autoscaling workloads, Vertical Pod Autoscaling, In-place resize (v1.35+); KEDA docs — ScaledObject, Kafka scaler; Karpenter docs — NodePools and disruption',
     },
   ],
   codeChallenges: [

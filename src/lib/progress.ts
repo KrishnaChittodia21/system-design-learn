@@ -37,6 +37,16 @@ export interface Settings {
 
 export type Accent = 'indigo' | 'teal' | 'rose' | 'amber';
 
+/** best result of one end-of-topic challenge puzzle (src/challenges), keyed `<topic>/<puzzle id>` */
+export interface ChallengeRecord {
+  /** best star rating so far (1–3); a record only exists once the puzzle was completed */
+  stars: 1 | 2 | 3;
+  /** completed plays */
+  plays: number;
+  /** ISO time of the first completion */
+  firstAt: string;
+}
+
 export interface Progress {
   tests: Record<string, TestRecord>;
   sections: Record<string, number[]>;
@@ -55,6 +65,11 @@ export interface Progress {
    * before achievements existed load unchanged; they are earned (and celebrated once) on the next evaluation.
    */
   achievements?: StoredAchievements;
+  /**
+   * end-of-topic challenge results: { '<topic>/<puzzle id>': ChallengeRecord }. Optional, so older saves load
+   * unchanged. Not part of topicCompletion or any percentage.
+   */
+  challenges?: Record<string, ChallengeRecord>;
   settings: Settings;
 }
 
@@ -207,6 +222,19 @@ export function setDraft(id: string, text: string) {
 
 export function setSettings(s: Partial<Settings>) {
   update((p) => ({ ...p, settings: { ...p.settings, ...s } }), false);
+}
+
+/** Record a completed challenge puzzle; keeps the best star rating. */
+export function recordChallenge(key: string, stars: 1 | 2 | 3) {
+  update((p) => {
+    const prev = p.challenges?.[key];
+    const rec: ChallengeRecord = {
+      stars: prev ? (Math.max(prev.stars, stars) as 1 | 2 | 3) : stars,
+      plays: (prev?.plays ?? 0) + 1,
+      firstAt: prev?.firstAt ?? new Date().toISOString(),
+    };
+    return { ...p, challenges: { ...p.challenges, [key]: rec } };
+  });
 }
 
 /** Store newly earned badges / tier-ups. Not study activity, and never downgrades a stored tier. */

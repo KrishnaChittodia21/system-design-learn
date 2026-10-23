@@ -10,7 +10,6 @@ const topic: Topic = {
   estimatedMinutes: 85,
   sources: [
     'Gaurav Sen — InterviewReady System Design course, "Building an Ecommerce App: 1 to 1M" (inspiration for the staged, analogy-first approach; all content here is original)',
-    'Alex Xu — System Design Interview Vol 1, Ch 1 "Scale From Zero To Millions Of Users"',
     'AWS documentation — RDS Multi-AZ, read replicas, ALB idle timeout, S3/CloudFront, data transfer pricing pages (prices quoted are approximate list prices; check current)',
     'PostgreSQL documentation — declarative partitioning, pg_trgm, pg_stat_statements',
     'Citus documentation — distributed tables and co-location',
@@ -91,7 +90,7 @@ The point of these numbers: 2K QPS is **not** big-tech scale. A few pods serve i
         '1M registered users is about 2K QPS at sale peak: modest compute, real database and spike problems.',
         'State the trigger metric, the change, and the new failure mode for each step.',
       ],
-      source: 'Inspired by Gaurav Sen (InterviewReady) "1 to 1M" and Alex Xu Vol 1 Ch 1; numbers are original estimates',
+      source: 'numbers are original estimates',
     },
     {
       heading: 'Stages 0–1 — One box, then split the database off (1 to ~10K users)',

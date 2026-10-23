@@ -9,7 +9,6 @@ const topic: Topic = {
     'ETL vs ELT, batch vs stream, lambda vs kappa, windows, event time and watermarks, exactly-once checkpoints, CDC with Debezium, lakes vs warehouses, real-time dashboards and reconciliation.',
   estimatedMinutes: 115,
   sources: [
-    'Alex Xu — System Design Interview Vol 2, Ch 6 Ad Click Event Aggregation',
     'Designing Data-Intensive Applications — Ch 10 (batch) & Ch 11 (stream processing)',
     'Apache Flink documentation (event time, watermarks, checkpointing)',
     'Debezium documentation (PostgreSQL connector, outbox event router)',
@@ -207,7 +206,6 @@ SELECT click_id, ad_id, user_id, ip, event_time FROM (
         'Kappa requires replayable history and capacity to reprocess.',
         'Hybrid: stream for freshness + batch reconciliation for correctness.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 6 (Lambda vs Kappa, reconciliation)',
     },
     {
       heading: 'Windowing: tumbling, hopping, sliding and session windows',
@@ -263,7 +261,6 @@ GROUP BY user_id, window_start, window_end;`,
         'Hopping multiplies state/output by size ÷ hop.',
         'Sessions can merge on late events; final only after the watermark passes.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 6 (aggregation windows)',
     },
     {
       heading: 'Event time vs processing time, watermarks and late data',
@@ -324,7 +321,6 @@ counts.getSideOutput(late).sinkTo(lateClicksSink);  // for reconciliation + metr
         'Watermark = max event time − delay; operator watermark = min over inputs.',
         'Idle partitions stall watermarks; late data needs an explicit policy.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 6 (event time, watermark)',
     },
     {
       heading: 'Exactly-once in streaming: checkpoints, 2PC sinks and idempotent writes',
@@ -379,7 +375,6 @@ restart-strategy.exponential-delay.max-backoff: 2min
         'Transactional sinks add latency ≥ checkpoint interval.',
         'Source-data duplicates still need business-level dedup.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 6 (exactly-once, recalculation)',
     },
     {
       heading: 'Change Data Capture with Debezium (and the outbox pattern)',
@@ -580,7 +575,6 @@ ORDER BY hour, clicks DESC;`,
         'OLAP dedup (ReplacingMergeTree) is eventual — use FINAL/argMax for exactness.',
         'Show data freshness on dashboards; cache queries for seconds.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 6 (aggregation, query service)',
     },
     {
       heading: 'Reconciliation, data quality and the pipeline scenario playbook',
@@ -633,7 +627,6 @@ LIMIT 1000;
         'Data quality: counts, uniqueness, nulls, freshness, contracts.',
         'Map each pipeline incident to its root cause before scaling anything.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 6 (reconciliation)',
     },
   ],
   codeChallenges: [

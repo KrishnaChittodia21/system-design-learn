@@ -9,7 +9,6 @@ const topic: Topic = {
     'How traffic is spread, why algorithms fail in surprising ways, consistent hashing with virtual nodes, health checks, LB tiers, long-lived connections and draining.',
   estimatedMinutes: 80,
   sources: [
-    'Alex Xu — System Design Interview Vol 1, Ch 5 Design Consistent Hashing',
     'Mastering API Architecture — Ch 3 (load balancers in the edge stack, failover pitfalls)',
     'Google Maglev paper (NSDI 2016); Mitzenmacher — The Power of Two Choices',
   ],
@@ -192,7 +191,7 @@ export class HashRing {
         '100–200 vnodes per node give ~10–5% load std-dev and even failover spread.',
         'Bounded-load variants and key replication handle hot keys.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 5; Google Maglev (NSDI 2016)',
+      source: 'Google Maglev (NSDI 2016)',
     },
     {
       heading: 'Sticky sessions (session affinity): convenience vs balance',

@@ -9,8 +9,6 @@ const topic: Topic = {
     'The production incidents of queue-based systems: slow APIs, 10× spikes, lag, crashes mid-message, duplicates, poison pills, ordering under retries, hot partitions and backpressure. For each one: symptoms, root cause, fix.',
   estimatedMinutes: 105,
   sources: [
-    'Alex Xu — System Design Interview Vol 2, Ch 4 Distributed Message Queue',
-    'Alex Xu — System Design Interview Vol 2, Ch 11 Payment System (retry queue, DLQ, idempotency)',
     'Uber Engineering — Reliable reprocessing with Kafka (retry topics and DLQs)',
     'AWS SQS Developer Guide (visibility timeout, DLQ redrive)',
   ],
@@ -221,7 +219,6 @@ spec:
         'Compute backlog and drain time; ensure retention covers both.',
         'Separate priority lanes; shed load at the edge if the backlog is beyond the SLO.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 4 (decoupling, buffering)',
     },
     {
       heading: 'Scenario: the consumer is slower than the producer',
@@ -465,7 +462,6 @@ while (!stopping) {
         'The dedup marker must commit atomically with the effect.',
         'Dedup on producer-assigned event ids, not offsets or payload hashes.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 11 (idempotency)',
     },
     {
       heading: 'Scenario: repeated failures → retry topics, DLQ, poison pills and redrive',
@@ -548,7 +544,6 @@ await retryConsumer.run({
         'Retry topics keep the main partition flowing; pause, don\'t sleep, until due.',
         'A DLQ needs alerts, context headers and a redrive tool — or it\'s a black hole.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 11 (retry queue and dead letter queue)',
     },
     {
       heading: 'Scenario: ordering is required — keys, per-key serialization and sequence numbers',

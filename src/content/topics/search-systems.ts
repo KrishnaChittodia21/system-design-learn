@@ -11,7 +11,6 @@ const topic: Topic = {
   sources: [
     'Elasticsearch Reference (8.x) — mapping, analysis, similarity, search_after, aliases',
     'Lucene / BM25: Robertson & Zaragoza — The Probabilistic Relevance Framework',
-    'Alex Xu — System Design Interview Vol 1, Ch 13 Search Autocomplete System',
   ],
   tags: ['elasticsearch', 'opensearch', 'lucene', 'inverted-index', 'bm25', 'autocomplete', 'fuzzy', 'cdc', 'relevance'],
   cheatSheet: [
@@ -470,7 +469,7 @@ export class AutocompleteTrie {
         'Edge n-grams for document typeahead with filters; completion suggester for pure speed.',
         'Query suggestion = offline top-k trie from query logs, cached at every node.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 13; Elasticsearch Reference — Completion suggester',
+      source: 'Elasticsearch Reference — Completion suggester',
     },
     {
       heading: 'Fuzzy search: Levenshtein distance and making it cheap',

@@ -17,7 +17,6 @@ const topic: Topic = {
     'LeetCode Discuss — Salesforce LMTS India interview experience (Sept 2025)',
     'DesignGurus — Dream11 and Paytm interview process guides',
     'DEV Community — "The replication lag question that shows up in most senior interviews"',
-    'ByteByteGo — Vertical vs horizontal partitioning; Crash course on database sharding',
     'Expand/contract migration write-ups (DEV Community, Substack) — "add a NOT NULL column to a 500M-row table", "rename a column read on every request"',
     'GitHub gh-ost and Percona pt-online-schema-change documentation',
   ],

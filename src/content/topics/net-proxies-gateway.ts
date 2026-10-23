@@ -10,7 +10,6 @@ const topic: Topic = {
   estimatedMinutes: 75,
   sources: [
     'Mastering API Architecture — Ch 3 API Gateways: Ingress Traffic Management',
-    'Alex Xu — System Design Interview Vol 1 (API gateway / rate limiter context)',
     'NGINX, Envoy and Kong official documentation',
   ],
   tags: ['reverse-proxy', 'forward-proxy', 'api-gateway', 'bff', 'edge', 'nginx', 'envoy', 'kong', 'north-south'],

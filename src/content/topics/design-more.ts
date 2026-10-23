@@ -9,7 +9,6 @@ const topic: Topic = {
     'Five designs that interviewers keep asking and that test different muscles: politeness and dedup at web scale, streaming heavy hitters with sketches, counting under extreme write contention, running untrusted code safely during a contest spike, and strongly consistent bidding against a deadline.',
   estimatedMinutes: 180,
   sources: [
-    'Alex Xu — System Design Interview Vol 1, Ch 9 (Design a Web Crawler)',
     'Heydon & Najork — Mercator: A Scalable, Extensible Web Crawler (1999); Najork & Heydon — High-Performance Web Crawling (2002)',
     'Manku, Jain & Das Sarma — Detecting Near-Duplicates for Web Crawling (WWW 2007, SimHash at Google)',
     'Cho & Garcia-Molina — Effective Page Refresh Policies for Web Crawlers (ACM TODS 2003)',
@@ -100,7 +99,7 @@ const topic: Topic = {
         '5B pages per 30 days is only ~2K pages/s; bandwidth and the global rate are not the hard part.',
         'Everything is keyed by a URL hash, so a sharded KV store is enough; checkpoint the frontier so a crash resumes instead of restarting.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 9; Hello Interview — Web Crawler breakdown',
+      source: 'Hello Interview — Web Crawler breakdown',
     },
     {
       heading: 'Web Crawler (2/3): the URL frontier — priority, politeness & DNS',
@@ -189,7 +188,7 @@ export class PoliteFrontier {
         'Shard the frontier by host so that politeness never needs a distributed lock.',
         'Cache DNS inside the crawler and avoid threadpool-bound getaddrinfo at thousands of lookups per second.',
       ],
-      source: 'Heydon & Najork — Mercator (1999); Alex Xu Vol 1, Ch 9',
+      source: 'Heydon & Najork — Mercator (1999)',
     },
     {
       heading: 'Web Crawler (3/3): dedup, traps, re-crawl policy & bottlenecks',
@@ -314,7 +313,7 @@ export function topK(counts: Map<string, number>, k: number): [string, number][]
         'A size-K min-heap gives O(n log K); memory O(distinct keys) is the real limit.',
         'Stream for fresh approximate results, batch over the raw log for exact charts (lambda).',
       ],
-      source: 'Hello Interview — YouTube Top K breakdown; Alex Xu Vol 2, Ch 6 (top-N clicked ads)',
+      source: 'Hello Interview — YouTube Top K breakdown',
     },
     {
       heading: 'Top-K / Trending (2/3): Count-Min Sketch, Space-Saving & mergeability',
@@ -451,7 +450,7 @@ export function updateBaseline(prev: number, hourCount: number, alpha = 0.05): n
         'Pre-aggregate at the edge or producer to tame hot items; slide windows by adding the new bucket and subtracting the expired one.',
         'Trending = velocity vs the item\'s own baseline, with a volume floor, unique-user dedup and decay.',
       ],
-      source: 'Hello Interview — YouTube Top K; Alex Xu Vol 2, Ch 6; Apache Flink docs (windows, checkpoints)',
+      source: 'Hello Interview — YouTube Top K; Apache Flink docs (windows, checkpoints)',
     },
     // ------------------------------------------------------------ COUNTERS
     {
@@ -904,7 +903,7 @@ FROM accepted a;`,
         'Fan out through per-auction pub/sub, coalesced to a few updates per second, with seq numbers for ordering.',
         'The cached price may only reject bids early; acceptance always goes through the authority.',
       ],
-      source: 'Hello Interview — Online Auction; Alex Xu Vol 2 (job scheduler patterns for timers)',
+      source: 'Hello Interview — Online Auction',
     },
     {
       heading: 'Level bar: what mid, senior and staff answers include',
@@ -1184,7 +1183,7 @@ export class EventLogCounter {
         'GetCount returns the cached {count, lastRollupTs} and triggers a rollup. The accurate variant adds a live delta scan.',
         'Costs: seconds of lag, idempotency only inside acceptLimit, lost in-memory triggers, and cross-region events that miss their window.',
       ],
-      source: 'Netflix TechBlog — Netflix\'s Distributed Counter Abstraction (Shringi, Tkachuk, Sathyanarayanan, Nov 2024); ByteByteGo — How Netflix Built a Distributed Counter (2025)',
+      source: 'Netflix TechBlog — Netflix\'s Distributed Counter Abstraction (Shringi, Tkachuk, Sathyanarayanan, Nov 2024)',
     },
     {
       heading: 'More streaming & probabilistic structures: lossy counting and cuckoo filters',
@@ -1355,7 +1354,7 @@ export class CuckooFilter {
         'Cuckoo filter: i2 = i1 XOR hash(fp) lets fingerprints move without their keys. Lookups read 2 buckets, b = 4 reaches ~95% load, and FPR ≤ 2b/2^f.',
         'Cuckoo deletes are only safe for items that were inserted. The filter fails inserts near capacity, where a Bloom filter degrades gradually instead.',
       ],
-      source: 'Manku & Motwani — Approximate Frequency Counts over Data Streams (VLDB 2002); Fan, Andersen, Kaminsky & Mitzenmacher — Cuckoo Filter: Practically Better Than Bloom (CoNEXT 2014); ByteByteGo — 12 Algorithms for System Design Interviews; 6 Data Structures to Save Storage (2025)',
+      source: 'Manku & Motwani — Approximate Frequency Counts over Data Streams (VLDB 2002); Fan, Andersen, Kaminsky & Mitzenmacher — Cuckoo Filter: Practically Better Than Bloom (CoNEXT 2014)',
     },
   ],
   codeChallenges: [

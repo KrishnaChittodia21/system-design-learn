@@ -9,8 +9,6 @@ const topic: Topic = {
     'Push vs pull CDNs, HTTP caching headers, origin shield, purge vs versioned URLs, GeoDNS vs Anycast, multi-region routing, data residency and edge compute.',
   estimatedMinutes: 95,
   sources: [
-    'Alex Xu — System Design Interview Vol 2, Ch 1 Proximity Service (multi-region deployment)',
-    'Alex Xu — System Design Interview Vol 2, Ch 9 S3-like Object Storage',
     'RFC 9111 (HTTP Caching), RFC 5861 (stale-while-revalidate / stale-if-error)',
     'Mastering API Architecture — Ch 3 (API gateways & edge)',
   ],
@@ -367,7 +365,6 @@ MumbaiHealth:
         'Home-region-per-user avoids multi-writer conflicts while still serving locally.',
         'Deep DR (RPO/RTO, promotion, drills) lives in rel-dr.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 1 (multi-region deployment)',
     },
     {
       heading: 'Data locality and residency',

@@ -35,4 +35,4 @@ Progress is saved in your browser's localStorage. You can reset it from Settings
 
 ## Adding content
 
-Topic files live in `src/content/topics/*.ts` and must match `src/types.ts`. See `CONTENT_GUIDE.md` for the quality rules, then run `npm run validate`.
+Topic files live in `src/content/topics/*.ts` and must match `src/types.ts`. Run `npm run validate` after adding or editing one.

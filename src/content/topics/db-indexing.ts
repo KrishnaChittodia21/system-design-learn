@@ -9,7 +9,6 @@ const topic: Topic = {
     'B-tree vs LSM vs hash vs GIN/GiST/BRIN, composite indexes and the leftmost-prefix rule, covering and partial indexes, reading EXPLAIN ANALYZE, finding slow queries, N+1 and DataLoader, keyset pagination, write amplification and timeouts.',
   estimatedMinutes: 110,
   sources: [
-    'Alex Xu — System Design Interview Vol 2, Ch 1 Proximity Service (geospatial indexing)',
     'PostgreSQL 16 docs — Ch 11 Indexes, Ch 14 Performance Tips (EXPLAIN)',
     'Markus Winand — Use The Index, Luke',
     'Mastering API Architecture — Ch 2 (API performance, pagination)',
@@ -112,7 +111,6 @@ CREATE INDEX CONCURRENTLY idx_orders_status_pending ON orders (created_at)
         'LSM trades read and compaction amplification for write throughput.',
         'CREATE INDEX CONCURRENTLY on production tables (slower, no write lock; can leave an INVALID index on failure).',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 1 Proximity Service',
     },
     {
       heading: 'Composite indexes and the leftmost-prefix rule',
@@ -667,7 +665,7 @@ SELECT live_items, avg_item_size, free_size FROM bt_page_stats('orders_pkey', 1)
         'Leaf splits copy the separator up and internal splits move it up. Height grows only at the root, so every leaf has the same depth.',
         'Page fill matters: random keys leave pages ~70% full and can add a level. Sequential keys pack pages near the fillfactor.',
       ],
-      source: 'Bayer & McCreight — Organization and Maintenance of Large Ordered Indexes (1972); Comer — The Ubiquitous B-Tree (1979); PostgreSQL 16 docs — B-Tree Indexes, pgstattuple, pageinspect; ByteByteGo — 5 Data Structures That Make DB Queries Super Fast; Database Index Types Every Developer Should Know (2025)',
+      source: 'Bayer & McCreight — Organization and Maintenance of Large Ordered Indexes (1972); Comer — The Ubiquitous B-Tree (1979); PostgreSQL 16 docs — B-Tree Indexes, pgstattuple, pageinspect',
     },
     {
       heading: 'Beyond the B+ tree: hash limits, bitmap indexes vs Postgres bitmap scans, and inverted (GIN) indexes',
@@ -745,7 +743,7 @@ CREATE INDEX idx_tickets_fts ON tickets
         'Postgres bitmap scans are built per query from regular indexes. When they outgrow work_mem they go lossy, which shows up as Heap Blocks: lossy and Index Recheck.',
         'Inverted/GIN: term → posting list, and AND means list intersection. Writes fan out to many keys, so fastupdate pending lists trade insert speed for merge pauses.',
       ],
-      source: 'PostgreSQL 16 docs — Hash Indexes, GIN Indexes (fastupdate, gin_pending_list_limit), Text Search indexes, Using EXPLAIN (bitmap scans); Oracle Database Concepts — Bitmap Indexes; MySQL 8 docs — Comparison of B-Tree and Hash Indexes, Adaptive Hash Index; ByteByteGo — 5 Data Structures That Make DB Queries Super Fast (2025)',
+      source: 'PostgreSQL 16 docs — Hash Indexes, GIN Indexes (fastupdate, gin_pending_list_limit), Text Search indexes, Using EXPLAIN (bitmap scans); Oracle Database Concepts — Bitmap Indexes; MySQL 8 docs — Comparison of B-Tree and Hash Indexes, Adaptive Hash Index',
     },
   ],
   codeChallenges: [

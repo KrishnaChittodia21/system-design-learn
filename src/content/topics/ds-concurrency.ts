@@ -9,8 +9,6 @@ const topic: Topic = {
     'Race conditions, optimistic vs pessimistic locking, atomic ops, Redis/etcd locks, fencing tokens and deadlocks — the bugs that only show up at 3 AM under load.',
   estimatedMinutes: 110,
   sources: [
-    'Alex Xu — System Design Interview Vol 2, Ch 7 Hotel Reservation (concurrency)',
-    'Alex Xu — System Design Interview Vol 2, Ch 11 Payment System (idempotency)',
     'Martin Kleppmann — How to do distributed locking (2016)',
     'Designing Data-Intensive Applications — Ch 7 & 8',
   ],
@@ -249,7 +247,6 @@ WHERE  id = 42 AND version = 7;
         'Great for low contention and long think-time; terrible for hot rows.',
         'Use integer versions, bounded retries with jitter, and 409/412 to clients.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 7 Hotel Reservation',
     },
     {
       heading: 'Pessimistic locking: SELECT ... FOR UPDATE, NOWAIT, SKIP LOCKED',
@@ -317,7 +314,6 @@ WHERE  id = 42 AND version = 7;
         'NOWAIT / lock_timeout bound waiting; SKIP LOCKED builds work queues.',
         'Never do network I/O while holding a row lock.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 7 Hotel Reservation',
     },
     {
       heading: 'Atomic operations & CAS: let the storage enforce the invariant',
@@ -442,7 +438,6 @@ FOR UPDATE;`,
         'Unique constraint + ON CONFLICT is the atomic "have I seen this?" check.',
         'Propagate the idempotency key to external APIs (PSPs).',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 11 Payment System',
     },
     {
       heading: 'Distributed locks with Redis: SET NX PX and safe release',

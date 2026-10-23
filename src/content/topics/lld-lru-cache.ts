@@ -15,7 +15,6 @@ const topic: Topic = {
     'Ben Manes — Caffeine design notes (W-TinyLFU, read/write buffers)',
     'O\'Neil, O\'Neil, Weikum — The LRU-K Page Replacement Algorithm (SIGMOD 1993); Johnson & Shasha — 2Q (VLDB 1994)',
     'Redis documentation — Key eviction (approximated LRU/LFU, maxmemory-samples)',
-    'Alex Xu — System Design Interview Vol 1, Ch 5–6 (consistent hashing, key-value store)',
   ],
   tags: [
     'lld',
@@ -75,7 +74,7 @@ const topic: Topic = {
         'The same idea runs at the CDN, L1, Redis and DB tiers, with different approximations.',
         'Design the core so the follow-ups (TTL, LFU, locks) reuse it.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 1, Ch 6 (key-value store); Redis docs — Key eviction',
+      source: 'Redis docs — Key eviction',
     },
     {
       heading: 'The data structure: why a hash map AND a doubly linked list',
@@ -1020,7 +1019,7 @@ export class WriteBackLRU<K, V> {
         'Consistent hashing gives local LRU per shard and moves ~1/N keys on resize.',
         'Redis: 24-bit clock per key + sampling (maxmemory-samples, default 5) + eviction pool; LFU reuses the bits.',
       ],
-      source: 'Redis docs — Key eviction / Approximated LRU algorithm; Alex Xu — System Design Interview Vol 1, Ch 5 (consistent hashing)',
+      source: 'Redis docs — Key eviction / Approximated LRU algorithm',
     },
   ],
   codeChallenges: [

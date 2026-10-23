@@ -9,9 +9,6 @@ const topic: Topic = {
     'Eight senior/staff-level case studies, each crisp but deep: Redis sorted-set leaderboards, a microsecond matching engine, a sharded cache tier, rate limiting across regions, typeahead and web search, real-time ad auctions, multi-stage recommenders, and tenant isolation in SaaS.',
   estimatedMinutes: 170,
   sources: [
-    'Alex Xu & Sahn Lam — System Design Interview Vol 2, Ch 10 Real-time Gaming Leaderboard',
-    'Alex Xu & Sahn Lam — System Design Interview Vol 2, Ch 13 Stock Exchange',
-    'Alex Xu — System Design Interview Vol 1, Ch 4 Rate Limiter, Ch 13 Search Autocomplete',
     'Nishtala et al. — Scaling Memcache at Facebook (NSDI 2013)',
     'Covington et al. — Deep Neural Networks for YouTube Recommendations (RecSys 2016)',
     'AWS SaaS Lens / SaaS Tenant Isolation Strategies whitepaper',
@@ -91,7 +88,6 @@ export async function myRankWithNeighbours(userId: string) {
         'Monthly key per tournament; old keys archived, then expired.',
         'Persist score events elsewhere; Redis is a rebuildable index.',
       ],
-      source: 'Alex Xu Vol 2 — Ch 10 Real-time Gaming Leaderboard',
     },
     {
       heading: 'Real-time gaming leaderboard (2/2): ties, sharding to 500M DAU and alternatives',
@@ -136,7 +132,6 @@ return points`,
         'Percentile ranks from histograms when exact rank isn\'t needed.',
         'Friends leaderboard: small set, compute on read.',
       ],
-      source: 'Alex Xu Vol 2 — Ch 10 (scaling Redis, alternative NoSQL solution)',
     },
     {
       heading: 'Stock exchange (1/3): requirements, estimation and the sequenced architecture',
@@ -177,7 +172,6 @@ Sequencer (out) ──► Order manager ──► gateway ──► broker
         'The sequencer makes inputs totally ordered, so matching is a replayable state machine.',
         'Market data and reporting are off the critical path.',
       ],
-      source: 'Alex Xu Vol 2 — Ch 13 Stock Exchange',
     },
     {
       heading: 'Stock exchange (2/3): the order book and price-time matching',
@@ -267,7 +261,6 @@ export class OrderBook {
         'Integer ticks, not floats; partial fills keep priority.',
         'L1/L2/L3 market data and candlesticks come from executions.',
       ],
-      source: 'Alex Xu Vol 2 — Ch 13 (order book, matching algorithms)',
     },
     {
       heading: 'Stock exchange (3/3): microsecond latency, event sourcing and failover',
@@ -307,7 +300,6 @@ export class OrderBook {
         'The event log is the truth; state is replayed; hot-warm engines for fast failover.',
         'Raft across servers for durability; the sequencer order defines fairness.',
       ],
-      source: 'Alex Xu Vol 2 — Ch 13 (performance, event sourcing, high availability)',
     },
     {
       heading: 'Distributed cache (1/2): partitioning, routing and replication',
@@ -459,7 +451,6 @@ return { allowed, math.floor(tokens) }`,
         'Define failure behaviour explicitly: fail-open within bounds vs conservative split.',
         'Sticky home-region routing when exactness matters.',
       ],
-      source: 'Alex Xu Vol 1 — Ch 4 Rate Limiter (extended to multi-region)',
     },
     {
       heading: 'Search autocomplete / typeahead: trie with cached top-k',
@@ -522,7 +513,6 @@ export function suggest(root: Node, prefix: string, limit = 5): string[] {
         'Shard by distribution-aware prefix ranges; browser and CDN caching.',
         'Client debounce and cancellation cut QPS a lot.',
       ],
-      source: 'Alex Xu Vol 1 — Ch 13 Design a Search Autocomplete System',
     },
     {
       heading: 'Web search engine: crawl, index, serve',

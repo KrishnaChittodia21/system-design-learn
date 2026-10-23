@@ -9,9 +9,6 @@ const topic: Topic = {
     'Five end-to-end case studies where a wrong answer costs real money: inventory that must never oversell, seats held under flash-sale load, carts that turn into orders, payments that must happen exactly once, and wallets that must balance to the paisa.',
   estimatedMinutes: 150,
   sources: [
-    'Alex Xu & Sahn Lam — System Design Interview Vol 2, Ch 7 Hotel Reservation System',
-    'Alex Xu & Sahn Lam — System Design Interview Vol 2, Ch 11 Payment System',
-    'Alex Xu & Sahn Lam — System Design Interview Vol 2, Ch 12 Digital Wallet',
     'Stripe Engineering — Designing robust and predictable APIs with idempotency',
     'Queue-it / Ticketmaster engineering talks — virtual waiting rooms',
   ],
@@ -69,7 +66,6 @@ The invariants you should state out loud in the first five minutes:
         'Correctness levers: DB constraints, idempotency keys, TTL holds, state machines, reconciliation.',
         'Write QPS in commerce is usually small; the hard part is contention and failure handling.',
       ],
-      source: 'Alex Xu Vol 2 — Ch 7, Ch 11, Ch 12 (framing)',
     },
     {
       heading: 'Hotel reservation (1/3): requirements, estimation, API and data model',
@@ -127,7 +123,6 @@ CREATE INDEX ON reservation (guest_id, created_at DESC);`,
         'Reserve room TYPES per date; specific rooms are assigned at check-in.',
         'Client-generated reservation_id as PK makes POST /reservations idempotent.',
       ],
-      source: 'Alex Xu Vol 2 — Ch 7 Hotel Reservation System',
     },
     {
       heading: 'Hotel reservation (2/3): architecture and the double-booking problem',
@@ -201,7 +196,6 @@ export async function reserve(r: {
         'A conditional UPDATE (check + increment in one statement) removes the race window.',
         'Multi-night stays: require rowCount === nights; touch rows in a consistent order.',
       ],
-      source: 'Alex Xu Vol 2 — Ch 7 (concurrency issues)',
     },
     {
       heading: 'Hotel reservation (3/3): scaling, caching and cross-service consistency',
@@ -225,7 +219,6 @@ export async function reserve(r: {
         'Update caches via CDC, not dual writes.',
         'Saga only around payment; compensation returns inventory.',
       ],
-      source: 'Alex Xu Vol 2 — Ch 7 (scalability, data consistency among microservices)',
     },
     {
       heading: 'Ticket booking (1/2): BookMyShow/Ticketmaster seat holds with TTL',
@@ -495,7 +488,6 @@ Buyer ◄── PSP hosted payment page (card data never touches us) ◄──�
         'Hosted payment page keeps raw card data out of your systems.',
         'payment_order_id doubles as the PSP idempotency key.',
       ],
-      source: 'Alex Xu Vol 2 — Ch 11 Payment System',
     },
     {
       heading: 'Payment system (2/3): the double-entry ledger',
@@ -561,7 +553,6 @@ GRANT SELECT, INSERT ON ledger_entry, ledger_txn TO payments_app;`,
         'Unique external_ref makes posting idempotent.',
         'Integer minor units + currency code, never floats.',
       ],
-      source: 'Alex Xu Vol 2 — Ch 11 (double-entry ledger system)',
     },
     {
       heading: 'Payment system (3/3): idempotency, retries, webhooks and reconciliation',
@@ -626,7 +617,6 @@ export class IdempotencyInterceptor implements NestInterceptor {
         'Webhooks: verify signature, dedupe on event id, forward-only state transitions.',
         'Nightly reconciliation against settlement files is mandatory.',
       ],
-      source: 'Alex Xu Vol 2 — Ch 11 (retry, idempotency, reconciliation)',
     },
     {
       heading: 'Digital wallet (1/2): 1M TPS, in-memory vs DB, and distributed transactions',
@@ -684,7 +674,6 @@ export async function transfer(
         'Debit first, credit second; in-flight money sits in a system account.',
         'A phase status table enables crash recovery; phases must be idempotent.',
       ],
-      source: 'Alex Xu Vol 2 — Ch 12 Digital Wallet (distributed transactions)',
     },
     {
       heading: 'Digital wallet (2/2): event sourcing, CQRS and Raft-replicated state',
@@ -759,7 +748,6 @@ export class WalletStateMachine {
         'Replicate the event log with Raft; state follows.',
         'Snapshots bound recovery; CQRS projections serve reads.',
       ],
-      source: 'Alex Xu Vol 2 — Ch 12 (event sourcing, CQRS, Raft)',
     },
     {
       heading: 'Wrap-up: trade-offs across the five designs',

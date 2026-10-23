@@ -10,8 +10,6 @@ const topic: Topic = {
   estimatedMinutes: 85,
   sources: [
     'Martin Kleppmann — Designing Data-Intensive Applications, Ch 5 & 9',
-    'Alex Xu — System Design Interview Vol 1, Ch 6 (Key-value store)',
-    'Alex Xu — System Design Interview Vol 2, Ch 12 (Digital Wallet)',
     'DeCandia et al. — Dynamo: Amazon\'s Highly Available Key-value Store (2007)',
     'Daniel Abadi — Consistency Tradeoffs in Modern Distributed Database System Design (PACELC, 2012)',
     'Jepsen consistency models map (jepsen.io/consistency)',
@@ -325,7 +323,7 @@ export async function quorumRead(replicas: Replica[], key: string, R: number, W:
         'Quorum latency = W-th / R-th fastest replica; W=2 of 3 hides one slow node.',
         'Sloppy quorums trade the overlap guarantee for write availability; hinted handoff heals later.',
       ],
-      source: 'Dynamo paper (2007); Alex Xu Vol 1 Ch 6',
+      source: 'Dynamo paper (2007)',
     },
     {
       heading: 'Anti-entropy: read repair, Merkle trees, and why repairs are mandatory',
@@ -492,7 +490,6 @@ export class PNCounter {
         'Read-your-writes for the actor fixes most "my change disappeared" complaints.',
         'Home-region mastering keeps latency local while keeping per-user data strongly consistent.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 7, 11, 12',
     },
   ],
   codeChallenges: [

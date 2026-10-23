@@ -24,7 +24,6 @@ const topic: Topic = {
     'Shopify Engineering — A Pods Architecture to Allow Shopify to Scale (Xavier Denis, March 2018)',
     'Bart de Water — Shopify\'s Architecture to Handle the World\'s Biggest Flash Sales (QCon Plus, InfoQ, Oct 2022)',
     'Shopify — Black Friday Cyber Monday 2024 press release (SEC exhibit 99.1, Dec 2024)',
-    'ByteByteGo — 2025 archive (Airbnb evolution, Netflix scaling, Shopify stack, modular monoliths), used as a reading list only; every fact here is checked against the original source',
   ],
   tags: [
     'case-study',

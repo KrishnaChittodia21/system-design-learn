@@ -9,7 +9,6 @@ const topic: Topic = {
     'Block vs file vs object, S3 internals (data/metadata split, placement, erasure coding, checksums), multipart & presigned uploads, resumable uploads, dedup, lifecycle tiers, CDN delivery and video streaming.',
   estimatedMinutes: 120,
   sources: [
-    'Alex Xu — System Design Interview Vol 2, Ch 9 S3-like Object Storage',
     'AWS S3 User Guide — multipart upload limits, lifecycle, presigned URLs',
     'tus.io — Resumable Upload Protocol 1.0',
     'Apple HLS Authoring Specification / MPEG-DASH (ISO/IEC 23009-1)',
@@ -67,7 +66,6 @@ const topic: Topic = {
         'Object storage has no rename: a "folder move" is N copies + N deletes. Design keys you never need to rename.',
         'File storage metadata servers are the scaling wall for billions of small files.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 9',
     },
     {
       heading: '2. S3 high-level architecture — separate metadata from data',
@@ -105,7 +103,6 @@ Since December 2020 AWS S3 provides **strong read-after-write consistency** for 
         'Data store is addressed by UUID only; names, buckets and versions live in metadata.',
         'Both halves scale independently: add data nodes for capacity, add metadata shards for object count/QPS.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 9 (Figures 9.4–9.6)',
     },
     {
       heading: '3. Data store internals — routing, placement and data nodes',
@@ -161,7 +158,6 @@ COMMIT;`,
         'Pack small objects into multi-GB append-only files; seal to read-only; one RW file per core.',
         'Acking on primary only is fast but can lose acknowledged writes — object stores normally wait for a quorum/all.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 9 (Data store, Figures 9.8–9.13)',
     },
     {
       heading: '4. Durability — replication vs erasure coding, failure domains, checksums',
@@ -222,7 +218,6 @@ export async function readVerified(
         'EC reads fan out to ≥8 nodes — tail latency and repair bandwidth are the hidden costs.',
         'Durability = f(copy count, failure-domain independence, repair speed, corruption detection).',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 9 (Durability, Erasure coding, Correctness verification)',
     },
     {
       heading: '5. Metadata DB design — schema, sharding, listing, versioning',
@@ -281,7 +276,6 @@ LIMIT 1000;                            -- caller drops rows whose object_id IS N
         'Listing = prefix + delimiter roll-up; use a bucket-sharded listing index and keyset cursors.',
         'Versioned DELETE = delete marker; storage is only freed by NoncurrentVersionExpiration.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 9 (Metadata data model, Listing, Versioning)',
     },
     {
       heading: '6. Multipart upload — how big files actually get in',
@@ -354,7 +348,7 @@ export class MultipartService {
         'Incomplete MPUs are billed and invisible — lifecycle AbortIncompleteMultipartUpload is mandatory.',
         'Multipart ETag ≠ MD5 of file; use part checksums or additional checksum algorithms.',
       ],
-      source: 'Alex Xu — System Design Interview Vol 2, Ch 9 (Optimizing uploads of large files); AWS S3 multipart limits',
+      source: 'AWS S3 multipart limits',
     },
     {
       heading: '7. Presigned URLs — let clients talk to the bucket directly',
@@ -507,7 +501,7 @@ export async function chunkDigests(path: string): Promise<string[]> {
         'tus: POST create, HEAD offset, PATCH from offset; Tus-Resumable header on every request.',
         'Content addressing gives dedup + integrity for free; dedup server-side or per tenant; refcount deletes.',
       ],
-      source: 'tus.io Resumable Upload Protocol 1.0; Alex Xu Vol 2 Ch 9',
+      source: 'tus.io Resumable Upload Protocol 1.0',
     },
     {
       heading: '9. Lifecycle policies, storage tiers and garbage collection',
@@ -567,7 +561,7 @@ export async function chunkDigests(path: string): Promise<string[]> {
         'Per-object transition fees and minimum sizes/durations make tiering tiny objects a loss.',
         'Expire noncurrent versions and abort stale MPUs — the two most common invisible cost leaks.',
       ],
-      source: 'AWS S3 pricing & lifecycle docs; Alex Xu Vol 2 Ch 9 (Garbage collection)',
+      source: 'AWS S3 pricing & lifecycle docs',
     },
     {
       heading: '10. CDN in front of object storage — global downloads without melting origin',
@@ -689,7 +683,7 @@ ffmpeg -i original.mp4 \\
         'CMAF fMP4 segments can serve both HLS and DASH — store once.',
         'Transcode in parallel chunks from a queue; segments immutable on CDN, live manifests short TTL.',
       ],
-      source: 'Apple HLS Authoring Specification; MPEG-DASH; Alex Xu Vol 1 (YouTube design)',
+      source: 'Apple HLS Authoring Specification; MPEG-DASH',
     },
     {
       heading: '12. Scenario playbook — what to say when the interviewer throws these at you',

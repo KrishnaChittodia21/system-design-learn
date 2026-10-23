@@ -12,7 +12,6 @@ const topic: Topic = {
     'Ongaro & Ousterhout — In Search of an Understandable Consensus Algorithm (Raft, 2014)',
     'Leslie Lamport — Paxos Made Simple (2001); Time, Clocks, and the Ordering of Events (1978)',
     'Martin Kleppmann — Designing Data-Intensive Applications, Ch 8 & 9; "How to do distributed locking" (2016)',
-    'Alex Xu — System Design Interview Vol 2, Ch 12 (Digital Wallet — Raft) & Ch 13 (Stock Exchange)',
     'Corbett et al. — Spanner (TrueTime, 2012); Kulkarni et al. — Hybrid Logical Clocks (2014)',
     'etcd and ZooKeeper documentation',
   ],

@@ -9,7 +9,6 @@ const topic: Topic = {
     'Fixed window, sliding log, sliding window counter, token bucket and leaky bucket — implemented, compared and distributed across a fleet, with the headers, placement and fail-open/fail-closed decisions interviewers probe.',
   estimatedMinutes: 85,
   sources: [
-    'Alex Xu — System Design Interview Vol 1, Ch 4 Design a Rate Limiter (referenced by Vol 2)',
     'Stripe Engineering — Scaling your API with rate limiters',
     'Cloudflare Blog — How we built rate limiting capable of scaling to millions of domains',
     'IETF draft-ietf-httpapi-ratelimit-headers; RFC 6585 (429); RFC 9110 (Retry-After)',
