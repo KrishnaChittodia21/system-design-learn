@@ -11,7 +11,7 @@
    App .chip is a filter toggle (.chip.on). The mockup's mono uppercase label chip is .nb-chip
    (variants .blue .cyan .amber .mag .rose .green). Other mockup primitives keep their mockup names:
    .glass .glass-flat .gborder>.in .holo .gtext .lede .num .mono .dot .track>i(.f-pass|.f-prog) .nb-ring
-   .rise .d1–.d6 .pulse .pulse-a .orbit(.slow|.rev)>.orbit-dot .flow .pkt .ping .blink, svg helpers .sv-* .st-*,
+   .pulse .pulse-a .orbit(.slow|.rev)>.orbit-dot .flow .pkt .ping .blink, svg helpers .sv-* .st-*,
    code island pre.code + .codehead. Layout container: .nb-wrap (the mockup's .wrap collides with .row.wrap).
    ===================================================================== */
 
@@ -835,27 +835,8 @@ pre.code .ty {
 }
 
 /* ---------- motion utilities ---------- */
-.rise {
-  animation: nb-rise 0.9s var(--ease-out) both;
-}
-.d1 {
-  animation-delay: 0.07s;
-}
-.d2 {
-  animation-delay: 0.14s;
-}
-.d3 {
-  animation-delay: 0.21s;
-}
-.d4 {
-  animation-delay: 0.28s;
-}
-.d5 {
-  animation-delay: 0.35s;
-}
-.d6 {
-  animation-delay: 0.42s;
-}
+/* page entrances and scroll reveals run in GSAP (lib/gsap.ts: heroIn, revealOnScroll); nb-rise is kept for
+   in-page reveal panels */
 @keyframes nb-rise {
   from {
     opacity: 0;

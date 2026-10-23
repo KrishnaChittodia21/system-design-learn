@@ -148,7 +148,7 @@ export function DashboardMetrics({ p, topics, readiness, firstExamHref }: { p: P
           empty={
             ratings.rated ? undefined : (
               <>
-                <p>Answer an interview question out loud, then rate yourself nailed, partial or missed. Your mix shows up here.</p>
+                <p>Answer an interview question out loud, then rate yourself nailed, partial or missed.</p>
                 <Link className="btn" to="/contents">
                   Find interview questions
                 </Link>

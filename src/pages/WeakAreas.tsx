@@ -41,11 +41,11 @@ export function WeakAreasPage() {
   if (!answered) {
     return (
       <div className="page wk-page">
-        <header className="wk-head rise">
+        <header className="wk-head">
           <div className="eyebrow">Diagnostics</div>
           <h1>Weak areas</h1>
         </header>
-        <section className="wk-empty glass rise d1" aria-label="Nothing to analyse yet">
+        <section className="wk-empty glass" aria-label="Nothing to analyse yet">
           <div className="wk-empty-art" aria-hidden>
             <span className="wk-empty-ring r1" />
             <span className="wk-empty-ring r2" />
@@ -77,7 +77,7 @@ export function WeakAreasPage() {
   const overallPct = pct(overall);
   return (
     <div className="page wk-page">
-      <header className="wk-head rise">
+      <header className="wk-head">
         <div className="eyebrow">Diagnostics</div>
         <h1>Weak areas</h1>
         <p className="lead">
@@ -86,7 +86,7 @@ export function WeakAreasPage() {
         </p>
       </header>
 
-      <section className="wk-summary glass rise d1" aria-label="Summary">
+      <section className="wk-summary glass" aria-label="Summary">
         <div className="wk-kpi">
           <div className="eyebrow">Overall accuracy</div>
           <div className={`num wk-kpi-num ${toneFor(overallPct)}`}>
@@ -140,13 +140,13 @@ export function WeakAreasPage() {
       )}
 
       <div className="wk-list">
-        {weak.map((w, i) => {
+        {weak.map((w) => {
           const total = w.topic.test.length || 1;
           const share = Math.round((w.wrong.length / total) * 100);
           const tone = w.attempts > 0 && !w.passed ? 'rose' : 'amber';
           const maxSec = Math.max(1, ...w.sections.map((s) => s.missed.length));
           return (
-            <article key={w.topic.id} className={`wk-topic card ${tone} rise d${Math.min(6, i + 2)}`}>
+            <article key={w.topic.id} className={`wk-topic card ${tone}`}>
               <div className="wk-topic-head">
                 <div className="wk-topic-title">
                   <div className="wk-chips">
@@ -294,7 +294,7 @@ export function PracticePage() {
         <Link to="/weak-areas" className="ex-back">
           <ArrowLeft size={15} aria-hidden /> Weak areas
         </Link>
-        <section className="wk-empty glass rise" aria-labelledby="pr-empty-h">
+        <section className="wk-empty glass" aria-labelledby="pr-empty-h">
           <div className={`wk-empty-art ${attempted ? 'done' : ''}`} aria-hidden>
             <span className="wk-empty-ring r1" />
             <span className="wk-empty-ring r2" />

@@ -92,8 +92,9 @@ export default function TopicPage() {
   const tabParam = params.get('tab');
   // GSAP: the topic header staggers in once; each tab's cards reveal as they scroll into view
   const root = useRef<HTMLDivElement>(null);
-  usePageMotion(root, { intro: ':scope > .tp-crumbs, :scope > .tp-hero, :scope > .tp-tabs', deps: [id] });
-  usePageMotion(root, { reveal: '.tp-sec, .tp-stack > article, .tp-stack > section, :scope > .tp-panel', deps: [id, tabParam] });
+  // breadcrumbs and tabs are navigation and the Learn sections are long-form reading, so neither animates in
+  usePageMotion(root, { intro: ':scope > .tp-hero', deps: [id] });
+  usePageMotion(root, { reveal: '.tp-stack > article, .tp-stack > section, :scope > .tp-panel', deps: [id, tabParam] });
   if (!topic) {
     return (
       <div className="page">

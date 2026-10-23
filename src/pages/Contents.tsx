@@ -258,10 +258,12 @@ export default function ContentsPage() {
   };
   const setAll = (value: boolean) => setOpen(Object.fromEntries(PHASES.map((ph) => [ph.id, value])));
 
-  // GSAP: heading, sheet and filters stagger in; phase rows reveal as they scroll into view (phase bodies use Framer Motion)
+  // GSAP: the heading enters with the syllabus sheet (media); filters stay put; phase rows reveal as they scroll into
+  // view (phase bodies use Framer Motion)
   const root = useRef<HTMLDivElement>(null);
   usePageMotion(root, {
-    intro: '.ct-head > *, :scope > .ct-sheet, :scope > .ct-tools',
+    intro: '.ct-head',
+    introMedia: ':scope > .ct-sheet',
     reveal: '.ct-rows > .ct-phase',
   });
 
