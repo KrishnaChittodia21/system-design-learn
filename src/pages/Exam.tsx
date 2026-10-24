@@ -7,6 +7,7 @@ import { CountUp } from '../components/CountUp';
 import { NextUp } from '../components/NextUp';
 import type { Difficulty, MCQ } from '../types';
 import { recordAnswers, recordTest, useProgress } from '../lib/progress';
+import { commiserate } from '../lib/commiserate';
 import { weakSections } from '../lib/weak';
 import { practiceLocked } from '../lib/stats';
 import { StudyLock } from './Topic';
@@ -126,7 +127,8 @@ export function Exam({ title, questions, recordTopicId, backHref }: ExamProps) {
     setPhase('done');
   }, []);
 
-  // record result once when finishing a full-length exam
+  // record result once when finishing a full-length exam (and commiserate once if it's below the pass mark)
+  const passMark = p.settings.passMark;
   const recorded = useRef(false);
   useEffect(() => {
     if (phase === 'running') recorded.current = false;
@@ -134,8 +136,9 @@ export function Exam({ title, questions, recordTopicId, backHref }: ExamProps) {
       recorded.current = true;
       recordAnswers(items.map((it) => ({ id: it.q.id, correct: sameSet(answers[it.q.id] ?? [], it.q.correct) })));
       if (recordTopicId && items.length === total) recordTest(recordTopicId, score);
+      if (items.length && score < passMark) commiserate(`Not yet — ${score}%`, 'Every miss is a pointer. Review the answers below, then retake.');
     }
-  }, [phase, items, answers, total, recordTopicId, score]);
+  }, [phase, items, answers, total, recordTopicId, score, passMark]);
 
   // countdown
   useEffect(() => {

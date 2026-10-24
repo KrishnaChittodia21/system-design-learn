@@ -10,6 +10,7 @@ import { Board, type BoardEdgeView, type BoardNodeView } from './Board';
 import { Frame, NodeText } from './kit';
 import { MODE_INFO, useRun, type GameProps } from './run';
 import { useDrag } from './useDrag';
+import { commiserate } from '../../lib/commiserate';
 import { replayClass, useReducedMotion, useWidth } from './hooks';
 
 type Speed = 1 | 2 | 0;
@@ -95,6 +96,7 @@ export default function SpikeGame({ puzzle, best, onComplete, onReset, next }: G
       return;
     }
     run.miss();
+    commiserate('The spike won this round', 'Check what broke below, change a card and run it again.');
     const b = breaches[0];
     const g = puzzle.goals[b.goal];
     const hot = b.hot ? ` ${label(b.hot)} was at ${formatNum(all.find((x) => x.t === b.t)!.util[b.hot] * 100)}% of its capacity.` : '';

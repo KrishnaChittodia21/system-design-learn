@@ -275,7 +275,7 @@ export default function SettingsPage() {
                     onClick={() => {
                       resetProgress();
                       closeConfirm();
-                      showToast('Progress reset', 'A clean slate. Settings were kept.');
+                      showToast('Progress reset', 'A clean slate. Settings were kept.', 3000, 'gentle');
                     }}
                   >
                     <RotateCcw size={15} aria-hidden /> Yes, reset everything

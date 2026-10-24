@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { PartyPopper, X } from 'lucide-react';
+import { PartyPopper, RotateCcw, X } from 'lucide-react';
 import { dismissToast, useToasts } from '../lib/toast';
 
 /** Bottom-right toasts (celebrations), above the mobile tab bar. Announced politely to screen readers. */
@@ -12,7 +12,7 @@ export function Toaster() {
         {toasts.map((t) => (
           <motion.div
             key={t.id}
-            className="toast glass"
+            className={`toast glass${t.tone === 'gentle' ? ' gentle' : ''}`}
             layout={!reduce}
             initial={reduce ? { opacity: 0 } : { opacity: 0, y: 16, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -20,7 +20,7 @@ export function Toaster() {
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
           >
             <span className="toast-icon" aria-hidden>
-              <PartyPopper size={18} />
+              {t.tone === 'gentle' ? <RotateCcw size={18} /> : <PartyPopper size={18} />}
             </span>
             <div className="toast-body">
               <strong>{t.title}</strong>
