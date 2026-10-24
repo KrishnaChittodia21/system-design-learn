@@ -610,6 +610,16 @@
   color: var(--on-accent);
   box-shadow: 0 8px 20px -10px var(--cyan-g);
 }
+/* "not yet" toasts after a failed attempt: calm tile and a warm top line instead of the celebration gradient */
+.toast.gentle::before {
+  background: var(--amber);
+}
+.toast.gentle .toast-icon {
+  background: var(--surface-2);
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+  box-shadow: none;
+}
 .toast-body {
   flex: 1;
   min-width: 0;
